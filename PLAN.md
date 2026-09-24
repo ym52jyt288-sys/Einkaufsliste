@@ -24,6 +24,24 @@ Selbsttest online 80/80. Prüfung auf dem iPhone durch den Nutzer steht noch aus
 - Kamera-Scan (braucht HTTPS → erst nach GitHub Pages), Standort, Offline-Betrieb, Home-Bildschirm, Wischen.
 - Claude-Fotoerkennung: nicht mit echtem Schlüssel getestet.
 
+### Überarbeitung 24.09.2026 (Runde 2)
+- **Schnellauswahl** (Chips) erscheint nur noch in der Listenansicht. Sie ist personalisierbar: Artikel anheften (immer zuerst),
+  ausblenden, Anzahl 6/9/12/18, ganz abschaltbar. Verwaltet wird sie unter Einstellungen → Schnellauswahl oder per langem Druck auf einen Chip.
+- **Farben je Bereich** (`BEREICHE` in `katalog.js`: 8 Bereiche, Sonstiges bleibt grau). Es gibt drei Schemata (`FARBSCHEMATA`
+  in `index.html`), alle aus derselben geprüften Referenzpalette mit 8 Farbtönen und je einem Wert für hell und dunkel.
+  Die Zuordnung ist per Skript gewählt (Validator aus dem dataviz-Skill, ΔE in OKLab, benachbarte Bereiche im Standard-Laufweg):
+  | Schema | Normalsicht (min. ΔE, Grenze 15) | Rot-Grün-Schwäche (min. ΔE, Ziel 8 / Untergrenze 6) |
+  |---|---|---|
+  | Markt (warenbezogen) | 19,6 hell / 19,7 dunkel | 6,9 / 6,5 – Untergrenze, zulässig weil die Abteilung immer beschriftet ist |
+  | Kontrast | 19,6 / 19,3 | 9,2 / 9,4 |
+  | Ruhig (4 Zonen, alle Paare geprüft) | 19,6 / 19,3 | 13,0 / 6,9 |
+  Einzelfarben für alle 20 Abteilungen wären nicht unterscheidbar; deshalb gibt es Bereiche. Darstellung: Streifen oder farbige Zeilen, abschaltbar.
+- **Hell / Dunkel / Automatisch** umschaltbar (`data-theme` auf `<html>`).
+- **Autovervollständigung** zeigt je Katalogeintrag nur noch einen Vorschlag (kein „Tomate“ neben „Tomaten“).
+- **Mengen mit Einheit** Stück / g / kg / ml / l: eintippen („500 g Hack“, „Kartoffeln 2 kg“) oder im Detailblatt umschalten
+  (g↔kg und ml↔l werden umgerechnet). Der Verlauf merkt sich die zuletzt genutzte Menge mit Einheit.
+- Selbsttest jetzt 97/97.
+
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
 |---|---|---|

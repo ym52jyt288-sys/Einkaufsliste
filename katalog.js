@@ -236,3 +236,16 @@ const OFF_KATEGORIEN = [
   ['alcoholic-beverages', 'getraenke'], ['beverages', 'getraenke'],
   ['fruits', 'obst'], ['vegetables', 'gemuese'],
 ];
+
+// Bereiche im Laden: fassen Abteilungen für die Farbmarkierung zusammen.
+// Mehr als acht Farben lassen sich nicht zuverlässig unterscheiden, daher Bereiche statt Einzelfarben.
+const BEREICHE = [
+  { id: 'frische',   name: 'Obst & Gemüse',       abteilungen: ['gemuese', 'obst'] },
+  { id: 'brot',      name: 'Brot',                abteilungen: ['brot'] },
+  { id: 'kuehl',     name: 'Kühlregal',           abteilungen: ['molkerei', 'kaese', 'kuehlveg'] },
+  { id: 'fleisch',   name: 'Fleisch & Fisch',     abteilungen: ['fleisch', 'fisch'] },
+  { id: 'trocken',   name: 'Trockenwaren',        abteilungen: ['fruehstueck', 'nudeln', 'konserven', 'oel', 'backen', 'suess'] },
+  { id: 'getraenke', name: 'Getränke',            abteilungen: ['pflanzendrink', 'getraenke'] },
+  { id: 'tk',        name: 'Tiefkühl',            abteilungen: ['tk'] },
+  { id: 'nonfood',   name: 'Drogerie & Haushalt', abteilungen: ['drogerie', 'haushalt'] },
+];

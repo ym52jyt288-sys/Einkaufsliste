@@ -7,8 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Einkauf">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" id="themeFarbe">
 <link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
 <title>Einkaufsliste</title>
@@ -21,12 +20,15 @@
     --line: #e6e6ea;
     --accent: #2e6b4f;
     --accent-weich: #e7f0eb;
+    --accent-text: #ffffff;
     --danger: #b3261e;
     --sheet: #ffffff;
     --schatten: 0 10px 40px rgba(0,0,0,.18);
+    color-scheme: light;
   }
+  /* Dunkel: nach Systemeinstellung, außer „Hell“ ist gewählt – oder ausdrücklich „Dunkel“ */
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --bg: #111214;
       --bg2: #1c1d20;
       --fg: #f2f2f5;
@@ -34,10 +36,26 @@
       --line: #2a2b2f;
       --accent: #6fbf95;
       --accent-weich: #1d2c24;
+      --accent-text: #0c1a13;
       --danger: #ef6b62;
       --sheet: #1a1b1e;
       --schatten: 0 10px 40px rgba(0,0,0,.6);
+      color-scheme: dark;
     }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111214;
+    --bg2: #1c1d20;
+    --fg: #f2f2f5;
+    --muted: #8d8d94;
+    --line: #2a2b2f;
+    --accent: #6fbf95;
+    --accent-weich: #1d2c24;
+    --accent-text: #0c1a13;
+    --danger: #ef6b62;
+    --sheet: #1a1b1e;
+    --schatten: 0 10px 40px rgba(0,0,0,.6);
+    color-scheme: dark;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--bg); color: var(--fg); }
@@ -83,6 +101,7 @@
 
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .chip {
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
     height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid var(--line);
     font-size: 15px; background: var(--bg);
   }
@@ -143,9 +162,8 @@
     background: linear-gradient(to top, var(--bg) 70%, transparent);
   }
   .knopf {
-    width: 100%; height: 50px; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 600; font-size: 17px;
+    width: 100%; height: 50px; border-radius: 12px; background: var(--accent); color: var(--accent-text); font-weight: 600; font-size: 17px;
   }
-  @media (prefers-color-scheme: dark) { .knopf { color: #0c1a13; } }
   .knopf.zweit { background: var(--bg2); color: var(--fg); }
   .knopf.gefahr { background: transparent; color: var(--danger); border: 1px solid var(--line); }
   .knopf:disabled { opacity: .45; }
@@ -211,6 +229,45 @@
   .pruef label { display: flex; align-items: center; gap: 12px; flex: 1; min-height: 50px; }
   .pruef .marke { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; margin-left: auto; white-space: nowrap; }
   .pruef input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+
+  /* Farbmarkierung der Abteilungen (--zf wird pro Zeile/Gruppe gesetzt, Werte kommen aus #farbStil) */
+  .farbig .item { padding-left: 12px; }
+  .farbig .item::before {
+    content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 4px; border-radius: 2px; background: var(--zf);
+  }
+  .farbig.flaeche .item { background: color-mix(in srgb, var(--zf) 11%, var(--bg)); }
+  .farbig.flaeche .item.erledigt { background: var(--bg); }
+  .farbig .item.erledigt::before { opacity: .35; }
+  .farbig .gruppe h2 > span:first-child { display: flex; align-items: center; gap: 8px; }
+  .farbig .gruppe h2 > span:first-child::before {
+    content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--zf); flex: none;
+  }
+  .punkt { display: none; width: 8px; height: 8px; border-radius: 50%; background: var(--zf); flex: none; }
+  .farbig .punkt { display: inline-block; }
+
+  /* Menge und Einheit */
+  .einheiten { display: flex; background: var(--bg2); border-radius: 9px; padding: 2px; margin-top: 8px; }
+  .einheiten button { flex: 1; height: 36px; border-radius: 7px; font-size: 15px; color: var(--muted); }
+  .einheiten button.an { background: var(--bg); color: var(--fg); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .stepper input {
+    width: 84px; height: 44px; border: 0; background: transparent; text-align: center; font-size: 17px; font-weight: 600;
+    font-variant-numeric: tabular-nums; outline: none;
+  }
+  .stepper .einheit { color: var(--muted); padding-right: 6px; min-width: 24px; }
+
+  /* Auswahlkarten (Farbschema, Darstellung) */
+  .wahl { display: grid; gap: 8px; }
+  .wahl button {
+    display: block; width: 100%; text-align: left; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line);
+  }
+  .wahl button.an { border-color: var(--accent); background: var(--accent-weich); }
+  .wahl .titel { font-weight: 600; }
+  .wahl .text-muted { display: block; margin-top: 2px; font-size: 13px; }
+  .muster { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; }
+  .muster span { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  .muster i { width: 14px; height: 14px; border-radius: 4px; background: var(--c); }
+  .segment.klein { margin-top: 8px; }
+  .chip.gepinnt { border-color: var(--accent); }
 
   /* Scanner */
   .scanner { position: fixed; inset: 0; z-index: 50; background: #000; color: #fff; }
@@ -321,8 +378,17 @@ const STARTVERLAUF = ['Haferflocken', 'Milch', 'Salat', 'Zucchini', 'Pilze', 'La
 
 const S = {
   liste: [], verlauf: {}, korrekturen: {}, eans: {}, profile: [], aktivesProfil: 'supermarkt',
-  einstellungen: { ansicht: 'liste', apiKey: '', standort: false },
+  einstellungen: null,
 };
+
+function standardEinstellungen() {
+  return {
+    ansicht: 'liste', apiKey: '', standort: false,
+    thema: 'system',                                        // system | light | dark
+    farben: { an: true, schema: 'markt', stil: 'streifen' }, // stil: streifen | flaeche
+    chips: { an: true, anzahl: 12, angeheftet: [], ausgeblendet: [] },
+  };
+}
 
 function ladeAlles() {
   S.liste = lade('liste', []);
@@ -331,7 +397,8 @@ function ladeAlles() {
   S.eans = lade('eans', {});
   S.profile = lade('profile', null) || standardProfile();
   S.aktivesProfil = lade('aktivesProfil', S.profile[0].id);
-  S.einstellungen = Object.assign({ ansicht: 'liste', apiKey: '', standort: false }, lade('einstellungen', {}));
+  const std = standardEinstellungen(), gel = lade('einstellungen', {});
+  S.einstellungen = { ...std, ...gel, farben: { ...std.farben, ...(gel.farben || {}) }, chips: { ...std.chips, ...(gel.chips || {}) } };
   for (const i of S.liste) if (!ABT_IDS.includes(i.abteilung)) i.abteilung = klassifiziere(i.name).abt;
   if (!S.verlauf) {
     S.verlauf = {};
@@ -504,11 +571,37 @@ function korrigiere(name) {
    Eingabe zerlegen
    ============================================================ */
 
+// „2 Milch“, „3x Eier“, „500 g Hack“, „1,5l Milch“, „Hack 500g“ → { menge, einheit, name, explizit }
 function parseMenge(text) {
-  const m = String(text).trim().match(/^(\d+(?:[.,]\d+)?)\s*(?:x|×|stk\.?|stück)?\s+(.+)$/i);
-  if (m) return { menge: parseFloat(m[1].replace(',', '.')), name: m[2].trim() };
-  return { menge: 1, name: String(text).trim() };
+  const t = String(text).trim();
+  const EINH = '(x|×|stk\\.?|stück|g|gr|gramm|kg|kilo|ml|l|liter|ltr)';
+  let m = t.match(new RegExp(`^(\\d+(?:[.,]\\d+)?)\\s*${EINH}?\\s+(.+)$`, 'i'));
+  if (m) return { menge: parseFloat(m[1].replace(',', '.')), einheit: einheitAus(m[2]), name: m[3].trim(), explizit: true };
+  m = t.match(new RegExp(`^(.+?)\\s+(\\d+(?:[.,]\\d+)?)\\s*(g|gr|kg|ml|l|liter)\\.?$`, 'i'));
+  if (m) return { menge: parseFloat(m[2].replace(',', '.')), einheit: einheitAus(m[3]), name: m[1].trim(), explizit: true };
+  return { menge: 1, einheit: 'stk', name: t, explizit: false };
 }
+const EINHEITEN_MENGE = ['stk', 'g', 'kg', 'ml', 'l'];
+const EINHEIT_NAME = { stk: 'Stück', g: 'g', kg: 'kg', ml: 'ml', l: 'l' };
+const EINHEIT_SCHRITT = { stk: 1, g: 50, kg: 0.5, ml: 100, l: 0.5 };
+const EINHEIT_START = { stk: 1, g: 500, kg: 1, ml: 500, l: 1 };
+function einheitAus(roh) {
+  const e = String(roh || '').toLowerCase().replace('.', '');
+  if (/^(g|gr|gramm)$/.test(e)) return 'g';
+  if (/^(kg|kilo)$/.test(e)) return 'kg';
+  if (/^ml$/.test(e)) return 'ml';
+  if (/^(l|liter|ltr)$/.test(e)) return 'l';
+  return 'stk';
+}
+const zahlText = n => String(Math.round(n * 1000) / 1000).replace('.', ',');
+// Anzeige: Stück nur ab 2, Gewicht/Volumen immer mit Einheit
+function mengeText(item) {
+  const e = item.einheit || 'stk';
+  const m = item.menge || EINHEIT_START[e];
+  if (e === 'stk') return m !== 1 ? zahlText(m) : '';
+  return `${zahlText(m)} ${EINHEIT_NAME[e]}`;
+}
+
 function zerlegeEingabe(text) {
   return String(text).split(/[,;\n]+|\s+und\s+|\s+&\s+/i).map(t => t.trim()).filter(Boolean).map(parseMenge).filter(x => x.name);
 }
@@ -529,24 +622,34 @@ function merkeVerlauf(item) {
   v.abteilung = item.abteilung;
   if (item.stamm) v.stamm = true;
   if (item.ean) v.ean = item.ean;
+  // Gewicht/Volumen merken, damit „Hackfleisch“ beim nächsten Mal gleich mit 500 g kommt
+  if (item.einheit && item.einheit !== 'stk') { v.einheit = item.einheit; v.menge = item.menge; }
+  else { delete v.einheit; delete v.menge; }
   S.verlauf[key] = v;
 }
 
 // Fügt einen Artikel hinzu oder erhöht die Menge, wenn er schon offen auf der Liste steht.
-function hinzufuegen(rohName, menge = 1, extra = {}) {
+// menge = null heißt: nichts angegeben → zuletzt verwendete Menge mit Einheit (bei g/kg/ml/l), sonst 1 Stück.
+function hinzufuegen(rohName, menge = null, extra = {}) {
   const name = gross(korrigiere(rohName.trim()));
   if (!name) return null;
   const key = kompakt(name);
+  const v = S.verlauf[key];
+  let einheit = extra.einheit || 'stk';
+  if (menge == null) {
+    if (v && v.einheit) { einheit = v.einheit; menge = v.menge || EINHEIT_START[einheit]; }
+    else menge = 1;
+  }
   let item = S.liste.find(i => kompakt(i.name) === key && (!i.erledigt || i.stamm));
   if (item && !item.erledigt && !item.pausiert) {
-    item.menge = (item.menge || 1) + (menge || 1);
+    if ((item.einheit || 'stk') === einheit) item.menge = (item.menge || 1) + menge;
+    else { item.einheit = einheit; item.menge = menge; }
   } else if (item) {
-    item.erledigt = false; item.pausiert = false; item.erledigtUm = null; item.menge = menge || 1;
+    item.erledigt = false; item.pausiert = false; item.erledigtUm = null; item.menge = menge; item.einheit = einheit;
     S.liste.splice(S.liste.indexOf(item), 1); S.liste.push(item);
   } else {
-    const v = S.verlauf[key];
     item = {
-      id: uid(), name, menge: menge || 1, abteilung: extra.abteilung || klassifiziere(name).abt,
+      id: uid(), name, menge, einheit, abteilung: extra.abteilung || klassifiziere(name).abt,
       stamm: !!(v && v.stamm), erledigt: false, erledigtUm: null,
     };
     if (extra.notiz) item.notiz = extra.notiz;
@@ -586,7 +689,12 @@ function einkaufAbschliessen() {
   const neu = [];
   for (const item of S.liste) {
     if (item.stamm) {
-      if (item.erledigt || item.pausiert) { item.erledigt = false; item.pausiert = false; item.erledigtUm = null; item.menge = 1; }
+      if (item.erledigt || item.pausiert) {
+        item.erledigt = false; item.pausiert = false; item.erledigtUm = null;
+        item.menge = EINHEIT_START[item.einheit || 'stk'];
+        const v = S.verlauf[kompakt(item.name)];
+        if (v && v.einheit === item.einheit && v.menge) item.menge = v.menge;
+      }
       neu.push(item);
     } else if (!item.erledigt) {
       neu.push(item);
@@ -626,17 +734,25 @@ function istBekannt(name) {
   return !!(r && r.art === 'exakt' && r.ganz);
 }
 
+// Katalogeintrag, zu dem ein Name gehört (fasst Singular/Plural und Synonyme zusammen)
+function eintragVon(name) {
+  const r = erkenne(name);
+  return r && r.ganz && (r.art === 'exakt' || r.art === 'fuzzy') ? r.e.name : null;
+}
+
 function vorschlaege(text) {
   const { name } = parseMenge(text);
   const t = kompakt(name);
   const tw = norm(name);
   if (t.length < 2) return [];
   const aus = [];
-  const gesehen = new Set();
-  const nimm = (n, art, hinweis) => {
+  const gesehen = new Set();   // kompakte Namen
+  const eintraege = new Set(); // Katalogeinträge: „Tomate“ und „Tomaten“ nur einmal
+  const nimm = (n, art, hinweis, eintrag) => {
     const k = kompakt(n);
-    if (gesehen.has(k) || aus.length >= 5) return;
+    if (aus.length >= 5 || gesehen.has(k) || (eintrag && eintraege.has(eintrag))) return;
     gesehen.add(k);
+    if (eintrag) eintraege.add(eintrag);
     aus.push({ name: n, art, hinweis });
   };
   const offenKeys = new Set(offene().map(i => kompakt(i.name)));
@@ -646,31 +762,135 @@ function vorschlaege(text) {
   const ausVerlauf = Object.entries(S.verlauf)
     .filter(([k, v]) => k.startsWith(t) || norm(v.name).split(' ').some(w => w.startsWith(tw)))
     .sort((a, b) => (b[1].anzahl - a[1].anzahl) || (b[1].zuletzt - a[1].zuletzt));
-  for (const [, v] of ausVerlauf) nimm(v.name, 'verlauf', hinweisFuer(v.name));
+  for (const [, v] of ausVerlauf) nimm(v.name, 'verlauf', hinweisFuer(v.name), eintragVon(v.name));
 
-  // Katalog: Anfang eines Begriffs, kurze zuerst
-  const ausKatalog = INDEX_KEYS.filter(k => k.startsWith(t)).sort((a, b) => a.length - b.length);
-  for (const k of ausKatalog) {
+  // Katalog: je Eintrag ein Vorschlag – der Hauptname, wenn er zum Getippten passt, sonst die kürzeste passende Schreibweise
+  const proEintrag = new Map();
+  for (const k of INDEX_KEYS) {
+    if (!k.startsWith(t)) continue;
     const e = INDEX.get(k);
-    nimm(e.fehler ? e.name : e.text, 'praefix', ABT_NAME[e.abt]);
+    const bisher = proEintrag.get(e.name);
+    if (!bisher || k.length < bisher.key.length) proEintrag.set(e.name, e);
   }
+  const ausKatalog = [...proEintrag.values()].map(e => {
+    const haupt = kompakt(e.name);
+    const text = haupt.startsWith(t) || e.fehler ? e.name : e.text;
+    return { text, e, laenge: kompakt(text).length };
+  }).sort((a, b) => a.laenge - b.laenge);
+  for (const { text, e } of ausKatalog) nimm(text, 'praefix', ABT_NAME[e.abt], e.name);
 
   // Tippfehler
   if (aus.length < 5 && t.length >= 5 && !INDEX.has(t)) {
     const f = naechsterTreffer(t);
-    if (f) nimm(f.e.fehler ? f.e.name : f.e.text, 'fuzzy', 'Korrektur');
+    if (f) nimm(f.e.fehler ? f.e.name : f.e.text, 'fuzzy', 'Korrektur', f.e.name);
   }
   // Exakt Getipptes nicht als Vorschlag wiederholen
   return aus.filter(v => kompakt(v.name) !== t || v.art === 'verlauf').slice(0, 5);
 }
 
-function haeufige() {
-  const offenKeys = new Set(offene().map(i => kompakt(i.name)));
-  return Object.entries(S.verlauf)
-    .filter(([k]) => !offenKeys.has(k))
-    .sort((a, b) => (b[1].anzahl - a[1].anzahl) || (b[1].zuletzt - a[1].zuletzt))
-    .slice(0, 12).map(([, v]) => v.name);
+// Schnellauswahl: angeheftete Artikel zuerst, dann die häufigsten; ausgeblendete nie.
+// Artikel, die schon offen auf der Liste stehen, werden weggelassen.
+function haeufige({ alle = false } = {}) {
+  const c = S.einstellungen.chips;
+  const offenKeys = alle ? new Set() : new Set(offene().map(i => kompakt(i.name)));
+  const weg = new Set(c.ausgeblendet);
+  const aus = [];
+  const gesehen = new Set();
+  for (const n of c.angeheftet) {
+    const k = kompakt(n);
+    if (!offenKeys.has(k) && !gesehen.has(k)) { gesehen.add(k); aus.push({ name: n, gepinnt: true }); }
+  }
+  const auto = Object.entries(S.verlauf)
+    .filter(([k]) => !offenKeys.has(k) && !weg.has(k) && !gesehen.has(k))
+    .sort((a, b) => (b[1].anzahl - a[1].anzahl) || (b[1].zuletzt - a[1].zuletzt));
+  for (const [k, v] of auto) {
+    if (aus.length >= c.anzahl) break;
+    gesehen.add(k); aus.push({ name: v.name, gepinnt: false });
+  }
+  return aus.slice(0, Math.max(c.anzahl, c.angeheftet.length));
 }
+function hefteAn(name) {
+  const c = S.einstellungen.chips, k = kompakt(name);
+  if (!c.angeheftet.some(n => kompakt(n) === k)) c.angeheftet.push(name);
+  c.ausgeblendet = c.ausgeblendet.filter(x => x !== k);
+  sichereEinstellungen();
+}
+function loeseAn(name) {
+  const c = S.einstellungen.chips, k = kompakt(name);
+  c.angeheftet = c.angeheftet.filter(n => kompakt(n) !== k);
+  sichereEinstellungen();
+}
+function blendeAus(name) {
+  const c = S.einstellungen.chips, k = kompakt(name);
+  loeseAn(name);
+  if (!c.ausgeblendet.includes(k)) c.ausgeblendet.push(k);
+  sichereEinstellungen();
+}
+
+/* ============================================================
+   Farben und Hell/Dunkel
+   ============================================================ */
+
+// Alle Farbwerte stammen aus einer geprüften Referenzpalette (acht Farbtöne, je ein Wert für hell und dunkel).
+// Die Zuordnung zu den Bereichen ist per Skript so gewählt, dass im Standard-Laufweg benachbarte Bereiche
+// auch bei Rot-Grün-Schwäche unterscheidbar bleiben (ΔE in OKLab). Die Beschriftung der Abteilungen bleibt
+// immer sichtbar – die Farbe ist eine Orientierungshilfe, nie die einzige Information.
+const FARBTOENE = {
+  blau: ['#2a78d6', '#3987e5'], orange: ['#eb6834', '#d95926'], tuerkis: ['#1baf7a', '#199e70'], gelb: ['#eda100', '#c98500'],
+  pink: ['#e87ba4', '#d55181'], gruen: ['#008300', '#008300'], violett: ['#4a3aa7', '#9085e9'], rot: ['#e34948', '#e66767'],
+};
+const NEUTRAL = ['#8a8a90', '#8d8d94'];
+const FARBSCHEMATA = [
+  { id: 'markt', name: 'Markt', text: 'Farben passend zur Ware: Gemüse grün, Brot gelb, Kühlregal blau, Fleisch rot.',
+    // Prüfung: Normalsicht ΔE ≥ 19,6 · Rot-Grün-Schwäche ΔE 6,9 hell / 6,5 dunkel (mit Beschriftung zulässig)
+    bereiche: { frische: 'gruen', brot: 'gelb', kuehl: 'blau', fleisch: 'rot', trocken: 'tuerkis', getraenke: 'orange', tk: 'violett', nonfood: 'pink' } },
+  { id: 'kontrast', name: 'Kontrast', text: 'Größtmöglicher Abstand zwischen benachbarten Bereichen, auch bei Rot-Grün-Schwäche.',
+    // Prüfung: Normalsicht ΔE ≥ 19,3 · Rot-Grün-Schwäche ΔE 9,2 hell / 9,4 dunkel (Ziel ≥ 8 erfüllt)
+    bereiche: { frische: 'orange', brot: 'tuerkis', kuehl: 'blau', fleisch: 'gelb', trocken: 'pink', getraenke: 'gruen', tk: 'violett', nonfood: 'rot' } },
+  { id: 'ruhig', name: 'Ruhig', text: 'Nur vier Farben für die großen Zonen: Frisch, Kühlung, Trocken, Drogerie.',
+    // Prüfung über alle Paare: Normalsicht ΔE ≥ 19,3 · Rot-Grün-Schwäche ΔE 13,0 hell / 6,9 dunkel
+    zonen: [
+      { name: 'Frisch', ton: 'gruen', bereiche: ['frische', 'brot'] },
+      { name: 'Kühlung', ton: 'blau', bereiche: ['kuehl', 'fleisch', 'tk'] },
+      { name: 'Trocken & Getränke', ton: 'gelb', bereiche: ['trocken', 'getraenke'] },
+      { name: 'Drogerie & Haushalt', ton: 'pink', bereiche: ['nonfood'] },
+    ] },
+];
+const BEREICH_VON = Object.fromEntries(BEREICHE.flatMap(b => b.abteilungen.map(a => [a, b.id])));
+
+// Farbton je Abteilung im gewählten Schema; Sonstiges bleibt neutral
+function tonFuer(schema, abt) {
+  const bereich = BEREICH_VON[abt];
+  if (!bereich) return null;
+  if (schema.zonen) return (schema.zonen.find(z => z.bereiche.includes(bereich)) || {}).ton || null;
+  return schema.bereiche[bereich] || null;
+}
+// Legende eines Schemas: Liste von { name, ton }
+function legende(schema) {
+  if (schema.zonen) return schema.zonen.map(z => ({ name: z.name, ton: z.ton }));
+  return BEREICHE.map(b => ({ name: b.name, ton: schema.bereiche[b.id] }));
+}
+const aktuellesSchema = () => FARBSCHEMATA.find(f => f.id === S.einstellungen.farben.schema) || FARBSCHEMATA[0];
+const zf = abt => `--zf:var(--z-${abt})`;
+
+function wendeDarstellungAn() {
+  const e = S.einstellungen;
+  const root = document.documentElement;
+  if (e.thema === 'light' || e.thema === 'dark') root.dataset.theme = e.thema; else delete root.dataset.theme;
+  const dunkel = e.thema === 'dark' || (e.thema !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+  $('#themeFarbe').content = dunkel ? '#111214' : '#ffffff';
+
+  const schema = aktuellesSchema();
+  const vars = i => ABT_IDS.map(a => { const t = tonFuer(schema, a); return `--z-${a}:${t ? FARBTOENE[t][i] : NEUTRAL[i]};`; }).join('');
+  let stil = $('#farbStil');
+  if (!stil) { stil = document.createElement('style'); stil.id = 'farbStil'; document.head.appendChild(stil); }
+  stil.textContent = `:root{${vars(0)}}
+    @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${vars(1)}}}
+    :root[data-theme="dark"]{${vars(1)}}`;
+  document.body.classList.toggle('farbig', !!e.farben.an);
+  document.body.classList.toggle('flaeche', e.farben.stil === 'flaeche');
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { if (S.einstellungen) wendeDarstellungAn(); });
 
 /* ============================================================
    Darstellung
@@ -685,11 +905,12 @@ function sortiert(items) {
 }
 
 function zeileHTML(item, mitAbteilung) {
-  const menge = item.menge && item.menge !== 1 ? `<span class="menge">${esc(String(item.menge).replace('.', ','))}</span>` : '';
+  const m = mengeText(item);
+  const menge = m ? `<span class="menge">${esc(m)}</span>` : '';
   const sub = item.notiz ? `<span class="sub">${esc(item.notiz)}</span>` : '';
   const zuordnen = item.abteilung === 'sonstiges' && !item.erledigt ? '<button type="button" class="zuordnen" data-aktion="zuordnen">zuordnen</button>' : '';
-  const abt = mitAbteilung && item.abteilung !== 'sonstiges' ? `<span>${esc(ABT_NAME[item.abteilung] || '')}</span>` : '';
-  return `<li class="zeile" data-id="${item.id}">
+  const abt = mitAbteilung && item.abteilung !== 'sonstiges' ? `<span class="punkt"></span><span>${esc(ABT_NAME[item.abteilung] || '')}</span>` : '';
+  return `<li class="zeile" data-id="${item.id}" style="${zf(item.abteilung)}">
     <div class="wisch${item.stamm ? ' pause' : ''}">${item.stamm ? 'Diesmal nicht' : 'Löschen'}</div>
     <div class="item${item.erledigt ? ' erledigt' : ''}">
       <button type="button" class="check" data-aktion="abhaken" aria-label="${item.erledigt ? 'Zurückholen' : 'Abhaken'}"><span>${ICON_HAKEN}</span></button>
@@ -724,7 +945,7 @@ function render() {
       const items = gruppen(abt);
       if (!items.length) return '';
       const erledigt = items.filter(i => i.erledigt).length;
-      return `<section class="gruppe"><h2><span>${esc(ABT_NAME[abt] || abt)}</span><span>${erledigt ? `${erledigt}/${items.length}` : items.length}</span></h2>
+      return `<section class="gruppe" style="${zf(abt)}"><h2><span>${esc(ABT_NAME[abt] || abt)}</span><span>${erledigt ? `${erledigt}/${items.length}` : items.length}</span></h2>
         <ul class="artikel">${sortiert(items).map(i => zeileHTML(i, false)).join('')}</ul></section>`;
     };
     html += reihenfolge.filter(a => !p.ausgeblendet.includes(a)).map(gruppeHTML).join('');
@@ -759,10 +980,12 @@ function renderHilfe() {
     chips.hidden = true;
   } else {
     vs.hidden = true;
-    const zeigen = document.activeElement === feld || !S.liste.some(i => !i.pausiert);
-    const namen = zeigen ? haeufige() : [];
-    chips.hidden = !namen.length;
-    chips.innerHTML = namen.map(n => `<button type="button" class="chip" data-chip="${esc(n)}">${esc(n)}</button>`).join('');
+    // Schnellauswahl nur in der Listenansicht – im Laden zählt jeder Zentimeter Bildschirm
+    const zeigen = S.einstellungen.chips.an && S.einstellungen.ansicht === 'liste'
+      && (document.activeElement === feld || !S.liste.some(i => !i.pausiert));
+    const liste = zeigen ? haeufige() : [];
+    chips.hidden = !liste.length;
+    chips.innerHTML = liste.map(c => `<button type="button" class="chip${c.gepinnt ? ' gepinnt' : ''}" data-chip="${esc(c.name)}">${esc(c.name)}</button>`).join('');
   }
 }
 
@@ -794,7 +1017,7 @@ function blitze(id) {
 
 function eintragen(eintraege) {
   let letztes = null;
-  for (const { name, menge } of eintraege) letztes = hinzufuegen(name, menge) || letztes;
+  for (const { name, menge, einheit, explizit } of eintraege) letztes = hinzufuegen(name, explizit ? menge : null, { einheit }) || letztes;
   sichereListe(); sichereVerlauf();
   render();
   if (letztes) blitze(letztes.id);
@@ -809,7 +1032,7 @@ $('#formEingabe').addEventListener('submit', e => {
   // Ein einzelner unbekannter Begriff: den ersten Vorschlag (Ergänzung oder Korrektur) übernehmen
   if (eintraege.length === 1 && !istBekannt(eintraege[0].name)) {
     const v = vorschlaege(text)[0];
-    if (v && kompakt(v.name) !== kompakt(eintraege[0].name)) eintraege = [{ name: v.name, menge: eintraege[0].menge }];
+    if (v && kompakt(v.name) !== kompakt(eintraege[0].name)) eintraege = [{ ...eintraege[0], name: v.name }];
   }
   feld.value = '';
   eintragen(eintraege);
@@ -827,13 +1050,37 @@ $('#vorschlaege').addEventListener('click', e => {
   const b = e.target.closest('[data-vorschlag]');
   if (!b) return;
   const v = $('#vorschlaege')._liste[+b.dataset.vorschlag];
-  const { menge } = parseMenge($('#eingabe').value);
+  const p = parseMenge($('#eingabe').value);
   $('#eingabe').value = '';
-  eintragen([{ name: v.name, menge }]);
+  eintragen([{ ...p, name: v.name }]);
 });
+// Lange drücken: anheften oder ausblenden
+(function chipsLangDruck() {
+  let timer = null;
+  $('#chips').addEventListener('pointerdown', e => {
+    const b = e.target.closest('[data-chip]');
+    if (!b) return;
+    b._langGedrueckt = false;
+    timer = setTimeout(() => { b._langGedrueckt = true; oeffneChipMenue(b.dataset.chip); }, 500);
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) $('#chips').addEventListener(ev, () => clearTimeout(timer));
+  $('#chips').addEventListener('contextmenu', e => e.preventDefault());
+})();
+function oeffneChipMenue(name) {
+  const gepinnt = S.einstellungen.chips.angeheftet.some(n => kompakt(n) === kompakt(name));
+  const b = oeffneBlatt(`<div class="blatt-kopf"><h3>${esc(name)}</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
+    <div class="knopfreihe">
+      <button type="button" class="knopf zweit" id="cPin">${gepinnt ? 'Nicht mehr anheften' : 'Immer in der Schnellauswahl zeigen'}</button>
+      <button type="button" class="knopf zweit" id="cWeg">Nicht mehr vorschlagen</button>
+    </div>
+    <p class="text-muted">Verwalten unter Einstellungen → Schnellauswahl.</p>`);
+  $('#cPin', b).onclick = () => { gepinnt ? loeseAn(name) : hefteAn(name); schliesseBlatt(b); };
+  $('#cWeg', b).onclick = () => { blendeAus(name); schliesseBlatt(b); };
+  b._beimSchliessen = renderHilfe;
+}
 $('#chips').addEventListener('click', e => {
   const b = e.target.closest('[data-chip]');
-  if (b) eintragen([{ name: b.dataset.chip, menge: 1 }]);
+  if (b && !b._langGedrueckt) eintragen([{ name: b.dataset.chip }]);
 });
 
 $$('.segment button').forEach(b => b.addEventListener('click', () => {
@@ -935,17 +1182,36 @@ function oeffneDetails(item) {
     <div class="blatt-kopf"><h3>Artikel</h3><button type="button" class="zurueck" data-schliessen>Fertig</button></div>
     <label class="feld"><span>Name</span><input type="text" id="dName" value="${esc(item.name)}"></label>
     <div class="feld"><span>Menge</span>
-      <div class="stepper"><button type="button" id="dMinus" aria-label="Weniger">−</button><output id="dMenge">${esc(String(item.menge || 1).replace('.', ','))}</output><button type="button" id="dPlus" aria-label="Mehr">+</button></div>
+      <div class="stepper"><button type="button" id="dMinus" aria-label="Weniger">−</button><input id="dMenge" inputmode="decimal" aria-label="Menge"><span class="einheit" id="dEinheit"></span><button type="button" id="dPlus" aria-label="Mehr">+</button></div>
+      <div class="einheiten" id="dEinheiten">${EINHEITEN_MENGE.map(e => `<button type="button" data-einheit="${e}">${EINHEIT_NAME[e]}</button>`).join('')}</div>
     </div>
     <label class="feld"><span>Abteilung</span><select id="dAbt">${abteilungsOptionen(item.abteilung)}</select></label>
     <label class="feld"><span>Marke / Notiz</span><input type="text" id="dNotiz" value="${esc(item.notiz || '')}" placeholder="z. B. Alnatura, 1,5 %"></label>
     <label class="schalter"><div>Wird immer benötigt<small>Steht nach jedem Einkauf von selbst wieder auf der Liste</small></div><input type="checkbox" id="dStamm"${item.stamm ? ' checked' : ''}></label>
     <div class="knopfreihe"><button type="button" class="knopf gefahr" id="dLoeschen">Von der Liste löschen</button></div>
   `);
-  const menge = () => item.menge || 1;
-  const zeigeMenge = () => { $('#dMenge', b).textContent = String(menge()).replace('.', ','); };
-  $('#dMinus', b).onclick = () => { item.menge = Math.max(1, menge() - 1); zeigeMenge(); sichereListe(); };
-  $('#dPlus', b).onclick = () => { item.menge = menge() + 1; zeigeMenge(); sichereListe(); };
+  const einheit = () => item.einheit || 'stk';
+  const menge = () => item.menge || EINHEIT_START[einheit()];
+  const zeigeMenge = () => {
+    $('#dMenge', b).value = zahlText(menge());
+    $('#dEinheit', b).textContent = einheit() === 'stk' ? '' : EINHEIT_NAME[einheit()];
+    $$('#dEinheiten button', b).forEach(x => x.classList.toggle('an', x.dataset.einheit === einheit()));
+  };
+  const setze = m => { item.menge = Math.max(EINHEIT_SCHRITT[einheit()], Math.round(m * 1000) / 1000); zeigeMenge(); sichereListe(); };
+  zeigeMenge();
+  $('#dMinus', b).onclick = () => setze(menge() - EINHEIT_SCHRITT[einheit()]);
+  $('#dPlus', b).onclick = () => setze(menge() + EINHEIT_SCHRITT[einheit()]);
+  $('#dMenge', b).onchange = e => { const n = parseFloat(e.target.value.replace(',', '.')); if (n > 0) { item.menge = n; sichereListe(); } zeigeMenge(); };
+  $('#dEinheiten', b).onclick = e => {
+    const x = e.target.closest('[data-einheit]');
+    if (!x || x.dataset.einheit === einheit()) return;
+    // Umrechnen, wo es geht (g↔kg, ml↔l); sonst Startwert der neuen Einheit
+    const alt = einheit(), neu = x.dataset.einheit, m = menge();
+    const faktor = { 'g>kg': 0.001, 'kg>g': 1000, 'ml>l': 0.001, 'l>ml': 1000 }[`${alt}>${neu}`];
+    item.einheit = neu;
+    item.menge = faktor ? Math.round(m * faktor * 1000) / 1000 : EINHEIT_START[neu];
+    zeigeMenge(); sichereListe();
+  };
   $('#dAbt', b).onchange = e => setzeAbteilung(item, e.target.value);
   $('#dStamm', b).onchange = e => setzeStamm(item, e.target.checked);
   $('#dNotiz', b).oninput = e => { item.notiz = e.target.value.trim() || undefined; sichereListe(); };
@@ -960,9 +1226,13 @@ function oeffneDetails(item) {
     if (neu && neu !== item.name) {
       item.name = neu;
       if (!S.korrekturen[kompakt(neu)]) item.abteilung = $('#dAbt', b).value;
-      merkeVerlauf(item); sichereVerlauf();
+      merkeVerlauf(item);
+    } else {
+      // Menge/Einheit für das nächste Mal merken, ohne den Zähler zu erhöhen
+      const v = S.verlauf[kompakt(item.name)];
+      if (v) { if (einheit() !== 'stk') { v.einheit = einheit(); v.menge = menge(); } else { delete v.einheit; delete v.menge; } }
     }
-    sichereListe(); render();
+    sichereVerlauf(); sichereListe(); render();
   };
 }
 
@@ -987,6 +1257,21 @@ function oeffneAbteilungWahl(item) {
 
 $('#btnEinstellungen').addEventListener('click', oeffneEinstellungen);
 
+const istDunkel = () => S.einstellungen.thema === 'dark' || (S.einstellungen.thema !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+
+function chipVerwaltungHTML() {
+  const c = S.einstellungen.chips;
+  const auto = haeufige({ alle: true }).filter(x => !x.gepinnt);
+  const zeile = (name, knoepfe) => `<li><span style="flex:1">${esc(name)}</span>${knoepfe}</li>`;
+  const knopf = (aktion, name, text, farbe) => `<button type="button" class="zurueck" data-chip-aktion="${aktion}" data-name="${esc(name)}"${farbe ? ` style="color:${farbe}"` : ''}>${text}</button>`;
+  const ausgeblendet = c.ausgeblendet.map(k => (S.verlauf[k] || {}).name || k);
+  return `
+    ${c.angeheftet.length ? `<p class="text-muted" style="margin:14px 0 2px">Angeheftet, immer zuerst</p><ul class="liste-einst">${c.angeheftet.map(n => zeile(n, knopf('los', n, 'Lösen'))).join('')}</ul>` : ''}
+    <p class="text-muted" style="margin:14px 0 2px">Automatisch, nach Häufigkeit. Auch in der Schnellauswahl: Chip lange drücken.</p>
+    ${auto.length ? `<ul class="liste-einst">${auto.map(x => zeile(x.name, knopf('pin', x.name, 'Anheften') + knopf('weg', x.name, 'Ausblenden', 'var(--danger)'))).join('')}</ul>` : '<p class="text-muted">Noch nichts gekauft.</p>'}
+    ${ausgeblendet.length ? `<p class="text-muted" style="margin:14px 0 2px">Ausgeblendet</p><ul class="liste-einst">${ausgeblendet.map(n => zeile(n, knopf('zeig', n, 'Wieder zeigen'))).join('')}</ul>` : ''}`;
+}
+
 function oeffneEinstellungen() {
   const b = oeffneBlatt('<div id="einst"></div>', { voll: true });
   const zeichne = () => {
@@ -998,6 +1283,28 @@ function oeffneEinstellungen() {
         <span class="klein">${p.ort ? ' · Standort gespeichert' : ''}${p.ausgeblendet.length ? ` · ${ABT_IDS.length - p.ausgeblendet.length} Abteilungen` : ''}</span></button></li>`).join('')}
         <li><button type="button" class="fuellen" id="eNeuesProfil" style="color:var(--accent)">Laden hinzufügen</button></li></ul>
       <label class="schalter"><div>Laden per Standort wählen<small>Beim Öffnen im Laden passendes Profil einstellen</small></div><input type="checkbox" id="eStandort"${S.einstellungen.standort ? ' checked' : ''}></label>
+
+      <div class="abschnitt">Darstellung</div>
+      <div class="segment klein" id="eThema">${[['system', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']].map(([id, n]) =>
+        `<button type="button" data-thema="${id}" class="${S.einstellungen.thema === id ? 'an' : ''}">${n}</button>`).join('')}</div>
+      <label class="schalter" style="margin-top:8px"><div>Abteilungen farbig markieren<small>Farbe je Bereich im Laden, die Beschriftung bleibt</small></div><input type="checkbox" id="eFarben"${S.einstellungen.farben.an ? ' checked' : ''}></label>
+      <div id="eFarbWahl"${S.einstellungen.farben.an ? '' : ' hidden'}>
+        <div class="wahl" style="margin-top:12px">${FARBSCHEMATA.map(f => `<button type="button" data-schema="${f.id}" class="${aktuellesSchema().id === f.id ? 'an' : ''}">
+          <span class="titel">${esc(f.name)}</span><span class="text-muted">${esc(f.text)}</span>
+          <span class="muster">${legende(f).map(l => `<span><i style="--c:${FARBTOENE[l.ton][istDunkel() ? 1 : 0]}"></i>${esc(l.name)}</span>`).join('')}</span>
+        </button>`).join('')}</div>
+        <div class="segment klein" id="eStil">${[['streifen', 'Streifen'], ['flaeche', 'Farbige Zeilen']].map(([id, n]) =>
+          `<button type="button" data-stil="${id}" class="${S.einstellungen.farben.stil === id ? 'an' : ''}">${n}</button>`).join('')}</div>
+      </div>
+
+      <div class="abschnitt">Schnellauswahl</div>
+      <label class="schalter"><div>Schnellauswahl zeigen<small>Nur in der Listenansicht, wenn das Eingabefeld leer ist</small></div><input type="checkbox" id="eChips"${S.einstellungen.chips.an ? ' checked' : ''}></label>
+      <div id="eChipWahl"${S.einstellungen.chips.an ? '' : ' hidden'}>
+        <div class="feld"><span>Anzahl</span><div class="segment klein" id="eAnzahl">${[6, 9, 12, 18].map(n =>
+          `<button type="button" data-anzahl="${n}" class="${S.einstellungen.chips.anzahl === n ? 'an' : ''}">${n}</button>`).join('')}</div></div>
+        <form class="eingabe" id="ePinForm" style="margin-top:6px"><input id="ePinName" type="text" placeholder="Artikel anheften" autocapitalize="sentences" autocorrect="off" enterkeyhint="done"></form>
+        ${chipVerwaltungHTML()}
+      </div>
 
       <div class="abschnitt">Stammartikel</div>
       ${stamm.length ? `<ul class="liste-einst">${stamm.map(v => `<li><span class="fuellen" style="flex:1">${esc(v.name)}</span>
@@ -1020,7 +1327,31 @@ function oeffneEinstellungen() {
     `;
   };
   zeichne();
+  b.addEventListener('submit', e => {
+    if (e.target.id !== 'ePinForm') return;
+    e.preventDefault();
+    const n = gross(korrigiere($('#ePinName', b).value.trim()));
+    if (n) { hefteAn(n); zeichne(); }
+  });
   b.addEventListener('click', e => {
+    const e1 = S.einstellungen;
+    const thema = e.target.closest('[data-thema]');
+    if (thema) { e1.thema = thema.dataset.thema; sichereEinstellungen(); wendeDarstellungAn(); zeichne(); return; }
+    const schema = e.target.closest('[data-schema]');
+    if (schema) { e1.farben.schema = schema.dataset.schema; sichereEinstellungen(); wendeDarstellungAn(); zeichne(); return; }
+    const stil = e.target.closest('[data-stil]');
+    if (stil) { e1.farben.stil = stil.dataset.stil; sichereEinstellungen(); wendeDarstellungAn(); zeichne(); return; }
+    const anzahl = e.target.closest('[data-anzahl]');
+    if (anzahl) { e1.chips.anzahl = +anzahl.dataset.anzahl; sichereEinstellungen(); zeichne(); return; }
+    const ca = e.target.closest('[data-chip-aktion]');
+    if (ca) {
+      const n = ca.dataset.name;
+      if (ca.dataset.chipAktion === 'pin') hefteAn(n);
+      if (ca.dataset.chipAktion === 'los') loeseAn(n);
+      if (ca.dataset.chipAktion === 'weg') blendeAus(n);
+      if (ca.dataset.chipAktion === 'zeig') { e1.chips.ausgeblendet = e1.chips.ausgeblendet.filter(k => k !== kompakt(n)); sichereEinstellungen(); }
+      zeichne(); return;
+    }
     const p = e.target.closest('[data-profil]');
     if (p) return oeffneProfil(S.profile.find(x => x.id === p.dataset.profil), zeichne);
     if (e.target.closest('#eNeuesProfil')) {
@@ -1048,6 +1379,8 @@ function oeffneEinstellungen() {
     }
   });
   b.addEventListener('change', e => {
+    if (e.target.id === 'eFarben') { S.einstellungen.farben.an = e.target.checked; sichereEinstellungen(); wendeDarstellungAn(); zeichne(); }
+    if (e.target.id === 'eChips') { S.einstellungen.chips.an = e.target.checked; sichereEinstellungen(); zeichne(); }
     if (e.target.id === 'eStandort') { S.einstellungen.standort = e.target.checked; sichereEinstellungen(); if (e.target.checked) waehleLadenPerStandort(true); }
     if (e.target.id === 'eApiKey') { S.einstellungen.apiKey = e.target.value.trim(); sichereEinstellungen(); }
     if (e.target.id === 'eImportDatei' && e.target.files[0]) importieren(e.target.files[0], zeichne);
@@ -1322,7 +1655,7 @@ async function barcodeGefunden(ean) {
     S.eans[ean] = { name, abt };
     sichere('eans', S.eans);
     S.korrekturen[kompakt(name)] = abt; sichere('korrekturen', S.korrekturen);
-    const item = hinzufuegen(name, 1, { abteilung: abt, ean });
+    const item = hinzufuegen(name, null, { abteilung: abt, ean });
     item.abteilung = abt;
     sichereListe(); sichereVerlauf();
     schliesseBlatt(b); render(); if (item) blitze(item.id);
@@ -1451,7 +1784,7 @@ function oeffnePruefung(artikel) {
     let letztes = null;
     for (const cb of $$('input[data-i]:checked', b)) {
       const a = artikel[+cb.dataset.i];
-      letztes = hinzufuegen(a.name, 1, { abteilung: a.abt }) || letztes;
+      letztes = hinzufuegen(a.name, null, { abteilung: a.abt }) || letztes;
     }
     sichereListe(); sichereVerlauf();
     schliesseBlatt(b); render();
@@ -1549,6 +1882,7 @@ function selbsttest() {
 
   // Für den Test ohne gespeicherte Daten klassifizieren
   S.verlauf = {}; S.korrekturen = {}; S.liste = []; S.eans = {};
+  S.einstellungen = standardEinstellungen();
 
   const beispiel = {
     '2 Haferflocken': 'fruehstueck', '2 Milch': 'molkerei', 'Salat': 'gemuese', 'Zucchini': 'gemuese', 'Pilze': 'gemuese',
@@ -1575,10 +1909,23 @@ function selbsttest() {
   pruefe('Keine Korrektur bei Mehrwort', korrigiere('Hafermilch mit Soja Barrista Bereef'), 'Hafermilch mit Soja Barrista Bereef');
   pruefe('Vorschlag Tomatenkonz', vorschlaege('Tomatenkonz')[0]?.name, 'Tomatenkonzentrat');
 
-  pruefe('Menge „2 Milch“', parseMenge('2 Milch'), { menge: 2, name: 'Milch' });
-  pruefe('Menge „3x Eier“', parseMenge('3x Eier'), { menge: 3, name: 'Eier' });
-  pruefe('Menge ohne Zahl', parseMenge('Milch'), { menge: 1, name: 'Milch' });
+  const pm = t => { const r = parseMenge(t); return [r.menge, r.einheit, r.name]; };
+  pruefe('Menge „2 Milch“', pm('2 Milch'), [2, 'stk', 'Milch']);
+  pruefe('Menge „3x Eier“', pm('3x Eier'), [3, 'stk', 'Eier']);
+  pruefe('Menge ohne Zahl', pm('Milch'), [1, 'stk', 'Milch']);
+  pruefe('Menge „500 g Hackfleisch“', pm('500 g Hackfleisch'), [500, 'g', 'Hackfleisch']);
+  pruefe('Menge „1,5l Milch“', pm('1,5l Milch'), [1.5, 'l', 'Milch']);
+  pruefe('Menge hinten „Kartoffeln 2 kg“', pm('Kartoffeln 2 kg'), [2, 'kg', 'Kartoffeln']);
+  pruefe('Kein Gramm bei „3 Gurken“', pm('3 Gurken'), [3, 'stk', 'Gurken']);
+  pruefe('Kein Liter bei „2 Lachs“', pm('2 Lachs'), [2, 'stk', 'Lachs']);
+  pruefe('Mengentext', [mengeText({ menge: 1 }), mengeText({ menge: 3 }), mengeText({ menge: 500, einheit: 'g' }), mengeText({ menge: 1.5, einheit: 'l' })], ['', '3', '500 g', '1,5 l']);
   pruefe('Mehrfacheingabe', zerlegeEingabe('Milch, Eier und 2 Tomaten').map(x => [x.menge, x.name]), [[1, 'Milch'], [1, 'Eier'], [2, 'Tomaten']]);
+
+  // Autovervollständigung: Singular/Plural nur einmal
+  const vn = t => vorschlaege(t).map(v => v.name);
+  pruefe('Vorschlag „Tomat“ ohne Doppelung', vn('Tomat').filter(n => /^tomate?n?$/i.test(n)), ['Tomaten']);
+  pruefe('Vorschlag „Banan“ ohne Doppelung', vn('Banan'), ['Bananen']);
+  pruefe('Vorschlag „Karott“ ohne Doppelung', vn('Karott'), ['Karotten']);
 
   // Duplikate und Stammartikel
   hinzufuegen('Zucchini'); hinzufuegen('Zucchini.');
@@ -1592,6 +1939,29 @@ function selbsttest() {
   pruefe('Abschluss holt pausierten Stammartikel zurück', S.liste.map(i => [i.name, !!i.pausiert]), [['Deo', false]]);
   pruefe('Verlauf zählt', S.verlauf[kompakt('Zucchini')].anzahl, 2);
   void milch;
+
+  // Einheiten: gleiche Einheit addiert, andere ersetzt, Verlauf merkt Gewicht
+  S.liste = [];
+  const hack = hinzufuegen('Hackfleisch', 500, { einheit: 'g' });
+  hinzufuegen('Hackfleisch', 250, { einheit: 'g' });
+  pruefe('Gleiche Einheit addiert', [hack.menge, hack.einheit], [750, 'g']);
+  S.liste = [];
+  const hack2 = hinzufuegen('Hackfleisch');
+  pruefe('Verlauf merkt Menge mit Einheit', [hack2.menge, hack2.einheit], [750, 'g']);
+  hinzufuegen('Hackfleisch', 2);
+  pruefe('Andere Einheit ersetzt', [hack2.menge, hack2.einheit], [2, 'stk']);
+  S.liste = [];
+
+  // Schnellauswahl: angeheftet zuerst, ausgeblendet nie
+  S.einstellungen.chips.anzahl = 3;
+  hefteAn('Kaffee'); blendeAus('Zucchini');
+  const chipsNamen = haeufige().map(c => c.name);
+  pruefe('Angehefteter Chip zuerst', chipsNamen[0], 'Kaffee');
+  pruefe('Ausgeblendeter Chip fehlt', chipsNamen.includes('Zucchini'), false);
+  S.einstellungen = standardEinstellungen();
+
+  // Farben: jede Abteilung außer Sonstiges hat in jedem Schema einen Ton
+  for (const f of FARBSCHEMATA) pruefe(`Farbschema ${f.name} vollständig`, ABT_IDS.filter(a => a !== 'sonstiges' && !tonFuer(f, a)), []);
 
   // Gelernte Korrektur
   const x = hinzufuegen('Hummus'); setzeAbteilung(x, 'konserven');
@@ -1639,6 +2009,7 @@ if (new URLSearchParams(location.search).has('test')) {
   selbsttest();
 } else {
   ladeAlles();
+  wendeDarstellungAn();
   render();
   if (S.einstellungen.standort) waehleLadenPerStandort(false);
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
