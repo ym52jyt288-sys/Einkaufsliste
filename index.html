@@ -788,7 +788,8 @@ function vorschlaege(text) {
   return aus.filter(v => kompakt(v.name) !== t || v.art === 'verlauf').slice(0, 5);
 }
 
-// Schnellauswahl: angeheftete Artikel zuerst, dann die häufigsten; ausgeblendete nie.
+// Schnellauswahl: angeheftete Artikel zuerst, dann die häufigsten – ohne Stammartikel (die kommen ohnehin
+// von selbst auf die Liste) und ohne ausgeblendete.
 // Artikel, die schon offen auf der Liste stehen, werden weggelassen.
 function haeufige({ alle = false } = {}) {
   const c = S.einstellungen.chips;
@@ -801,7 +802,7 @@ function haeufige({ alle = false } = {}) {
     if (!offenKeys.has(k) && !gesehen.has(k)) { gesehen.add(k); aus.push({ name: n, gepinnt: true }); }
   }
   const auto = Object.entries(S.verlauf)
-    .filter(([k]) => !offenKeys.has(k) && !weg.has(k) && !gesehen.has(k))
+    .filter(([k, v]) => !v.stamm && !offenKeys.has(k) && !weg.has(k) && !gesehen.has(k))
     .sort((a, b) => (b[1].anzahl - a[1].anzahl) || (b[1].zuletzt - a[1].zuletzt));
   for (const [k, v] of auto) {
     if (aus.length >= c.anzahl) break;
@@ -1267,7 +1268,7 @@ function chipVerwaltungHTML() {
   const ausgeblendet = c.ausgeblendet.map(k => (S.verlauf[k] || {}).name || k);
   return `
     ${c.angeheftet.length ? `<p class="text-muted" style="margin:14px 0 2px">Angeheftet, immer zuerst</p><ul class="liste-einst">${c.angeheftet.map(n => zeile(n, knopf('los', n, 'Lösen'))).join('')}</ul>` : ''}
-    <p class="text-muted" style="margin:14px 0 2px">Automatisch, nach Häufigkeit. Auch in der Schnellauswahl: Chip lange drücken.</p>
+    <p class="text-muted" style="margin:14px 0 2px">Danach automatisch die häufigsten Käufe, ohne Stammartikel. Auch in der Schnellauswahl: Chip lange drücken.</p>
     ${auto.length ? `<ul class="liste-einst">${auto.map(x => zeile(x.name, knopf('pin', x.name, 'Anheften') + knopf('weg', x.name, 'Ausblenden', 'var(--danger)'))).join('')}</ul>` : '<p class="text-muted">Noch nichts gekauft.</p>'}
     ${ausgeblendet.length ? `<p class="text-muted" style="margin:14px 0 2px">Ausgeblendet</p><ul class="liste-einst">${ausgeblendet.map(n => zeile(n, knopf('zeig', n, 'Wieder zeigen'))).join('')}</ul>` : ''}`;
 }
@@ -1958,6 +1959,11 @@ function selbsttest() {
   const chipsNamen = haeufige().map(c => c.name);
   pruefe('Angehefteter Chip zuerst', chipsNamen[0], 'Kaffee');
   pruefe('Ausgeblendeter Chip fehlt', chipsNamen.includes('Zucchini'), false);
+  S.verlauf[kompakt('Milch')] = { name: 'Milch', anzahl: 99, zuletzt: Date.now(), abteilung: 'molkerei', stamm: true };
+  pruefe('Stammartikel nicht in Schnellauswahl', haeufige().some(c => c.name === 'Milch'), false);
+  hefteAn('Milch');
+  pruefe('Angehefteter Stammartikel bleibt', haeufige()[0].name, 'Kaffee');
+  pruefe('… und steht bei den angehefteten', haeufige().filter(c => c.gepinnt).map(c => c.name), ['Kaffee', 'Milch']);
   S.einstellungen = standardEinstellungen();
 
   // Farben: jede Abteilung außer Sonstiges hat in jedem Schema einen Ton

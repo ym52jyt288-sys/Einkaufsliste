@@ -41,6 +41,7 @@ Selbsttest online 80/80. Prüfung auf dem iPhone durch den Nutzer steht noch aus
 - **Mengen mit Einheit** Stück / g / kg / ml / l: eintippen („500 g Hack“, „Kartoffeln 2 kg“) oder im Detailblatt umschalten
   (g↔kg und ml↔l werden umgerechnet). Der Verlauf merkt sich die zuletzt genutzte Menge mit Einheit.
 - Selbsttest jetzt 97/97.
+- Schnellauswahl: automatischer Teil lässt Stammartikel weg (angeheftete bleiben immer vorne). Selbsttest 100/100.
 
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
