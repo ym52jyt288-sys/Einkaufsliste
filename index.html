@@ -1008,7 +1008,6 @@ function blitze(id) {
     const el = $(`.zeile[data-id="${id}"] .item`);
     if (!el) return;
     el.classList.remove('aufblitzen'); void el.offsetWidth; el.classList.add('aufblitzen');
-    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   });
 }
 
