@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Einkauf">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111214" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Einkaufsliste</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg2: #f4f4f6;
+    --fg: #1c1c1e;
+    --muted: #8a8a90;
+    --line: #e6e6ea;
+    --accent: #2e6b4f;
+    --accent-weich: #e7f0eb;
+    --danger: #b3261e;
+    --sheet: #ffffff;
+    --schatten: 0 10px 40px rgba(0,0,0,.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111214;
+      --bg2: #1c1d20;
+      --fg: #f2f2f5;
+      --muted: #8d8d94;
+      --line: #2a2b2f;
+      --accent: #6fbf95;
+      --accent-weich: #1d2c24;
+      --danger: #ef6b62;
+      --sheet: #1a1b1e;
+      --schatten: 0 10px 40px rgba(0,0,0,.6);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body {
+    font: 17px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+    padding-bottom: calc(90px + env(safe-area-inset-bottom));
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  input, select, textarea { font: inherit; color: inherit; }
+  svg { display: block; }
+  .ico { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Kopf */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg);
+    padding: calc(8px + env(safe-area-inset-top)) 16px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .kopfzeile { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .segment { flex: 1; display: flex; background: var(--bg2); border-radius: 9px; padding: 2px; }
+  .segment button { flex: 1; height: 32px; border-radius: 7px; font-size: 15px; font-weight: 500; color: var(--muted); }
+  .segment button.an { background: var(--bg); color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .icon-btn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 10px; color: var(--fg); flex: none; }
+  .icon-btn:active { background: var(--bg2); }
+
+  .eingabe { display: flex; align-items: center; gap: 4px; background: var(--bg2); border-radius: 12px; padding-left: 12px; }
+  .eingabe input {
+    flex: 1; min-width: 0; height: 46px; border: 0; background: transparent; outline: none;
+    font-size: 17px;
+  }
+  .eingabe input::placeholder { color: var(--muted); }
+  .eingabe .icon-btn { color: var(--muted); }
+
+  .vorschlaege { list-style: none; margin: 6px 0 0; padding: 0; }
+  .vorschlaege li button {
+    width: 100%; display: flex; align-items: baseline; gap: 8px; text-align: left;
+    min-height: 44px; padding: 10px 4px; border-bottom: 1px solid var(--line);
+  }
+  .vorschlaege li:first-child button { font-weight: 600; }
+  .vorschlaege .hinweis { margin-left: auto; font-size: 13px; color: var(--muted); font-weight: 400; white-space: nowrap; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip {
+    height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid var(--line);
+    font-size: 15px; background: var(--bg);
+  }
+  .chip:active { background: var(--accent-weich); border-color: var(--accent); }
+
+  /* Liste */
+  main { padding: 0 16px; }
+  .ladenwahl { display: flex; align-items: center; gap: 8px; padding: 12px 0 4px; color: var(--muted); font-size: 15px; }
+  .ladenwahl select {
+    appearance: none; -webkit-appearance: none; border: 0; background: transparent;
+    font-size: 15px; font-weight: 600; color: var(--fg); padding: 6px 18px 6px 0;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: right 6px center, right 1px center; background-size: 5px 5px; background-repeat: no-repeat;
+  }
+  .gruppe h2 {
+    margin: 18px 0 2px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+    display: flex; justify-content: space-between;
+  }
+  ul.artikel { list-style: none; margin: 0; padding: 0; }
+  .zeile { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+  .zeile .wisch {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; padding-right: 18px;
+    background: var(--danger); color: #fff; font-size: 15px; font-weight: 500;
+  }
+  .zeile .wisch.pause { background: var(--muted); }
+  .item {
+    position: relative; display: flex; align-items: center; gap: 12px; min-height: 52px; background: var(--bg);
+    touch-action: pan-y; transition: transform .2s ease;
+  }
+  .item.zieht { transition: none; }
+  .check { width: 44px; height: 44px; margin-left: -10px; display: grid; place-items: center; flex: none; }
+  .check span { width: 24px; height: 24px; border-radius: 50%; border: 1.7px solid var(--muted); display: grid; place-items: center; }
+  .erledigt .check span { background: var(--accent); border-color: var(--accent); }
+  .check svg { width: 14px; height: 14px; stroke: #fff; stroke-width: 2.4; fill: none; opacity: 0; }
+  .erledigt .check svg { opacity: 1; }
+  .item .txt { flex: 1; min-width: 0; padding: 8px 0; }
+  .item .name { overflow-wrap: anywhere; }
+  .item .menge { font-weight: 600; margin-right: 6px; font-variant-numeric: tabular-nums; }
+  .item .sub { display: block; font-size: 13px; color: var(--muted); margin-top: 1px; }
+  .item .rechts { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; flex: none; }
+  .item .stamm-ico { width: 16px; height: 16px; }
+  .erledigt .txt { color: var(--muted); }
+  .erledigt .name { text-decoration: line-through; text-decoration-color: var(--muted); }
+  .zuordnen { font-size: 13px; color: var(--accent); padding: 8px 0 8px 8px; }
+  .aufblitzen { animation: blitz .9s ease; }
+  @keyframes blitz { 0%, 100% { background: var(--bg); } 25% { background: var(--accent-weich); } }
+
+  details.versteckt { margin-top: 18px; }
+  details.versteckt summary { font-size: 13px; color: var(--muted); padding: 10px 0; list-style: none; }
+  details.versteckt summary::-webkit-details-marker { display: none; }
+  .pausiert { margin-top: 16px; font-size: 14px; color: var(--muted); }
+  .pausiert button { color: var(--accent); }
+  .leer { text-align: center; color: var(--muted); padding: 48px 20px; font-size: 15px; }
+
+  .abschluss {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 9;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--bg) 70%, transparent);
+  }
+  .knopf {
+    width: 100%; height: 50px; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 600; font-size: 17px;
+  }
+  @media (prefers-color-scheme: dark) { .knopf { color: #0c1a13; } }
+  .knopf.zweit { background: var(--bg2); color: var(--fg); }
+  .knopf.gefahr { background: transparent; color: var(--danger); border: 1px solid var(--line); }
+  .knopf:disabled { opacity: .45; }
+
+  /* Hinweis unten */
+  .toast {
+    position: fixed; left: 16px; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 30;
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px;
+    background: #2b2c30; color: #fff; font-size: 15px; box-shadow: var(--schatten);
+    transform: translateY(20px); opacity: 0; pointer-events: none; transition: .2s ease;
+  }
+  .toast.zeigen { transform: none; opacity: 1; pointer-events: auto; }
+  .toast button { margin-left: auto; color: #9fe0bd; font-weight: 600; }
+
+  /* Blätter */
+  .hinterlegt {
+    position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.35);
+    display: flex; align-items: flex-end; justify-content: center;
+    opacity: 0; transition: opacity .2s ease;
+  }
+  .hinterlegt.offen { opacity: 1; }
+  .blatt {
+    width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: var(--sheet); border-radius: 16px 16px 0 0; box-shadow: var(--schatten);
+    padding: 8px 16px calc(20px + env(safe-area-inset-bottom));
+    transform: translateY(30px); transition: transform .22s ease;
+  }
+  .hinterlegt.offen .blatt { transform: none; }
+  .blatt.voll { max-height: none; height: 100%; border-radius: 0; padding-top: calc(8px + env(safe-area-inset-top)); }
+  .blatt-kopf { display: flex; align-items: center; gap: 8px; min-height: 48px; position: sticky; top: -8px; background: var(--sheet); z-index: 2; }
+  .blatt-kopf h3 { flex: 1; margin: 0; font-size: 17px; font-weight: 600; }
+  .blatt-kopf .zurueck { color: var(--accent); font-size: 17px; min-height: 44px; padding: 0 4px; }
+  .feld { display: block; margin: 14px 0; }
+  .feld > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .feld input[type=text], .feld input[type=password], .feld select, .feld textarea {
+    width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+    padding: 10px 12px; font-size: 17px; outline: none;
+  }
+  .feld textarea { min-height: 160px; resize: vertical; font-size: 15px; }
+  .feld input:focus, .feld select:focus, .feld textarea:focus { border-color: var(--accent); }
+  .reihe { display: flex; align-items: center; gap: 10px; }
+  .stepper { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; }
+  .stepper button { width: 44px; height: 44px; font-size: 22px; color: var(--accent); }
+  .stepper output { min-width: 36px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .schalter { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; border-bottom: 1px solid var(--line); }
+  .schalter small { display: block; color: var(--muted); font-size: 13px; }
+  .schalter input { appearance: none; -webkit-appearance: none; width: 51px; height: 31px; border-radius: 16px; background: var(--line); position: relative; flex: none; transition: .2s; }
+  .schalter input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: .2s; }
+  .schalter input:checked { background: var(--accent); }
+  .schalter input:checked::after { left: 22px; }
+  .knopfreihe { display: grid; gap: 10px; margin-top: 18px; }
+  .abschnitt { margin: 24px 0 6px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .liste-einst { list-style: none; margin: 0; padding: 0; }
+  .liste-einst li { display: flex; align-items: center; gap: 10px; min-height: 50px; border-bottom: 1px solid var(--line); }
+  .liste-einst li > button.fuellen { flex: 1; text-align: left; min-height: 50px; }
+  .liste-einst .klein { color: var(--muted); font-size: 13px; }
+  .griff { width: 44px; height: 44px; display: grid; place-items: center; color: var(--muted); touch-action: none; cursor: grab; flex: none; }
+  .liste-einst li.zieht { background: var(--bg2); box-shadow: var(--schatten); position: relative; z-index: 3; }
+  .liste-einst li.aus .abtname { color: var(--muted); text-decoration: line-through; }
+  .liste-einst input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+  .text-muted { color: var(--muted); font-size: 14px; }
+  .pruef li { display: flex; align-items: center; gap: 12px; min-height: 50px; border-bottom: 1px solid var(--line); }
+  .pruef label { display: flex; align-items: center; gap: 12px; flex: 1; min-height: 50px; }
+  .pruef .marke { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; margin-left: auto; white-space: nowrap; }
+  .pruef input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+
+  /* Scanner */
+  .scanner { position: fixed; inset: 0; z-index: 50; background: #000; color: #fff; }
+  .scanner video { width: 100%; height: 100%; object-fit: cover; }
+  .scanner .rahmen { position: absolute; left: 12%; right: 12%; top: 38%; height: 20%; border: 2px solid rgba(255,255,255,.85); border-radius: 12px; }
+  .scanner .oben { position: absolute; top: 0; left: 0; right: 0; padding: calc(12px + env(safe-area-inset-top)) 16px 12px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(rgba(0,0,0,.6), transparent); }
+  .scanner .oben button { color: #fff; font-size: 17px; min-height: 44px; }
+  .scanner .unten { position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); text-align: center; font-size: 15px; background: linear-gradient(transparent, rgba(0,0,0,.6)); }
+
+  .laedt { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: dreh .8s linear infinite; vertical-align: -3px; margin-right: 8px; }
+  @keyframes dreh { to { transform: rotate(360deg); } }
+
+  /* Selbsttest */
+  .testbericht { padding: 20px 16px; font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .testbericht .ok { color: var(--accent); }
+  .testbericht .fehler { color: var(--danger); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="kopfzeile">
+    <div class="segment" role="tablist">
+      <button type="button" data-ansicht="liste">Liste</button>
+      <button type="button" data-ansicht="laden">Laden</button>
+    </div>
+    <button type="button" class="icon-btn" id="btnEinstellungen" aria-label="Einstellungen">
+      <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </div>
+  <form class="eingabe" id="formEingabe" autocomplete="off">
+    <input id="eingabe" type="text" enterkeyhint="done" autocapitalize="sentences" autocorrect="off" spellcheck="false"
+           placeholder="Artikel hinzufügen" aria-label="Artikel hinzufügen">
+    <button type="button" class="icon-btn" id="btnScan" aria-label="Barcode scannen">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>
+    </button>
+    <button type="button" class="icon-btn" id="btnRezept" aria-label="Rezept übernehmen">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/></svg>
+    </button>
+  </form>
+  <ul class="vorschlaege" id="vorschlaege" hidden></ul>
+  <div class="chips" id="chips" hidden></div>
+</header>
+
+<main id="main"></main>
+
+<div class="abschluss" id="abschluss" hidden>
+  <button type="button" class="knopf" id="btnAbschluss">Einkauf abschließen</button>
+</div>
+
+<div class="toast" id="toast" role="status"><span id="toastText"></span><button type="button" id="toastAktion"></button></div>
+
+<script src="katalog.js"></script>
+<script>
+'use strict';
+
+/* ============================================================
+   Hilfsfunktionen
+   ============================================================ */
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const gross = s => s ? s.charAt(0).toLocaleUpperCase('de') + s.slice(1) : s;
+
+const ICON_STAMM = '<svg class="ico stamm-ico" viewBox="0 0 24 24" aria-label="Stammartikel"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>';
+const ICON_HAKEN = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const ICON_GRIFF = '<svg class="ico" viewBox="0 0 24 24"><path d="M5 9h14M5 15h14"/></svg>';
+
+/* ============================================================
+   Speicher (localStorage, JSON)
+   ============================================================ */
+
+const SPEICHER_PREFIX = 'ek.';
+function lade(schluessel, standard) {
+  try {
+    const roh = localStorage.getItem(SPEICHER_PREFIX + schluessel);
+    return roh == null ? standard : JSON.parse(roh);
+  } catch (e) { return standard; }
+}
+let TESTMODUS = false;
+function sichere(schluessel, wert) {
+  if (TESTMODUS) return;
+  try { localStorage.setItem(SPEICHER_PREFIX + schluessel, JSON.stringify(wert)); }
+  catch (e) { zeigeToast('Speichern fehlgeschlagen'); }
+}
+
+const ABT_IDS = ABTEILUNGEN.map(a => a.id);
+const ABT_NAME = Object.fromEntries(ABTEILUNGEN.map(a => [a.id, a.name]));
+
+function standardProfile() {
+  return [
+    { id: 'supermarkt', name: 'Supermarkt', reihenfolge: [...ABT_IDS], ausgeblendet: [] },
+    { id: 'drogerie', name: 'Drogerie', reihenfolge: ['drogerie', 'haushalt', ...ABT_IDS.filter(a => a !== 'drogerie' && a !== 'haushalt')],
+      ausgeblendet: ABT_IDS.filter(a => a !== 'drogerie' && a !== 'haushalt' && a !== 'sonstiges') },
+  ];
+}
+
+// Die Beispielliste vom Projektstart füllt beim ersten Öffnen den Verlauf,
+// damit Autovervollständigung und Häufig-Chips sofort etwas anbieten.
+const STARTVERLAUF = ['Haferflocken', 'Milch', 'Salat', 'Zucchini', 'Pilze', 'Lachs', 'Tomaten', 'Deo', 'Balsamico',
+  'Ajona Zahnpasta', 'Beerenmix Bio', 'Himbeeren', 'Blaubeeren', 'Hühnerbrust', 'Griechischer Joghurt minus L', 'Käse',
+  'Brokkoli', 'Mozzarella', 'Spaghetti', 'Sahne laktosefrei', 'Tomatenkonzentrat', 'Kokosmilch', 'Paprika', 'Ingwer',
+  'Karotten', 'Hafermilch Soja Barista', 'Apfel-Bananen-Mus', 'Erbsen', 'Räucherforelle', 'Nutella', 'Wraps',
+  'Spülmittel', 'Rucola', 'Tahina', 'Kartoffeln', 'Halloumi', 'Schweinswürstl', 'Gurke', 'Thunfisch', 'Basilikum',
+  'Eier', 'Kichererbsen', 'Tofu', 'Schupfnudeln', 'Äpfel', 'Suppengemüse', 'Bananen', 'Wattepads'];
+
+const S = {
+  liste: [], verlauf: {}, korrekturen: {}, eans: {}, profile: [], aktivesProfil: 'supermarkt',
+  einstellungen: { ansicht: 'liste', apiKey: '', standort: false },
+};
+
+function ladeAlles() {
+  S.liste = lade('liste', []);
+  S.verlauf = lade('verlauf', null);
+  S.korrekturen = lade('korrekturen', {});
+  S.eans = lade('eans', {});
+  S.profile = lade('profile', null) || standardProfile();
+  S.aktivesProfil = lade('aktivesProfil', S.profile[0].id);
+  S.einstellungen = Object.assign({ ansicht: 'liste', apiKey: '', standort: false }, lade('einstellungen', {}));
+  for (const i of S.liste) if (!ABT_IDS.includes(i.abteilung)) i.abteilung = klassifiziere(i.name).abt;
+  if (!S.verlauf) {
+    S.verlauf = {};
+    const jetzt = Date.now();
+    for (const name of STARTVERLAUF) {
+      S.verlauf[kompakt(name)] = { name, anzahl: 1, zuletzt: jetzt, abteilung: klassifiziere(name).abt };
+    }
+    sichere('verlauf', S.verlauf);
+  }
+}
+const sichereListe = () => sichere('liste', S.liste);
+const sichereVerlauf = () => sichere('verlauf', S.verlauf);
+const sichereProfile = () => { sichere('profile', S.profile); sichere('aktivesProfil', S.aktivesProfil); };
+const sichereEinstellungen = () => sichere('einstellungen', S.einstellungen);
+
+/* ============================================================
+   Katalog, Normalisierung und Klassifizierung
+   ============================================================ */
+
+function norm(s) {
+  return String(s || '').toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[-'’]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+}
+const kompakt = s => norm(s).replace(/ /g, '');
+
+// Schlüssel (kompakt) → { name: Hauptname, text: Schreibweise, abt, fehler }
+const INDEX = new Map();
+(function baueIndex() {
+  for (const abt of ABT_IDS) {
+    const roh = KATALOG[abt] || '';
+    for (const eintrag of roh.split(/[,\n]/).map(t => t.trim()).filter(Boolean)) {
+      const varianten = eintrag.split('|').map(v => v.trim()).filter(Boolean);
+      const hauptname = varianten[0].replace(/^~/, '');
+      for (const v of varianten) {
+        const fehler = v.startsWith('~');
+        const text = v.replace(/^~/, '');
+        const key = kompakt(text);
+        if (key && !INDEX.has(key)) INDEX.set(key, { name: hauptname, text, abt, fehler, key });
+      }
+    }
+  }
+})();
+const INDEX_KEYS = [...INDEX.keys()];
+
+const STOPWOERTER = new Set(['bio', 'laktosefrei', 'laktosefreie', 'laktosefreier', 'laktosefreies', 'lactosefrei', 'minus', 'l',
+  'ohne', 'mit', 'und', 'extra', 'light', 'frisch', 'frische', 'frischer', 'frisches', 'gross', 'grosse', 'grosser', 'klein',
+  'kleine', 'kleiner', 'packung', 'pack', 'stk', 'stueck', 'st', 'x', 'vegan', 'vegane', 'veganer', 'veganes', 'natur', 'zero',
+  'von', 'vom', 'fuer', 'in', 'im', 'der', 'die', 'das', 'ein', 'eine', 'g', 'kg', 'ml']);
+const TK_WOERTER = new Set(['tk', 'tiefkuehl', 'tiefgekuehlt', 'tiefgekuehlte', 'gefroren', 'gefrorene', 'tiefkuehlware']);
+const TK_TAUGLICH = new Set(['gemuese', 'obst', 'fisch', 'fleisch', 'brot', 'kuehlveg']);
+
+function staemme(t) {
+  const s = new Set([t]);
+  for (const end of ['n', 'e', 's']) if (t.endsWith(end)) s.add(t.slice(0, -1));
+  for (const end of ['en', 'er', 'es', 'ns']) if (t.endsWith(end)) s.add(t.slice(0, -2));
+  for (const end of ['n', 'e', 'en', 's']) s.add(t + end);
+  return [...s].filter(x => x.length >= 2);
+}
+function exakt(key) {
+  for (const k of staemme(key)) { const e = INDEX.get(k); if (e) return e; }
+  return null;
+}
+
+// Damerau-Levenshtein (optimale Zeichenkettenausrichtung)
+function distanz(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  const d = [];
+  for (let i = 0; i <= a.length; i++) { d[i] = [i]; }
+  for (let j = 0; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let zeilenMin = Infinity;
+    for (let j = 1; j <= b.length; j++) {
+      const k = a[i - 1] === b[j - 1] ? 0 : 1;
+      let v = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + k);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, d[i - 2][j - 2] + 1);
+      d[i][j] = v;
+      if (v < zeilenMin) zeilenMin = v;
+    }
+    if (zeilenMin > max) return max + 1;
+  }
+  return d[a.length][b.length];
+}
+const fehlerGrenze = len => len <= 4 ? 0 : len <= 6 ? 1 : 2;
+
+function naechsterTreffer(key) {
+  const max = fehlerGrenze(key.length);
+  if (!max) return null;
+  let best = null;
+  for (const k of INDEX_KEYS) {
+    if (Math.abs(k.length - key.length) > max) continue;
+    const dist = distanz(key, k, max);
+    if (dist <= max && (!best || dist < best.dist || (dist === best.dist && Math.abs(k.length - key.length) < Math.abs(best.e.key.length - key.length)))) {
+      best = { e: INDEX.get(k), dist };
+    }
+  }
+  return best;
+}
+
+// Findet den passenden Katalogeintrag zu einem frei eingegebenen Namen.
+// Rückgabe: { e: Eintrag, art: 'exakt'|'praefix'|'suffix'|'fuzzy', ganz: deckt den ganzen Namen ab, tk } oder null.
+function erkenne(name) {
+  let woerter = norm(name).split(' ').filter(w => w && !STOPWOERTER.has(w) && !/^\d/.test(w));
+  const tk = woerter.some(w => TK_WOERTER.has(w));
+  woerter = woerter.filter(w => !TK_WOERTER.has(w));
+  if (!woerter.length) return null;
+  const n = woerter.length;
+
+  // 1. Exakte Treffer, längste zusammenhängende Wortgruppe zuerst
+  for (let len = n; len >= 1; len--) {
+    let best = null;
+    for (let i = 0; i + len <= n; i++) {
+      const e = exakt(woerter.slice(i, i + len).join(''));
+      if (e && (!best || e.key.length >= best.key.length)) best = e;
+    }
+    if (best) return { e: best, art: 'exakt', ganz: len === n, tk };
+  }
+  // 2. Abgekürzt: Wort ist Anfang eines Katalogbegriffs („Tomatenkonz“)
+  const kandidaten = [woerter.join(''), ...woerter.slice().reverse()];
+  for (const t of kandidaten) {
+    if (t.length < 4) continue;
+    let best = null;
+    for (const k of INDEX_KEYS) if (k.length > t.length && k.startsWith(t) && (!best || k.length < best.length)) best = k;
+    if (best) return { e: INDEX.get(best), art: 'praefix', ganz: t === kandidaten[0], tk };
+  }
+  // 3. Zusammengesetztes Wort: längster Katalogbegriff am Wortende („Räucherforelle“)
+  for (const t of woerter.slice().reverse()) {
+    let best = null;
+    for (const s of staemme(t)) {
+      for (const k of INDEX_KEYS) {
+        if (k.length >= 3 && s.length > k.length + 1 && s.endsWith(k) && (!best || k.length > best.length)) best = k;
+      }
+    }
+    if (best) return { e: INDEX.get(best), art: 'suffix', ganz: n === 1, tk };
+  }
+  // 4. Tippfehler
+  let best = null;
+  for (const t of kandidaten) {
+    const f = naechsterTreffer(t);
+    if (f && (!best || f.dist < best.dist)) best = { ...f, ganz: t === kandidaten[0] };
+  }
+  if (best) return { e: best.e, art: 'fuzzy', ganz: best.ganz, tk };
+  return null;
+}
+
+function klassifiziere(name) {
+  const key = kompakt(name);
+  if (S.korrekturen[key]) return { abt: S.korrekturen[key], quelle: 'korrektur' };
+  const v = S.verlauf && S.verlauf[key];
+  if (v && v.abteilung && v.abteilung !== 'sonstiges') return { abt: v.abteilung, quelle: 'verlauf' };
+  const r = erkenne(name);
+  if (!r) return { abt: 'sonstiges', quelle: 'unbekannt' };
+  let abt = r.e.abt;
+  if (r.tk && TK_TAUGLICH.has(abt)) abt = 'tk';
+  return { abt, quelle: r.art };
+}
+
+// Korrigiert offensichtliche Tippfehler, wenn der ganze Name ein einziger Begriff ist.
+function korrigiere(name) {
+  const r = erkenne(name);
+  if (!r || !r.ganz) return name;
+  if (r.art === 'fuzzy') return r.e.fehler ? r.e.name : r.e.text;
+  if (r.art === 'exakt' && r.e.fehler) return r.e.name;
+  return name;
+}
+
+/* ============================================================
+   Eingabe zerlegen
+   ============================================================ */
+
+function parseMenge(text) {
+  const m = String(text).trim().match(/^(\d+(?:[.,]\d+)?)\s*(?:x|×|stk\.?|stück)?\s+(.+)$/i);
+  if (m) return { menge: parseFloat(m[1].replace(',', '.')), name: m[2].trim() };
+  return { menge: 1, name: String(text).trim() };
+}
+function zerlegeEingabe(text) {
+  return String(text).split(/[,;\n]+|\s+und\s+|\s+&\s+/i).map(t => t.trim()).filter(Boolean).map(parseMenge).filter(x => x.name);
+}
+
+/* ============================================================
+   Listenoperationen
+   ============================================================ */
+
+const offene = () => S.liste.filter(i => !i.erledigt && !i.pausiert);
+const findeOffen = key => S.liste.find(i => !i.erledigt && kompakt(i.name) === key);
+
+function merkeVerlauf(item) {
+  const key = kompakt(item.name);
+  const v = S.verlauf[key] || { name: item.name, anzahl: 0 };
+  v.name = item.name;
+  v.anzahl = (v.anzahl || 0) + 1;
+  v.zuletzt = Date.now();
+  v.abteilung = item.abteilung;
+  if (item.stamm) v.stamm = true;
+  if (item.ean) v.ean = item.ean;
+  S.verlauf[key] = v;
+}
+
+// Fügt einen Artikel hinzu oder erhöht die Menge, wenn er schon offen auf der Liste steht.
+function hinzufuegen(rohName, menge = 1, extra = {}) {
+  const name = gross(korrigiere(rohName.trim()));
+  if (!name) return null;
+  const key = kompakt(name);
+  let item = S.liste.find(i => kompakt(i.name) === key && (!i.erledigt || i.stamm));
+  if (item && !item.erledigt && !item.pausiert) {
+    item.menge = (item.menge || 1) + (menge || 1);
+  } else if (item) {
+    item.erledigt = false; item.pausiert = false; item.erledigtUm = null; item.menge = menge || 1;
+    S.liste.splice(S.liste.indexOf(item), 1); S.liste.push(item);
+  } else {
+    const v = S.verlauf[key];
+    item = {
+      id: uid(), name, menge: menge || 1, abteilung: extra.abteilung || klassifiziere(name).abt,
+      stamm: !!(v && v.stamm), erledigt: false, erledigtUm: null,
+    };
+    if (extra.notiz) item.notiz = extra.notiz;
+    if (extra.ean) item.ean = extra.ean;
+    S.liste.push(item);
+  }
+  merkeVerlauf(item);
+  return item;
+}
+
+function abhaken(id) {
+  const item = S.liste.find(i => i.id === id);
+  if (!item) return;
+  item.erledigt = !item.erledigt;
+  item.erledigtUm = item.erledigt ? Date.now() : null;
+  sichereListe();
+  render();
+}
+
+function entfernen(id) {
+  const idx = S.liste.findIndex(i => i.id === id);
+  if (idx < 0) return;
+  const item = S.liste[idx];
+  if (item.stamm) {
+    item.pausiert = true;
+    sichereListe(); render();
+    zeigeToast(`${item.name}: diesmal nicht`, 'Rückgängig', () => { item.pausiert = false; sichereListe(); render(); });
+  } else {
+    S.liste.splice(idx, 1);
+    sichereListe(); render();
+    zeigeToast(`${item.name} gelöscht`, 'Rückgängig', () => { S.liste.splice(Math.min(idx, S.liste.length), 0, item); sichereListe(); render(); });
+  }
+}
+
+function einkaufAbschliessen() {
+  const vorher = JSON.parse(JSON.stringify(S.liste));
+  const neu = [];
+  for (const item of S.liste) {
+    if (item.stamm) {
+      if (item.erledigt || item.pausiert) { item.erledigt = false; item.pausiert = false; item.erledigtUm = null; item.menge = 1; }
+      neu.push(item);
+    } else if (!item.erledigt) {
+      neu.push(item);
+    }
+  }
+  const anzahl = vorher.filter(i => i.erledigt).length;
+  S.liste = neu;
+  sichereListe(); render();
+  zeigeToast(`Einkauf abgeschlossen (${anzahl})`, 'Rückgängig', () => { S.liste = vorher; sichereListe(); render(); });
+}
+
+function setzeAbteilung(item, abt) {
+  item.abteilung = abt;
+  const key = kompakt(item.name);
+  S.korrekturen[key] = abt;
+  if (S.verlauf[key]) S.verlauf[key].abteilung = abt;
+  for (const i of S.liste) if (kompakt(i.name) === key) i.abteilung = abt;
+  sichere('korrekturen', S.korrekturen); sichereVerlauf(); sichereListe();
+}
+
+function setzeStamm(item, an) {
+  item.stamm = an;
+  const key = kompakt(item.name);
+  if (!S.verlauf[key]) merkeVerlauf(item);
+  S.verlauf[key].stamm = an;
+  sichereVerlauf(); sichereListe();
+}
+
+/* ============================================================
+   Vorschläge und Häufig-Chips
+   ============================================================ */
+
+function istBekannt(name) {
+  const key = kompakt(name);
+  if (S.verlauf[key]) return true;
+  const r = erkenne(name);
+  return !!(r && r.art === 'exakt' && r.ganz);
+}
+
+function vorschlaege(text) {
+  const { name } = parseMenge(text);
+  const t = kompakt(name);
+  const tw = norm(name);
+  if (t.length < 2) return [];
+  const aus = [];
+  const gesehen = new Set();
+  const nimm = (n, art, hinweis) => {
+    const k = kompakt(n);
+    if (gesehen.has(k) || aus.length >= 5) return;
+    gesehen.add(k);
+    aus.push({ name: n, art, hinweis });
+  };
+  const offenKeys = new Set(offene().map(i => kompakt(i.name)));
+  const hinweisFuer = n => offenKeys.has(kompakt(n)) ? 'schon auf der Liste' : ABT_NAME[klassifiziere(n).abt];
+
+  // Verlauf: Anfang des Namens oder eines Worts
+  const ausVerlauf = Object.entries(S.verlauf)
+    .filter(([k, v]) => k.startsWith(t) || norm(v.name).split(' ').some(w => w.startsWith(tw)))
+    .sort((a, b) => (b[1].anzahl - a[1].anzahl) || (b[1].zuletzt - a[1].zuletzt));
+  for (const [, v] of ausVerlauf) nimm(v.name, 'verlauf', hinweisFuer(v.name));
+
+  // Katalog: Anfang eines Begriffs, kurze zuerst
+  const ausKatalog = INDEX_KEYS.filter(k => k.startsWith(t)).sort((a, b) => a.length - b.length);
+  for (const k of ausKatalog) {
+    const e = INDEX.get(k);
+    nimm(e.fehler ? e.name : e.text, 'praefix', ABT_NAME[e.abt]);
+  }
+
+  // Tippfehler
+  if (aus.length < 5 && t.length >= 5 && !INDEX.has(t)) {
+    const f = naechsterTreffer(t);
+    if (f) nimm(f.e.fehler ? f.e.name : f.e.text, 'fuzzy', 'Korrektur');
+  }
+  // Exakt Getipptes nicht als Vorschlag wiederholen
+  return aus.filter(v => kompakt(v.name) !== t || v.art === 'verlauf').slice(0, 5);
+}
+
+function haeufige() {
+  const offenKeys = new Set(offene().map(i => kompakt(i.name)));
+  return Object.entries(S.verlauf)
+    .filter(([k]) => !offenKeys.has(k))
+    .sort((a, b) => (b[1].anzahl - a[1].anzahl) || (b[1].zuletzt - a[1].zuletzt))
+    .slice(0, 12).map(([, v]) => v.name);
+}
+
+/* ============================================================
+   Darstellung
+   ============================================================ */
+
+const aktivesProfil = () => S.profile.find(p => p.id === S.aktivesProfil) || S.profile[0];
+
+function sortiert(items) {
+  const offen = items.filter(i => !i.erledigt);
+  const erledigt = items.filter(i => i.erledigt).sort((a, b) => (a.erledigtUm || 0) - (b.erledigtUm || 0));
+  return [...offen, ...erledigt];
+}
+
+function zeileHTML(item, mitAbteilung) {
+  const menge = item.menge && item.menge !== 1 ? `<span class="menge">${esc(String(item.menge).replace('.', ','))}</span>` : '';
+  const sub = item.notiz ? `<span class="sub">${esc(item.notiz)}</span>` : '';
+  const zuordnen = item.abteilung === 'sonstiges' && !item.erledigt ? '<button type="button" class="zuordnen" data-aktion="zuordnen">zuordnen</button>' : '';
+  const abt = mitAbteilung && item.abteilung !== 'sonstiges' ? `<span>${esc(ABT_NAME[item.abteilung] || '')}</span>` : '';
+  return `<li class="zeile" data-id="${item.id}">
+    <div class="wisch${item.stamm ? ' pause' : ''}">${item.stamm ? 'Diesmal nicht' : 'Löschen'}</div>
+    <div class="item${item.erledigt ? ' erledigt' : ''}">
+      <button type="button" class="check" data-aktion="abhaken" aria-label="${item.erledigt ? 'Zurückholen' : 'Abhaken'}"><span>${ICON_HAKEN}</span></button>
+      <div class="txt" data-aktion="details">${menge}<span class="name">${esc(item.name)}</span>${sub}</div>
+      <div class="rechts">${zuordnen}${abt}${item.stamm ? ICON_STAMM : ''}</div>
+    </div>
+  </li>`;
+}
+
+function render() {
+  const ansicht = S.einstellungen.ansicht;
+  $$('.segment button').forEach(b => b.classList.toggle('an', b.dataset.ansicht === ansicht));
+  const sichtbar = S.liste.filter(i => !i.pausiert);
+  const pausiert = S.liste.filter(i => i.pausiert);
+  let html = '';
+
+  if (ansicht === 'laden') {
+    const p = aktivesProfil();
+    html += `<div class="ladenwahl">Laden <select id="profilWahl" aria-label="Laden wählen">${S.profile.map(x =>
+      `<option value="${x.id}"${x.id === p.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>`;
+  }
+
+  if (!sichtbar.length) {
+    html += `<div class="leer">Die Liste ist leer.<br>Oben eintragen, scannen oder ein Rezept übernehmen.</div>`;
+  } else if (ansicht === 'liste') {
+    html += `<ul class="artikel">${sortiert(sichtbar).map(i => zeileHTML(i, true)).join('')}</ul>`;
+  } else {
+    const p = aktivesProfil();
+    const reihenfolge = [...p.reihenfolge, ...ABT_IDS.filter(a => !p.reihenfolge.includes(a))];
+    const gruppen = abt => sichtbar.filter(i => i.abteilung === abt);
+    const gruppeHTML = abt => {
+      const items = gruppen(abt);
+      if (!items.length) return '';
+      const erledigt = items.filter(i => i.erledigt).length;
+      return `<section class="gruppe"><h2><span>${esc(ABT_NAME[abt] || abt)}</span><span>${erledigt ? `${erledigt}/${items.length}` : items.length}</span></h2>
+        <ul class="artikel">${sortiert(items).map(i => zeileHTML(i, false)).join('')}</ul></section>`;
+    };
+    html += reihenfolge.filter(a => !p.ausgeblendet.includes(a)).map(gruppeHTML).join('');
+    const versteckt = reihenfolge.filter(a => p.ausgeblendet.includes(a));
+    const anzahlVersteckt = versteckt.reduce((s, a) => s + gruppen(a).filter(i => !i.erledigt).length, 0);
+    if (versteckt.some(a => gruppen(a).length)) {
+      html += `<details class="versteckt"><summary>Nicht in diesem Laden (${anzahlVersteckt})</summary>${versteckt.map(gruppeHTML).join('')}</details>`;
+    }
+  }
+
+  if (pausiert.length) {
+    html += `<div class="pausiert">Diesmal nicht: ${pausiert.map(i => `<button type="button" data-zurueck="${i.id}">${esc(i.name)}</button>`).join(', ')}</div>`;
+  }
+
+  $('#main').innerHTML = html;
+  const nErledigt = S.liste.filter(i => i.erledigt).length;
+  $('#abschluss').hidden = !nErledigt;
+  $('#btnAbschluss').textContent = `Einkauf abschließen · ${nErledigt} erledigt`;
+  renderHilfe();
+}
+
+function renderHilfe() {
+  const feld = $('#eingabe');
+  const text = feld.value;
+  const vs = $('#vorschlaege');
+  const chips = $('#chips');
+  if (text.trim()) {
+    const liste = vorschlaege(text);
+    vs.hidden = !liste.length;
+    vs.innerHTML = liste.map((v, i) => `<li><button type="button" data-vorschlag="${i}">${esc(v.name)}<span class="hinweis">${esc(v.hinweis || '')}</span></button></li>`).join('');
+    vs._liste = liste;
+    chips.hidden = true;
+  } else {
+    vs.hidden = true;
+    const zeigen = document.activeElement === feld || !S.liste.some(i => !i.pausiert);
+    const namen = zeigen ? haeufige() : [];
+    chips.hidden = !namen.length;
+    chips.innerHTML = namen.map(n => `<button type="button" class="chip" data-chip="${esc(n)}">${esc(n)}</button>`).join('');
+  }
+}
+
+let toastTimer;
+function zeigeToast(text, aktion, beiAktion) {
+  const t = $('#toast');
+  $('#toastText').textContent = text;
+  const b = $('#toastAktion');
+  b.hidden = !aktion;
+  b.textContent = aktion || '';
+  b.onclick = () => { t.classList.remove('zeigen'); if (beiAktion) beiAktion(); };
+  t.classList.add('zeigen');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('zeigen'), aktion ? 5000 : 2500);
+}
+
+function blitze(id) {
+  requestAnimationFrame(() => {
+    const el = $(`.zeile[data-id="${id}"] .item`);
+    if (!el) return;
+    el.classList.remove('aufblitzen'); void el.offsetWidth; el.classList.add('aufblitzen');
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+}
+
+/* ============================================================
+   Eingabe
+   ============================================================ */
+
+function eintragen(eintraege) {
+  let letztes = null;
+  for (const { name, menge } of eintraege) letztes = hinzufuegen(name, menge) || letztes;
+  sichereListe(); sichereVerlauf();
+  render();
+  if (letztes) blitze(letztes.id);
+}
+
+$('#formEingabe').addEventListener('submit', e => {
+  e.preventDefault();
+  const feld = $('#eingabe');
+  const text = feld.value.trim();
+  if (!text) return;
+  let eintraege = zerlegeEingabe(text);
+  // Ein einzelner unbekannter Begriff: den ersten Vorschlag (Ergänzung oder Korrektur) übernehmen
+  if (eintraege.length === 1 && !istBekannt(eintraege[0].name)) {
+    const v = vorschlaege(text)[0];
+    if (v && kompakt(v.name) !== kompakt(eintraege[0].name)) eintraege = [{ name: v.name, menge: eintraege[0].menge }];
+  }
+  feld.value = '';
+  eintragen(eintraege);
+});
+
+$('#eingabe').addEventListener('input', renderHilfe);
+$('#eingabe').addEventListener('focus', renderHilfe);
+$('#eingabe').addEventListener('blur', () => setTimeout(renderHilfe, 150));
+
+// pointerdown verhindert, dass das Eingabefeld den Fokus verliert und die Tastatur zuklappt
+for (const id of ['#vorschlaege', '#chips']) {
+  $(id).addEventListener('pointerdown', e => { if (e.target.closest('button')) e.preventDefault(); });
+}
+$('#vorschlaege').addEventListener('click', e => {
+  const b = e.target.closest('[data-vorschlag]');
+  if (!b) return;
+  const v = $('#vorschlaege')._liste[+b.dataset.vorschlag];
+  const { menge } = parseMenge($('#eingabe').value);
+  $('#eingabe').value = '';
+  eintragen([{ name: v.name, menge }]);
+});
+$('#chips').addEventListener('click', e => {
+  const b = e.target.closest('[data-chip]');
+  if (b) eintragen([{ name: b.dataset.chip, menge: 1 }]);
+});
+
+$$('.segment button').forEach(b => b.addEventListener('click', () => {
+  S.einstellungen.ansicht = b.dataset.ansicht;
+  sichereEinstellungen(); render();
+  window.scrollTo({ top: 0 });
+}));
+
+$('#btnAbschluss').addEventListener('click', einkaufAbschliessen);
+
+$('#main').addEventListener('change', e => {
+  if (e.target.id === 'profilWahl') { S.aktivesProfil = e.target.value; sichereProfile(); render(); }
+});
+
+$('#main').addEventListener('click', e => {
+  const zurueck = e.target.closest('[data-zurueck]');
+  if (zurueck) {
+    const item = S.liste.find(i => i.id === zurueck.dataset.zurueck);
+    if (item) { item.pausiert = false; sichereListe(); render(); }
+    return;
+  }
+  const zeile = e.target.closest('.zeile');
+  if (!zeile || zeile._gewischt) return;
+  const item = S.liste.find(i => i.id === zeile.dataset.id);
+  const aktion = e.target.closest('[data-aktion]')?.dataset.aktion;
+  if (!item || !aktion) return;
+  if (aktion === 'abhaken') abhaken(item.id);
+  else if (aktion === 'details') oeffneDetails(item);
+  else if (aktion === 'zuordnen') oeffneAbteilungWahl(item);
+});
+
+/* Nach links wischen: löschen bzw. „diesmal nicht“ */
+(function wischen() {
+  let start = null;
+  const main = $('#main');
+  main.addEventListener('touchstart', e => {
+    const item = e.target.closest('.item');
+    if (!item || e.touches.length > 1) return;
+    start = { x: e.touches[0].clientX, y: e.touches[0].clientY, item, dx: 0, aktiv: false };
+  }, { passive: true });
+  main.addEventListener('touchmove', e => {
+    if (!start) return;
+    const dx = e.touches[0].clientX - start.x;
+    const dy = e.touches[0].clientY - start.y;
+    if (!start.aktiv) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { start = null; return; }
+      if (dx < -10) { start.aktiv = true; start.item.classList.add('zieht'); }
+      else return;
+    }
+    start.dx = Math.min(0, dx);
+    start.item.style.transform = `translateX(${start.dx}px)`;
+  }, { passive: true });
+  main.addEventListener('touchend', () => {
+    if (!start) return;
+    const { item, dx, aktiv } = start;
+    start = null;
+    if (!aktiv) return;
+    item.classList.remove('zieht');
+    const zeile = item.closest('.zeile');
+    zeile._gewischt = true;
+    setTimeout(() => { zeile._gewischt = false; }, 350);
+    if (dx < -Math.min(110, item.offsetWidth * 0.3)) {
+      item.style.transform = 'translateX(-100%)';
+      setTimeout(() => entfernen(zeile.dataset.id), 180);
+    } else {
+      item.style.transform = '';
+    }
+  });
+})();
+
+/* ============================================================
+   Blätter (Bottom Sheets)
+   ============================================================ */
+
+function oeffneBlatt(html, { voll = false } = {}) {
+  const hint = document.createElement('div');
+  hint.className = 'hinterlegt';
+  hint.innerHTML = `<div class="blatt${voll ? ' voll' : ''}" role="dialog" aria-modal="true">${html}</div>`;
+  document.body.appendChild(hint);
+  document.body.style.overflow = 'hidden';
+  requestAnimationFrame(() => hint.classList.add('offen'));
+  hint.addEventListener('click', e => { if (e.target === hint) schliesseBlatt(hint); });
+  hint.addEventListener('click', e => { if (e.target.closest('[data-schliessen]')) schliesseBlatt(hint); });
+  return hint;
+}
+function schliesseBlatt(hint) {
+  if (!hint || !hint.isConnected) return;
+  hint.classList.remove('offen');
+  setTimeout(() => {
+    hint.remove();
+    if (!$('.hinterlegt')) document.body.style.overflow = '';
+    if (hint._beimSchliessen) hint._beimSchliessen();
+  }, 200);
+}
+const abteilungsOptionen = aktiv => ABTEILUNGEN.map(a => `<option value="${a.id}"${a.id === aktiv ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
+
+function oeffneDetails(item) {
+  const b = oeffneBlatt(`
+    <div class="blatt-kopf"><h3>Artikel</h3><button type="button" class="zurueck" data-schliessen>Fertig</button></div>
+    <label class="feld"><span>Name</span><input type="text" id="dName" value="${esc(item.name)}"></label>
+    <div class="feld"><span>Menge</span>
+      <div class="stepper"><button type="button" id="dMinus" aria-label="Weniger">−</button><output id="dMenge">${esc(String(item.menge || 1).replace('.', ','))}</output><button type="button" id="dPlus" aria-label="Mehr">+</button></div>
+    </div>
+    <label class="feld"><span>Abteilung</span><select id="dAbt">${abteilungsOptionen(item.abteilung)}</select></label>
+    <label class="feld"><span>Marke / Notiz</span><input type="text" id="dNotiz" value="${esc(item.notiz || '')}" placeholder="z. B. Alnatura, 1,5 %"></label>
+    <label class="schalter"><div>Wird immer benötigt<small>Steht nach jedem Einkauf von selbst wieder auf der Liste</small></div><input type="checkbox" id="dStamm"${item.stamm ? ' checked' : ''}></label>
+    <div class="knopfreihe"><button type="button" class="knopf gefahr" id="dLoeschen">Von der Liste löschen</button></div>
+  `);
+  const menge = () => item.menge || 1;
+  const zeigeMenge = () => { $('#dMenge', b).textContent = String(menge()).replace('.', ','); };
+  $('#dMinus', b).onclick = () => { item.menge = Math.max(1, menge() - 1); zeigeMenge(); sichereListe(); };
+  $('#dPlus', b).onclick = () => { item.menge = menge() + 1; zeigeMenge(); sichereListe(); };
+  $('#dAbt', b).onchange = e => setzeAbteilung(item, e.target.value);
+  $('#dStamm', b).onchange = e => setzeStamm(item, e.target.checked);
+  $('#dNotiz', b).oninput = e => { item.notiz = e.target.value.trim() || undefined; sichereListe(); };
+  $('#dLoeschen', b).onclick = () => {
+    const idx = S.liste.indexOf(item);
+    if (idx >= 0) S.liste.splice(idx, 1);
+    sichereListe(); schliesseBlatt(b);
+    zeigeToast(`${item.name} gelöscht`, 'Rückgängig', () => { S.liste.splice(Math.max(0, idx), 0, item); sichereListe(); render(); });
+  };
+  b._beimSchliessen = () => {
+    const neu = $('#dName', b).value.trim();
+    if (neu && neu !== item.name) {
+      item.name = neu;
+      if (!S.korrekturen[kompakt(neu)]) item.abteilung = $('#dAbt', b).value;
+      merkeVerlauf(item); sichereVerlauf();
+    }
+    sichereListe(); render();
+  };
+}
+
+function oeffneAbteilungWahl(item) {
+  const b = oeffneBlatt(`
+    <div class="blatt-kopf"><h3>${esc(item.name)}</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
+    <p class="text-muted">Abteilung wählen. Die App merkt sich das für diesen Artikel.</p>
+    <ul class="liste-einst">${ABTEILUNGEN.filter(a => a.id !== 'sonstiges').map(a =>
+      `<li><button type="button" class="fuellen" data-abt="${a.id}">${esc(a.name)}</button></li>`).join('')}</ul>
+  `);
+  b.addEventListener('click', e => {
+    const x = e.target.closest('[data-abt]');
+    if (!x) return;
+    setzeAbteilung(item, x.dataset.abt);
+    schliesseBlatt(b); render();
+  });
+}
+
+/* ============================================================
+   Einstellungen
+   ============================================================ */
+
+$('#btnEinstellungen').addEventListener('click', oeffneEinstellungen);
+
+function oeffneEinstellungen() {
+  const b = oeffneBlatt('<div id="einst"></div>', { voll: true });
+  const zeichne = () => {
+    const stamm = Object.values(S.verlauf).filter(v => v.stamm).sort((x, y) => x.name.localeCompare(y.name, 'de'));
+    $('#einst', b).innerHTML = `
+      <div class="blatt-kopf"><h3>Einstellungen</h3><button type="button" class="zurueck" data-schliessen>Fertig</button></div>
+      <div class="abschnitt">Läden</div>
+      <ul class="liste-einst">${S.profile.map(p => `<li><button type="button" class="fuellen" data-profil="${p.id}">${esc(p.name)}
+        <span class="klein">${p.ort ? ' · Standort gespeichert' : ''}${p.ausgeblendet.length ? ` · ${ABT_IDS.length - p.ausgeblendet.length} Abteilungen` : ''}</span></button></li>`).join('')}
+        <li><button type="button" class="fuellen" id="eNeuesProfil" style="color:var(--accent)">Laden hinzufügen</button></li></ul>
+      <label class="schalter"><div>Laden per Standort wählen<small>Beim Öffnen im Laden passendes Profil einstellen</small></div><input type="checkbox" id="eStandort"${S.einstellungen.standort ? ' checked' : ''}></label>
+
+      <div class="abschnitt">Stammartikel</div>
+      ${stamm.length ? `<ul class="liste-einst">${stamm.map(v => `<li><span class="fuellen" style="flex:1">${esc(v.name)}</span>
+        <button type="button" class="zurueck" data-stamm-weg="${esc(kompakt(v.name))}" style="color:var(--danger)">Entfernen</button></li>`).join('')}</ul>`
+        : '<p class="text-muted">Noch keine. Artikel antippen und „Wird immer benötigt“ einschalten.</p>'}
+
+      <div class="abschnitt">Rezept-Fotos</div>
+      <label class="feld"><span>Claude-API-Schlüssel (bleibt nur auf diesem Gerät)</span>
+        <input type="password" id="eApiKey" value="${esc(S.einstellungen.apiKey)}" placeholder="sk-ant-…" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+      <p class="text-muted">Ohne Schlüssel funktioniert „Text einfügen“ weiterhin. Mit Schlüssel kostet ein Rezeptfoto etwa 2–3 Cent.</p>
+
+      <div class="abschnitt">Daten</div>
+      <div class="knopfreihe">
+        <button type="button" class="knopf zweit" id="eExport">Sicherung exportieren</button>
+        <button type="button" class="knopf zweit" id="eImport">Sicherung importieren</button>
+        <button type="button" class="knopf gefahr" id="eVerlaufLeeren">Verlauf und gelernte Zuordnungen löschen</button>
+      </div>
+      <input type="file" id="eImportDatei" accept="application/json,.json" hidden>
+      <p class="text-muted" style="margin-top:20px">${Object.keys(S.verlauf).length} Artikel im Verlauf · ${Object.keys(S.korrekturen).length} gelernte Zuordnungen · ${INDEX.size} Katalogbegriffe</p>
+    `;
+  };
+  zeichne();
+  b.addEventListener('click', e => {
+    const p = e.target.closest('[data-profil]');
+    if (p) return oeffneProfil(S.profile.find(x => x.id === p.dataset.profil), zeichne);
+    if (e.target.closest('#eNeuesProfil')) {
+      const neu = { id: uid(), name: 'Neuer Laden', reihenfolge: [...aktivesProfil().reihenfolge], ausgeblendet: [] };
+      S.profile.push(neu); sichereProfile();
+      return oeffneProfil(neu, zeichne);
+    }
+    const weg = e.target.closest('[data-stamm-weg]');
+    if (weg) {
+      const key = weg.dataset.stammWeg;
+      if (S.verlauf[key]) S.verlauf[key].stamm = false;
+      for (const i of S.liste) if (kompakt(i.name) === key) i.stamm = false;
+      sichereVerlauf(); sichereListe(); zeichne();
+      return;
+    }
+    if (e.target.closest('#eExport')) return exportieren();
+    if (e.target.closest('#eImport')) return $('#eImportDatei', b).click();
+    if (e.target.closest('#eVerlaufLeeren')) {
+      if (!confirm('Verlauf, gelernte Abteilungen und gespeicherte Barcodes löschen? Die aktuelle Liste bleibt.')) return;
+      for (const i of S.liste) if (i.stamm) merkeVerlauf(i);
+      S.verlauf = Object.fromEntries(Object.entries(S.verlauf).filter(([, v]) => v.stamm));
+      S.korrekturen = {}; S.eans = {};
+      sichereVerlauf(); sichere('korrekturen', {}); sichere('eans', {});
+      zeichne();
+    }
+  });
+  b.addEventListener('change', e => {
+    if (e.target.id === 'eStandort') { S.einstellungen.standort = e.target.checked; sichereEinstellungen(); if (e.target.checked) waehleLadenPerStandort(true); }
+    if (e.target.id === 'eApiKey') { S.einstellungen.apiKey = e.target.value.trim(); sichereEinstellungen(); }
+    if (e.target.id === 'eImportDatei' && e.target.files[0]) importieren(e.target.files[0], zeichne);
+  });
+  b._beimSchliessen = render;
+}
+
+function oeffneProfil(p, nachher) {
+  const b = oeffneBlatt('<div id="prof"></div>', { voll: true });
+  const zeichne = () => {
+    const reihenfolge = [...p.reihenfolge, ...ABT_IDS.filter(a => !p.reihenfolge.includes(a))];
+    $('#prof', b).innerHTML = `
+      <div class="blatt-kopf"><button type="button" class="zurueck" data-schliessen>Zurück</button><h3></h3></div>
+      <label class="feld"><span>Name</span><input type="text" id="pName" value="${esc(p.name)}" placeholder="z. B. REWE Hauptstraße"></label>
+      <div class="abschnitt">Laufweg</div>
+      <p class="text-muted">Am Griff ziehen, um die Reihenfolge zu ändern. Haken entfernen, wenn es die Abteilung in diesem Laden nicht gibt.</p>
+      <ul class="liste-einst" id="pAbts">${reihenfolge.map(a => `<li data-abt="${a}" class="${p.ausgeblendet.includes(a) ? 'aus' : ''}">
+        <input type="checkbox" aria-label="In diesem Laden vorhanden"${p.ausgeblendet.includes(a) ? '' : ' checked'}>
+        <span class="abtname" style="flex:1">${esc(ABT_NAME[a])}</span><span class="griff" aria-label="Verschieben">${ICON_GRIFF}</span></li>`).join('')}</ul>
+      <div class="abschnitt">Standort</div>
+      <p class="text-muted">${p.ort ? `Gespeichert (±${Math.round(p.ort.genau || 0)} m).` : 'Nicht gespeichert. Im Laden stehend übernehmen, dann wählt die App diesen Laden automatisch.'}</p>
+      <div class="knopfreihe">
+        <button type="button" class="knopf zweit" id="pOrt">Aktuellen Standort übernehmen</button>
+        ${p.ort ? '<button type="button" class="knopf zweit" id="pOrtWeg">Standort entfernen</button>' : ''}
+        ${S.profile.length > 1 ? '<button type="button" class="knopf gefahr" id="pLoeschen">Laden löschen</button>' : ''}
+      </div>`;
+    ziehbar($('#pAbts', b), () => { p.reihenfolge = $$('#pAbts li', b).map(li => li.dataset.abt); sichereProfile(); });
+  };
+  zeichne();
+  b.addEventListener('input', e => { if (e.target.id === 'pName') { p.name = e.target.value.trim() || 'Laden'; sichereProfile(); } });
+  b.addEventListener('change', e => {
+    const li = e.target.closest('#pAbts li');
+    if (li && e.target.type === 'checkbox') {
+      const a = li.dataset.abt;
+      p.ausgeblendet = e.target.checked ? p.ausgeblendet.filter(x => x !== a) : [...p.ausgeblendet, a];
+      li.classList.toggle('aus', !e.target.checked);
+      sichereProfile();
+    }
+  });
+  b.addEventListener('click', async e => {
+    if (e.target.closest('#pOrt')) {
+      try {
+        e.target.disabled = true; e.target.innerHTML = '<span class="laedt"></span>Standort wird bestimmt';
+        const pos = await standort();
+        p.ort = { lat: pos.coords.latitude, lon: pos.coords.longitude, genau: pos.coords.accuracy };
+        sichereProfile(); zeichne();
+      } catch (err) { zeigeToast('Standort nicht verfügbar'); zeichne(); }
+    }
+    if (e.target.closest('#pOrtWeg')) { delete p.ort; sichereProfile(); zeichne(); }
+    if (e.target.closest('#pLoeschen') && confirm(`„${p.name}“ löschen?`)) {
+      S.profile = S.profile.filter(x => x !== p);
+      if (S.aktivesProfil === p.id) S.aktivesProfil = S.profile[0].id;
+      sichereProfile(); schliesseBlatt(b);
+    }
+  });
+  b._beimSchliessen = nachher;
+}
+
+// Sortieren per Ziehen am Griff
+function ziehbar(ul, beiEnde) {
+  let li = null, versatz = 0;
+  ul.addEventListener('pointerdown', e => {
+    const griff = e.target.closest('.griff');
+    if (!griff) return;
+    e.preventDefault();
+    li = griff.closest('li');
+    versatz = e.clientY;
+    li.classList.add('zieht');
+    griff.setPointerCapture(e.pointerId);
+  });
+  ul.addEventListener('pointermove', e => {
+    if (!li) return;
+    const dy = e.clientY - versatz;
+    li.style.transform = `translateY(${dy}px)`;
+    const nachbarn = [...ul.children].filter(x => x !== li);
+    const mitte = li.getBoundingClientRect().top + li.offsetHeight / 2;
+    for (const n of nachbarn) {
+      const r = n.getBoundingClientRect();
+      const nMitte = r.top + r.height / 2;
+      if (n === li.previousElementSibling && mitte < nMitte) { ul.insertBefore(li, n); versatz -= r.height; li.style.transform = `translateY(${e.clientY - versatz}px)`; break; }
+      if (n === li.nextElementSibling && mitte > nMitte) { ul.insertBefore(n, li); versatz += r.height; li.style.transform = `translateY(${e.clientY - versatz}px)`; break; }
+    }
+  });
+  const ende = () => {
+    if (!li) return;
+    li.style.transform = ''; li.classList.remove('zieht'); li = null;
+    beiEnde();
+  };
+  ul.addEventListener('pointerup', ende);
+  ul.addEventListener('pointercancel', ende);
+}
+
+/* Sicherung */
+async function exportieren() {
+  const daten = { version: 1, exportiert: new Date().toISOString(), liste: S.liste, verlauf: S.verlauf, korrekturen: S.korrekturen,
+    eans: S.eans, profile: S.profile, aktivesProfil: S.aktivesProfil, einstellungen: { ...S.einstellungen, apiKey: '' } };
+  const name = `einkaufsliste-${new Date().toISOString().slice(0, 10)}.json`;
+  const datei = new File([JSON.stringify(daten, null, 1)], name, { type: 'application/json' });
+  if (navigator.canShare && navigator.canShare({ files: [datei] })) {
+    try { await navigator.share({ files: [datei], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(datei); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+async function importieren(datei, nachher) {
+  try {
+    const d = JSON.parse(await datei.text());
+    if (!d || !Array.isArray(d.liste) || !Array.isArray(d.profile)) throw new Error('Format');
+    if (!confirm('Sicherung einspielen? Die aktuellen Daten werden ersetzt (der API-Schlüssel bleibt).')) return;
+    S.liste = d.liste; S.verlauf = d.verlauf || {}; S.korrekturen = d.korrekturen || {}; S.eans = d.eans || {};
+    S.profile = d.profile; S.aktivesProfil = d.aktivesProfil || d.profile[0].id;
+    S.einstellungen = { ...S.einstellungen, ...(d.einstellungen || {}), apiKey: S.einstellungen.apiKey };
+    sichereListe(); sichereVerlauf(); sichere('korrekturen', S.korrekturen); sichere('eans', S.eans); sichereProfile(); sichereEinstellungen();
+    zeigeToast('Sicherung eingespielt'); nachher(); render();
+  } catch (e) { zeigeToast('Datei konnte nicht gelesen werden'); }
+}
+
+/* ============================================================
+   Standort
+   ============================================================ */
+
+function standort() {
+  return new Promise((ok, fehler) => {
+    if (!navigator.geolocation) return fehler(new Error('keine Geolocation'));
+    navigator.geolocation.getCurrentPosition(ok, fehler, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
+  });
+}
+function entfernungMeter(a, b) {
+  const R = 6371000, rad = x => x * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+async function waehleLadenPerStandort(mitMeldung) {
+  if (!S.profile.some(p => p.ort)) { if (mitMeldung) zeigeToast('Erst bei einem Laden den Standort speichern'); return; }
+  try {
+    const pos = await standort();
+    const hier = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+    const treffer = S.profile.filter(p => p.ort).map(p => ({ p, m: entfernungMeter(hier, p.ort) })).sort((a, b) => a.m - b.m)[0];
+    if (treffer && treffer.m <= 250) {
+      S.aktivesProfil = treffer.p.id; S.einstellungen.ansicht = 'laden';
+      sichereProfile(); sichereEinstellungen(); render();
+      zeigeToast(`Laden: ${treffer.p.name}`);
+    } else if (mitMeldung) zeigeToast('Kein gespeicherter Laden in der Nähe');
+  } catch (e) { if (mitMeldung) zeigeToast('Standort nicht verfügbar'); }
+}
+
+/* ============================================================
+   Barcode
+   ============================================================ */
+
+$('#btnScan').addEventListener('click', oeffneScanner);
+
+function ladeSkript(src) {
+  return new Promise((ok, fehler) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = ok; s.onerror = fehler;
+    document.head.appendChild(s);
+  });
+}
+
+async function oeffneScanner() {
+  const el = document.createElement('div');
+  el.className = 'scanner';
+  el.innerHTML = `<video playsinline muted autoplay></video><div class="rahmen"></div>
+    <div class="oben"><button type="button" data-zu>Abbrechen</button><button type="button" data-hand>Nummer eingeben</button></div>
+    <div class="unten" id="scanHinweis">Barcode in den Rahmen halten</div>`;
+  document.body.appendChild(el);
+  const video = $('video', el);
+  let stopp = () => {};
+  let fertig = false;
+  const schliessen = () => { fertig = true; stopp(); el.remove(); };
+  el.querySelector('[data-zu]').onclick = schliessen;
+  el.querySelector('[data-hand]').onclick = () => {
+    const ean = prompt('EAN-Nummer (unter dem Barcode):');
+    if (ean && /^\d{8,14}$/.test(ean.trim())) { schliessen(); barcodeGefunden(ean.trim()); }
+  };
+  const gefunden = code => { if (fertig) return; schliessen(); barcodeGefunden(code); };
+
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('keine Kamera');
+    if ('BarcodeDetector' in window) {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      stopp = () => stream.getTracks().forEach(t => t.stop());
+      video.srcObject = stream;
+      await video.play();
+      const detektor = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+      const schleife = async () => {
+        if (fertig) return;
+        try { const r = await detektor.detect(video); if (r[0]) return gefunden(r[0].rawValue); } catch (e) {}
+        requestAnimationFrame(schleife);
+      };
+      schleife();
+    } else {
+      if (!window.ZXing) await ladeSkript('vendor/zxing.min.js');
+      const hints = new Map();
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E]);
+      const leser = new ZXing.BrowserMultiFormatReader(hints, 300);
+      stopp = () => leser.reset();
+      await leser.decodeFromConstraints({ video: { facingMode: 'environment' }, audio: false }, video, r => { if (r) gefunden(r.getText()); });
+    }
+  } catch (e) {
+    $('#scanHinweis', el).textContent = location.protocol === 'https:' || location.hostname === 'localhost'
+      ? 'Kamera nicht verfügbar. Zugriff in den Einstellungen erlauben oder Nummer eingeben.'
+      : 'Die Kamera geht nur, wenn die App über https geöffnet wird. Nummer eingeben geht trotzdem.';
+  }
+}
+
+function abteilungAusTags(tags, standard) {
+  const alle = (tags || []).join(' ');
+  for (const [muster, abt] of OFF_KATEGORIEN) if (alle.includes(muster)) return abt;
+  return standard;
+}
+
+async function holeJSON(url, ms = 7000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) { return null; } finally { clearTimeout(t); }
+}
+
+function produktname(p) {
+  const marke = gross((p.brands || '').split(',')[0].trim());
+  let name = (p.product_name_de || p.product_name || p.generic_name_de || p.generic_name || '').trim();
+  if (marke && name.toLowerCase().includes(marke.toLowerCase())) name = name.replace(new RegExp(marke.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '').trim();
+  const menge = (p.quantity || '').trim();
+  return [marke, name, menge].filter(Boolean).join(' ').replace(/\s+/g, ' ');
+}
+
+async function sucheProdukt(ean) {
+  const felder = 'product_name,product_name_de,generic_name,generic_name_de,brands,quantity,categories_tags';
+  const quellen = [
+    ['https://world.openfoodfacts.org', null],
+    ['https://world.openbeautyfacts.org', 'drogerie'],
+    ['https://world.openproductsfacts.org', 'haushalt'],
+  ];
+  for (const [basis, standard] of quellen) {
+    const d = await holeJSON(`${basis}/api/v2/product/${ean}.json?fields=${felder}`);
+    if (d && d.status === 1 && d.product) {
+      const name = produktname(d.product);
+      if (!name) continue;
+      const abt = abteilungAusTags(d.product.categories_tags, standard) || klassifiziere(d.product.product_name_de || d.product.product_name || name).abt;
+      return { name, abt };
+    }
+  }
+  return null;
+}
+
+async function barcodeGefunden(ean) {
+  const b = oeffneBlatt(`<div class="blatt-kopf"><h3>Barcode ${esc(ean)}</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
+    <p id="bcStatus"><span class="laedt"></span>Produkt wird gesucht</p><div id="bcForm"></div>`);
+  let treffer = S.eans[ean] || null;
+  if (!treffer) treffer = await sucheProdukt(ean);
+  if (!b.isConnected) return;
+  $('#bcStatus', b).textContent = treffer ? (S.eans[ean] ? 'Schon einmal gescannt.' : 'Gefunden. Name bei Bedarf kürzen.')
+    : 'Nicht in der Produktdatenbank. Einmal benennen, dann merkt sich die App den Barcode.';
+  $('#bcForm', b).innerHTML = `
+    <label class="feld"><span>Name</span><input type="text" id="bcName" value="${esc(treffer ? treffer.name : '')}" placeholder="z. B. Alpro Haferdrink Barista 1 l"></label>
+    <label class="feld"><span>Abteilung</span><select id="bcAbt">${abteilungsOptionen(treffer ? treffer.abt : 'sonstiges')}</select></label>
+    <div class="knopfreihe"><button type="button" class="knopf" id="bcOk">Hinzufügen</button></div>`;
+  const feld = $('#bcName', b);
+  if (!treffer) feld.focus();
+  feld.addEventListener('input', () => { if (!treffer) $('#bcAbt', b).value = klassifiziere(feld.value).abt; });
+  $('#bcOk', b).onclick = () => {
+    const name = feld.value.trim();
+    if (!name) return feld.focus();
+    const abt = $('#bcAbt', b).value;
+    S.eans[ean] = { name, abt };
+    sichere('eans', S.eans);
+    S.korrekturen[kompakt(name)] = abt; sichere('korrekturen', S.korrekturen);
+    const item = hinzufuegen(name, 1, { abteilung: abt, ean });
+    item.abteilung = abt;
+    sichereListe(); sichereVerlauf();
+    schliesseBlatt(b); render(); if (item) blitze(item.id);
+  };
+}
+
+/* ============================================================
+   Rezept
+   ============================================================ */
+
+$('#btnRezept').addEventListener('click', oeffneRezept);
+
+const EINHEITEN = ['g', 'gr', 'gramm', 'kg', 'mg', 'ml', 'cl', 'dl', 'l', 'liter', 'el', 'tl', 'essloffel', 'esslöffel', 'teelöffel', 'teeloffel',
+  'msp', 'messerspitze', 'prise', 'prisen', 'stk', 'stück', 'stck', 'dose', 'dosen', 'pck', 'pkg', 'päckchen', 'packung', 'packungen', 'pkt',
+  'bund', 'zehe', 'zehen', 'scheibe', 'scheiben', 'becher', 'glas', 'gläser', 'tasse', 'tassen', 'handvoll', 'zweig', 'zweige', 'stange',
+  'stangen', 'blatt', 'blätter', 'kopf', 'köpfe', 'knolle', 'knollen', 'schuss', 'spritzer', 'etwas', 'ca', 'circa', 'je', 'evtl', 'n.b.', 'nb',
+  'große', 'großer', 'großes', 'groß', 'kleine', 'kleiner', 'kleines', 'klein', 'mittelgroße', 'mittelgroßer', 'mittelgroßes', 'reife', 'reifer',
+  'frische', 'frischer', 'frisches', 'frisch', 'getrocknete', 'getrockneter', 'getrocknetes', 'gehackte', 'gehackter', 'tl.', 'el.', 'cup', 'cups', 'tbsp', 'tsp', 'oz'];
+const EINHEIT_RE = new RegExp(`^(?:${EINHEITEN.map(e => e.replace('.', '\\.')).join('|')})\\.?(?=\\s|$)`, 'i');
+
+function parseRezept(text) {
+  const zeilen = String(text).replace(/\r/g, '').split('\n');
+  // Nur eine Zeile mit Kommas (z. B. aus einem Fließtext): an Kommas trennen
+  const teile = zeilen.filter(z => z.trim()).length === 1 ? zeilen[0].split(/[,;]/) : zeilen;
+  const aus = [];
+  for (let z of teile) {
+    z = z.replace(/^[\s•·\-–—*▢□☐◦○●✓✔]+/, '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!z || z.endsWith(':') || z.length > 70) continue;
+    if (/^(zutaten|zubereitung|anleitung|schritt|portion|für \d|personen|nährwerte|tipp|dazu|außerdem)/i.test(z)) continue;
+    z = z.split(',')[0];
+    z = z.replace(/\b(nach (belieben|geschmack|bedarf)|zum (garnieren|bestreuen|servieren|braten|anbraten)|optional|zum Abschmecken|für die Form)\b.*$/i, '').trim();
+    for (let i = 0; i < 6; i++) {
+      const vorher = z;
+      z = z.replace(/^(ca\.?\s*)?[\d½¼¾⅓⅔⅛.,/\s-]+(?=\D)/, '').trim();
+      z = z.replace(EINHEIT_RE, '').trim();
+      z = z.replace(/^(à|a|von|vom|der|die|das)\s+/i, '').trim();
+      if (z === vorher) break;
+    }
+    if (!z || /^\d/.test(z) || z.length < 2) continue;
+    for (const teil of z.split(/\s+(?:und|oder|&)\s+|\s*\/\s*/)) {
+      const t = teil.trim();
+      if (t.length >= 2) aus.push(t);
+    }
+  }
+  return aus;
+}
+
+// Rezeptzeile → Artikel mit Hauptnamen aus dem Katalog („Knoblauchzehen“ → „Knoblauch“)
+function rezeptArtikel(namen) {
+  const offenKeys = new Set(offene().map(i => kompakt(i.name)));
+  const vorrat = new Set(VORRAT.map(kompakt));
+  const gesehen = new Set();
+  const aus = [];
+  for (const roh of namen) {
+    const r = erkenne(roh.name || roh);
+    let name = gross((roh.name || roh).trim());
+    if (r && r.ganz && r.art !== 'praefix') name = r.e.name;
+    const key = kompakt(name);
+    if (!key || gesehen.has(key)) continue;
+    gesehen.add(key);
+    const abt = roh.abteilung && ABT_IDS.includes(roh.abteilung) && !S.korrekturen[key] ? roh.abteilung : klassifiziere(name).abt;
+    const grund = offenKeys.has(key) ? 'auf der Liste' : vorrat.has(key) ? 'Vorrat' : '';
+    aus.push({ name, abt, an: !grund, grund });
+  }
+  return aus;
+}
+
+function oeffneRezept() {
+  const mitKey = !!S.einstellungen.apiKey;
+  const b = oeffneBlatt(`
+    <div class="blatt-kopf"><h3>Rezept übernehmen</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
+    <p class="text-muted">Im Foto oder Screenshot die Zutaten markieren (Text gedrückt halten), kopieren und hier einfügen.</p>
+    <label class="feld"><span>Zutaten</span><textarea id="rText" placeholder="200 g Spaghetti&#10;2 Zehen Knoblauch&#10;1 Bund Basilikum"></textarea></label>
+    <div class="knopfreihe">
+      <button type="button" class="knopf" id="rWeiter">Zutaten übernehmen</button>
+      <button type="button" class="knopf zweit" id="rFoto">${mitKey ? 'Foto wählen und erkennen lassen' : 'Foto erkennen lassen (API-Schlüssel nötig)'}</button>
+    </div>
+    <input type="file" id="rDatei" accept="image/*" hidden>
+    <p class="text-muted" id="rStatus"></p>`);
+  $('#rWeiter', b).onclick = () => {
+    const namen = parseRezept($('#rText', b).value);
+    if (!namen.length) return zeigeToast('Keine Zutaten erkannt');
+    schliesseBlatt(b);
+    setTimeout(() => oeffnePruefung(rezeptArtikel(namen)), 220);
+  };
+  $('#rFoto', b).onclick = () => {
+    if (!S.einstellungen.apiKey) { schliesseBlatt(b); setTimeout(oeffneEinstellungen, 220); return; }
+    $('#rDatei', b).click();
+  };
+  $('#rDatei', b).onchange = async e => {
+    const datei = e.target.files[0];
+    if (!datei) return;
+    const status = $('#rStatus', b);
+    status.innerHTML = '<span class="laedt"></span>Foto wird ausgewertet';
+    $$('button', b).forEach(x => x.disabled = true);
+    try {
+      const zutaten = await zutatenAusFoto(datei);
+      if (!b.isConnected) return;
+      if (!zutaten.length) throw new Error('Auf dem Foto wurden keine Zutaten gefunden.');
+      schliesseBlatt(b);
+      setTimeout(() => oeffnePruefung(rezeptArtikel(zutaten)), 220);
+    } catch (err) {
+      status.textContent = err.message || 'Fehler bei der Erkennung.';
+      $$('button', b).forEach(x => x.disabled = false);
+    }
+  };
+}
+
+function oeffnePruefung(artikel) {
+  const b = oeffneBlatt(`
+    <div class="blatt-kopf"><h3>Was brauchst du?</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
+    <p class="text-muted">Abwählen, was noch im Vorrat ist.</p>
+    <ul class="liste-einst pruef">${artikel.map((a, i) => `<li><label><input type="checkbox" data-i="${i}"${a.an ? ' checked' : ''}>
+      <span>${esc(a.name)}<span class="sub text-muted" style="display:block;font-size:13px">${esc(ABT_NAME[a.abt])}</span></span>
+      ${a.grund ? `<span class="marke">${esc(a.grund)}</span>` : ''}</label></li>`).join('')}</ul>
+    <div class="knopfreihe"><button type="button" class="knopf" id="pOk"></button></div>`);
+  const zaehle = () => {
+    const n = $$('input[data-i]:checked', b).length;
+    const k = $('#pOk', b);
+    k.textContent = n === 1 ? '1 Artikel hinzufügen' : `${n} Artikel hinzufügen`;
+    k.disabled = !n;
+  };
+  zaehle();
+  b.addEventListener('change', zaehle);
+  $('#pOk', b).onclick = () => {
+    let letztes = null;
+    for (const cb of $$('input[data-i]:checked', b)) {
+      const a = artikel[+cb.dataset.i];
+      letztes = hinzufuegen(a.name, 1, { abteilung: a.abt }) || letztes;
+    }
+    sichereListe(); sichereVerlauf();
+    schliesseBlatt(b); render();
+    if (letztes) blitze(letztes.id);
+  };
+}
+
+async function bildAlsJPEG(datei, maxKante = 1568) {
+  const url = URL.createObjectURL(datei);
+  try {
+    const img = await new Promise((ok, fehler) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fehler; i.src = url; });
+    const f = Math.min(1, maxKante / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * f); c.height = Math.round(img.naturalHeight * f);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.85).split(',')[1];
+  } finally { URL.revokeObjectURL(url); }
+}
+
+async function zutatenAusFoto(datei) {
+  const daten = await bildAlsJPEG(datei);
+  const abteilungen = ABTEILUNGEN.map(a => `${a.id} = ${a.name}`).join('\n');
+  const antwort = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': S.einstellungen.apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'server-side-fallback-2026-07-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-5',
+      max_tokens: 8000,
+      output_config: {
+        effort: 'low',
+        format: {
+          type: 'json_schema',
+          schema: {
+            type: 'object',
+            properties: {
+              zutaten: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: { name: { type: 'string' }, abteilung: { type: 'string', enum: ABT_IDS } },
+                  required: ['name', 'abteilung'],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ['zutaten'],
+            additionalProperties: false,
+          },
+        },
+      },
+      fallbacks: 'default',
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: daten } },
+          { type: 'text', text:
+`Das Bild zeigt ein Rezept (Foto oder Screenshot). Liste alle Zutaten als Einkaufsartikel auf Deutsch auf.
+- Nur den Artikelnamen, so wie man ihn auf einen Einkaufszettel schreibt: "Zwiebeln" statt "2 Zwiebeln, fein gewürfelt", "Knoblauch" statt "3 Zehen Knoblauch".
+- Keine Mengen, Einheiten oder Zubereitungshinweise. Doppelte Zutaten nur einmal.
+- Ordne jede Zutat genau einer Supermarkt-Abteilung zu (id verwenden):
+${abteilungen}
+Enthält das Bild kein Rezept, gib eine leere Liste zurück.` },
+        ],
+      }],
+    }),
+  });
+  let d = null;
+  try { d = await antwort.json(); } catch (e) {}
+  if (!antwort.ok) {
+    const meldung = d && d.error && d.error.message;
+    if (antwort.status === 401) throw new Error('API-Schlüssel ungültig. Bitte in den Einstellungen prüfen.');
+    if (antwort.status === 429 || antwort.status === 529) throw new Error('Claude ist gerade ausgelastet. Bitte gleich noch einmal versuchen.');
+    throw new Error(`Fehler ${antwort.status}${meldung ? ': ' + meldung : ''}`);
+  }
+  if (d.stop_reason === 'refusal') throw new Error('Die Anfrage wurde abgelehnt. Bitte den Text einfügen.');
+  if (d.stop_reason === 'max_tokens') throw new Error('Die Antwort war zu lang. Bitte einen kleineren Ausschnitt fotografieren.');
+  const text = (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
+  const json = JSON.parse(text);
+  return (json.zutaten || []).filter(z => z && z.name);
+}
+
+/* ============================================================
+   Selbsttest (index.html?test)
+   ============================================================ */
+
+function selbsttest() {
+  const ergebnisse = [];
+  const pruefe = (titel, ist, soll) => ergebnisse.push({ titel, ok: JSON.stringify(ist) === JSON.stringify(soll), ist, soll });
+
+  // Für den Test ohne gespeicherte Daten klassifizieren
+  S.verlauf = {}; S.korrekturen = {}; S.liste = []; S.eans = {};
+
+  const beispiel = {
+    '2 Haferflocken': 'fruehstueck', '2 Milch': 'molkerei', 'Salat': 'gemuese', 'Zucchini': 'gemuese', 'Pilze': 'gemuese',
+    'Lachs': 'fisch', '2 Tomaten': 'gemuese', 'Deo': 'drogerie', 'Balsamico': 'oel', 'Ajona Zahnpasta': 'drogerie',
+    'Beerenmix Bio': 'tk', 'Himbeere Blaubeeren': 'obst', 'Hühnerbrust': 'fleisch', '2 Griechischer Joghurt minus L': 'molkerei',
+    'Käse': 'kaese', 'Broccholi': 'gemuese', '1 Mozzarella': 'kaese', 'Spaghetti': 'nudeln', 'Sahne laktosefrei': 'molkerei',
+    'Tomatenkonz': 'konserven', 'Kokosmilch': 'konserven', 'Paprika': 'gemuese', 'Ingwer': 'gemuese', 'Karotten': 'gemuese',
+    '2 Hafermilch mit Soja Barrista Bereef': 'pflanzendrink', 'Apfel-Bananen-Mus': 'konserven', 'Erbsen': 'tk',
+    'Räucherforelle': 'fisch', 'Nutella': 'fruehstueck', 'Wrap': 'brot', 'Spülmittel': 'haushalt', 'Ruccola': 'gemuese',
+    'Tahina': 'konserven', 'Kartoffeln': 'gemuese', 'Halumi': 'kaese', 'Schweinswürschtl': 'fleisch', 'Gurke': 'gemuese',
+    'Zucchini.': 'gemuese', 'Thunfisch': 'konserven', 'Basilikum': 'gemuese', 'Eier': 'molkerei', 'Kichererbsen': 'konserven',
+    'Tofu': 'kuehlveg', 'Schupfnudelm': 'kuehlveg', '2 Äpfel Jazz': 'obst', 'Suppengemüse': 'gemuese', 'Bananen': 'obst',
+    'Wattepads': 'drogerie',
+    // weitere
+    'TK Spinat': 'tk', 'Wildreis': 'nudeln', 'Rote Linsen': 'nudeln', 'Klopapier': 'drogerie', 'Müllbeutel': 'haushalt',
+    'O-Saft': 'getraenke', 'Parmesan': 'kaese', 'Knoblauchzehen': 'gemuese', 'Joghurt': 'molkerei',
+  };
+  for (const [roh, soll] of Object.entries(beispiel)) pruefe(`Abteilung: ${roh}`, klassifiziere(parseMenge(roh).name).abt, soll);
+
+  pruefe('Korrektur Broccholi', korrigiere('Broccholi'), 'Broccoli');
+  pruefe('Korrektur Halumi', korrigiere('Halumi'), 'Halloumi');
+  pruefe('Korrektur Schupfnudelm', korrigiere('Schupfnudelm'), 'Schupfnudeln');
+  pruefe('Korrektur Ruccola', korrigiere('Ruccola'), 'Rucola');
+  pruefe('Keine Korrektur bei Mehrwort', korrigiere('Hafermilch mit Soja Barrista Bereef'), 'Hafermilch mit Soja Barrista Bereef');
+  pruefe('Vorschlag Tomatenkonz', vorschlaege('Tomatenkonz')[0]?.name, 'Tomatenkonzentrat');
+
+  pruefe('Menge „2 Milch“', parseMenge('2 Milch'), { menge: 2, name: 'Milch' });
+  pruefe('Menge „3x Eier“', parseMenge('3x Eier'), { menge: 3, name: 'Eier' });
+  pruefe('Menge ohne Zahl', parseMenge('Milch'), { menge: 1, name: 'Milch' });
+  pruefe('Mehrfacheingabe', zerlegeEingabe('Milch, Eier und 2 Tomaten').map(x => [x.menge, x.name]), [[1, 'Milch'], [1, 'Eier'], [2, 'Tomaten']]);
+
+  // Duplikate und Stammartikel
+  hinzufuegen('Zucchini'); hinzufuegen('Zucchini.');
+  pruefe('Duplikat erhöht Menge', S.liste.map(i => [i.name, i.menge]), [['Zucchini', 2]]);
+  const deo = hinzufuegen('Deo'); setzeStamm(deo, true);
+  const milch = hinzufuegen('Milch');
+  S.liste.forEach(i => { i.erledigt = true; i.erledigtUm = Date.now(); });
+  einkaufAbschliessen();
+  pruefe('Abschluss: nur Stammartikel bleibt, unabgehakt', S.liste.map(i => [i.name, i.erledigt]), [['Deo', false]]);
+  deo.pausiert = true; einkaufAbschliessen();
+  pruefe('Abschluss holt pausierten Stammartikel zurück', S.liste.map(i => [i.name, !!i.pausiert]), [['Deo', false]]);
+  pruefe('Verlauf zählt', S.verlauf[kompakt('Zucchini')].anzahl, 2);
+  void milch;
+
+  // Gelernte Korrektur
+  const x = hinzufuegen('Hummus'); setzeAbteilung(x, 'konserven');
+  pruefe('Korrektur wird gelernt', klassifiziere('hummus').abt, 'konserven');
+
+  // Rezept-Parser
+  const rezept = `Zutaten für 4 Personen:
+- 400 g Spaghetti
+- 2 Zehen Knoblauch, fein gehackt
+- 1 Bund Basilikum
+• 3 EL Olivenöl
+- 1 Dose gehackte Tomaten (400 g)
+- ½ TL Salz
+- Pfeffer nach Belieben
+- 100 g Parmesan, frisch gerieben
+- 1 große Zwiebel
+Zubereitung:
+Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen und servieren.`;
+  pruefe('Rezept-Parser', parseRezept(rezept), ['Spaghetti', 'Knoblauch', 'Basilikum', 'Olivenöl', 'Tomaten', 'Salz', 'Pfeffer', 'Parmesan', 'Zwiebel']);
+  const art = rezeptArtikel(parseRezept(rezept));
+  pruefe('Rezept: Vorrat abgewählt', art.filter(a => !a.an).map(a => a.name), ['Olivenöl', 'Salz', 'Pfeffer']);
+  pruefe('Rezept: Salz und Pfeffer getrennt', parseRezept('Salz und Pfeffer'), ['Salz', 'Pfeffer']);
+
+  // Open Food Facts
+  pruefe('OFF: Hafermilch', abteilungAusTags(['en:beverages', 'en:plant-based-foods', 'en:plant-based-milk-alternatives', 'en:oat-based-drinks'], null), 'pflanzendrink');
+  pruefe('OFF: Käse', abteilungAusTags(['en:dairies', 'en:fermented-foods', 'en:cheeses'], null), 'kaese');
+  pruefe('OFF: TK-Gemüse', abteilungAusTags(['en:plant-based-foods', 'en:vegetables', 'en:frozen-foods'], null), 'tk');
+  pruefe('OFF: Thunfischdose', abteilungAusTags(['en:seafood', 'en:fishes', 'en:canned-fishes', 'en:tunas'], null), 'konserven');
+  pruefe('Produktname', produktname({ brands: 'Alpro', product_name: 'Alpro Haferdrink Barista', quantity: '1 l' }), 'Alpro Haferdrink Barista 1 l');
+
+  const fehler = ergebnisse.filter(e => !e.ok);
+  document.body.innerHTML = `<div class="testbericht"><h2>Selbsttest: ${ergebnisse.length - fehler.length}/${ergebnisse.length} bestanden</h2>
+    ${ergebnisse.map(e => `<div class="${e.ok ? 'ok' : 'fehler'}">${e.ok ? 'OK  ' : 'FEHLER'} ${esc(e.titel)}${e.ok ? '' : `<br>&nbsp;&nbsp;ist:  ${esc(JSON.stringify(e.ist))}<br>&nbsp;&nbsp;soll: ${esc(JSON.stringify(e.soll))}`}</div>`).join('')}</div>`;
+  document.title = `Test ${ergebnisse.length - fehler.length}/${ergebnisse.length}`;
+  window.TESTERGEBNIS = { bestanden: ergebnisse.length - fehler.length, gesamt: ergebnisse.length, fehler };
+}
+
+/* ============================================================
+   Start
+   ============================================================ */
+
+if (new URLSearchParams(location.search).has('test')) {
+  // Der Test schreibt nichts in den Speicher, gespeicherte Daten bleiben unberührt
+  TESTMODUS = true;
+  selbsttest();
+} else {
+  ladeAlles();
+  render();
+  if (S.einstellungen.standort) waehleLadenPerStandort(false);
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+</script>
+</body>
+</html>
