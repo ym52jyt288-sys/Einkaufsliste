@@ -2,7 +2,8 @@
 
 ## Stand — 24.09.2026
 
-**Gebaut, am Mac getestet, noch nicht auf dem iPhone und noch nicht auf GitHub Pages.**
+**Online unter https://ym52jyt288-sys.github.io/Einkaufsliste/** (GitHub Pages, Repo `ym52jyt288-sys/Einkaufsliste`, Branch `main`).
+Selbsttest online 80/80. Prüfung auf dem iPhone durch den Nutzer steht noch aus.
 
 | Datei | Zweck |
 |---|---|
