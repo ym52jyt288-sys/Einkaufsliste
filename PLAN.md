@@ -3,7 +3,7 @@
 ## Stand — 24.09.2026
 
 **Online unter https://ym52jyt288-sys.github.io/Einkaufsliste/** (GitHub Pages, Repo `ym52jyt288-sys/Einkaufsliste`, Branch `main`).
-Selbsttest online 80/80. Prüfung auf dem iPhone durch den Nutzer steht noch aus.
+Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone durch den Nutzer steht noch aus.
 
 | Datei | Zweck |
 |---|---|
@@ -49,6 +49,26 @@ Selbsttest online 80/80. Prüfung auf dem iPhone durch den Nutzer steht noch aus
 - **„Ganze Liste löschen“** unter der Liste (nur Listenansicht, nur wenn die Liste nicht leer ist). Löscht nach Rückfrage
   (`confirm`) alle Artikel einschließlich Stammartikel; der Stammartikel-Status im Verlauf bleibt. Danach „Rückgängig“ im Hinweis.
 - Selbsttest 105/105. `sw.js` VERSION `einkauf-5`.
+
+### Runde 4 (25.09.2026): Liste teilen
+- **Teilen-Symbol** in der Kopfzeile. Es verschickt die offenen Artikel (ohne Erledigte und „diesmal nicht“) als lesbaren
+  Text nach Abteilung und einen Link `…/#l=<daten>`. Zum Verschicken dient das iPhone-Teilen-Menü (`navigator.share`). Wenn
+  Safari das Teilen verweigert, weil nach dem asynchronen Kodieren das Antippen „verbraucht“ ist, öffnet sich ein Blatt mit
+  den Knöpfen „Teilen“ und „Kopieren“.
+- **Daten im Fragment** (hinter `#`, geht nie an GitHub): JSON → `CompressionStream('deflate-raw')` → Base64url, Präfix `z`
+  (komprimiert) oder `j` (unkomprimiert, falls der Browser keinen `CompressionStream` hat). 48 Artikel ≈ 1.200 Zeichen Link.
+  Snapshot `{v:1, id, t, a:[[id, name, menge, einheit, abteilung, notiz]…]}`. Rückmeldung `{v:1, id, g:[gekauft], n:[nicht bekommen]}`.
+- **Empfänger**: eigene Ansicht „Geteilte Liste“ (`S.geteilt`, Schlüssel `ek.geteilt`), getrennt von der eigenen Liste.
+  Die Abteilungen stehen in Standardreihenfolge. Antippen hakt ab, Wischen und Detailblatt sind aus. Unten steht
+  „Erledigt zurückschicken“ und verschickt den Rücklink `#r=`. „Schließen“ fragt nach und verwirft die Liste.
+- **Absender** öffnet den Rücklink. Ein Blatt zeigt Gekauftes, Fehlendes und nicht mehr vorhandene Artikel, dann „N als
+  gekauft abhaken“ mit Rückgängig. Abschließen bleibt ein eigener Schritt.
+- **iPhone-Einschränkung**: Links aus Nachrichten öffnen immer Safari, nie die Home-Bildschirm-App, und beide haben getrennte
+  Speicher. Deshalb erkennt das **Eingabefeld eingefügte Links** (`#l=`/`#r=`) und verarbeitet sie. Ein Hinweis dazu steht im
+  Rückmelde-Blatt, wenn es nicht in der Home-Bildschirm-App läuft.
+- Selbsttest 115/115 (jetzt `async`, Abbruch wird angezeigt). Headless Chrome braucht `--virtual-time-budget`, sonst
+  wird das DOM vor dem Ende des asynchronen Tests ausgegeben. `sw.js` VERSION `einkauf-6`.
+- Offen, nur auf dem iPhone prüfbar: Teilen-Menü, Öffnen aus WhatsApp/iMessage, Einfügen in die Home-Bildschirm-App.
 
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
