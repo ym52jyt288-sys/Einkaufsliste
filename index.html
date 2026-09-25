@@ -154,6 +154,7 @@
   details.versteckt summary::-webkit-details-marker { display: none; }
   .pausiert { margin-top: 16px; font-size: 14px; color: var(--muted); }
   .pausiert button { color: var(--accent); }
+  .knopf.liste-leeren { margin-top: 28px; }
   .leer { text-align: center; color: var(--muted); padding: 48px 20px; font-size: 15px; }
 
   .abschluss {
@@ -384,6 +385,7 @@ const S = {
 function standardEinstellungen() {
   return {
     ansicht: 'liste', apiKey: '', standort: false,
+    abteilungInListe: true,                                 // Abteilungsname neben dem Artikel in der Listenansicht
     thema: 'system',                                        // system | light | dark
     farben: { an: true, schema: 'markt', stil: 'streifen' }, // stil: streifen | flaeche
     chips: { an: true, anzahl: 12, angeheftet: [], ausgeblendet: [] },
@@ -684,6 +686,16 @@ function entfernen(id) {
   }
 }
 
+function listeLeeren() {
+  const n = S.liste.length;
+  const mitStamm = S.liste.some(i => i.stamm) ? ' Auch die Stammartikel werden entfernt.' : '';
+  if (!n || !confirm(`Die ganze Einkaufsliste löschen (${n} Artikel)?${mitStamm}`)) return;
+  const vorher = S.liste;
+  S.liste = [];
+  sichereListe(); render();
+  zeigeToast('Liste gelöscht', 'Rückgängig', () => { S.liste = vorher; sichereListe(); render(); });
+}
+
 function einkaufAbschliessen() {
   const vorher = JSON.parse(JSON.stringify(S.liste));
   const neu = [];
@@ -937,7 +949,7 @@ function render() {
   if (!sichtbar.length) {
     html += `<div class="leer">Die Liste ist leer.<br>Oben eintragen, scannen oder ein Rezept übernehmen.</div>`;
   } else if (ansicht === 'liste') {
-    html += `<ul class="artikel">${sortiert(sichtbar).map(i => zeileHTML(i, true)).join('')}</ul>`;
+    html += `<ul class="artikel">${sortiert(sichtbar).map(i => zeileHTML(i, S.einstellungen.abteilungInListe)).join('')}</ul>`;
   } else {
     const p = aktivesProfil();
     const reihenfolge = [...p.reihenfolge, ...ABT_IDS.filter(a => !p.reihenfolge.includes(a))];
@@ -959,6 +971,10 @@ function render() {
 
   if (pausiert.length) {
     html += `<div class="pausiert">Diesmal nicht: ${pausiert.map(i => `<button type="button" data-zurueck="${i.id}">${esc(i.name)}</button>`).join(', ')}</div>`;
+  }
+
+  if (ansicht === 'liste' && S.liste.length) {
+    html += `<button type="button" class="knopf gefahr liste-leeren" id="btnListeLeeren">Ganze Liste löschen</button>`;
   }
 
   $('#main').innerHTML = html;
@@ -1096,6 +1112,7 @@ $('#main').addEventListener('change', e => {
 });
 
 $('#main').addEventListener('click', e => {
+  if (e.target.closest('#btnListeLeeren')) return listeLeeren();
   const zurueck = e.target.closest('[data-zurueck]');
   if (zurueck) {
     const item = S.liste.find(i => i.id === zurueck.dataset.zurueck);
@@ -1288,6 +1305,7 @@ function oeffneEinstellungen() {
       <div class="segment klein" id="eThema">${[['system', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']].map(([id, n]) =>
         `<button type="button" data-thema="${id}" class="${S.einstellungen.thema === id ? 'an' : ''}">${n}</button>`).join('')}</div>
       <label class="schalter" style="margin-top:8px"><div>Abteilungen farbig markieren<small>Farbe je Bereich im Laden, die Beschriftung bleibt</small></div><input type="checkbox" id="eFarben"${S.einstellungen.farben.an ? ' checked' : ''}></label>
+      <label class="schalter"><div>Abteilung in der Listenansicht zeigen<small>Name der Abteilung rechts neben dem Artikel</small></div><input type="checkbox" id="eAbtListe"${S.einstellungen.abteilungInListe ? ' checked' : ''}></label>
       <div id="eFarbWahl"${S.einstellungen.farben.an ? '' : ' hidden'}>
         <div class="wahl" style="margin-top:12px">${FARBSCHEMATA.map(f => `<button type="button" data-schema="${f.id}" class="${aktuellesSchema().id === f.id ? 'an' : ''}">
           <span class="titel">${esc(f.name)}</span><span class="text-muted">${esc(f.text)}</span>
@@ -1380,6 +1398,7 @@ function oeffneEinstellungen() {
   });
   b.addEventListener('change', e => {
     if (e.target.id === 'eFarben') { S.einstellungen.farben.an = e.target.checked; sichereEinstellungen(); wendeDarstellungAn(); zeichne(); }
+    if (e.target.id === 'eAbtListe') { S.einstellungen.abteilungInListe = e.target.checked; sichereEinstellungen(); }
     if (e.target.id === 'eChips') { S.einstellungen.chips.an = e.target.checked; sichereEinstellungen(); zeichne(); }
     if (e.target.id === 'eStandort') { S.einstellungen.standort = e.target.checked; sichereEinstellungen(); if (e.target.checked) waehleLadenPerStandort(true); }
     if (e.target.id === 'eApiKey') { S.einstellungen.apiKey = e.target.value.trim(); sichereEinstellungen(); }
@@ -1996,6 +2015,22 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
   pruefe('OFF: TK-Gemüse', abteilungAusTags(['en:plant-based-foods', 'en:vegetables', 'en:frozen-foods'], null), 'tk');
   pruefe('OFF: Thunfischdose', abteilungAusTags(['en:seafood', 'en:fishes', 'en:canned-fishes', 'en:tunas'], null), 'konserven');
   pruefe('Produktname', produktname({ brands: 'Alpro', product_name: 'Alpro Haferdrink Barista', quantity: '1 l' }), 'Alpro Haferdrink Barista 1 l');
+
+  // Abteilung in der Listenansicht ein-/ausblenden
+  const probe = { id: 'x', name: 'Milch', menge: null, abteilung: 'molkerei' };
+  pruefe('Listenzeile mit Abteilung', zeileHTML(probe, true).includes(esc(ABT_NAME.molkerei)), true);
+  pruefe('Listenzeile ohne Abteilung', zeileHTML(probe, false).includes(esc(ABT_NAME.molkerei)), false);
+
+  // Ganze Liste löschen: nur nach Bestätigung, Rückgängig stellt alles wieder her
+  const echtConfirm = window.confirm;
+  S.liste = []; hinzufuegen('Milch'); hinzufuegen('Brot');
+  window.confirm = () => false; listeLeeren();
+  pruefe('Liste leeren abgebrochen', S.liste.length, 2);
+  window.confirm = () => true; listeLeeren();
+  pruefe('Liste leeren bestätigt', S.liste.length, 0);
+  $('#toastAktion').click();
+  pruefe('Liste leeren rückgängig', S.liste.map(i => i.name), ['Milch', 'Brot']);
+  window.confirm = echtConfirm;
 
   const fehler = ergebnisse.filter(e => !e.ok);
   document.body.innerHTML = `<div class="testbericht"><h2>Selbsttest: ${ergebnisse.length - fehler.length}/${ergebnisse.length} bestanden</h2>

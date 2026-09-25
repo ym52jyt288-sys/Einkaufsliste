@@ -43,6 +43,13 @@ Selbsttest online 80/80. Prüfung auf dem iPhone durch den Nutzer steht noch aus
 - Selbsttest jetzt 97/97.
 - Schnellauswahl: automatischer Teil lässt Stammartikel weg (angeheftete bleiben immer vorne). Selbsttest 100/100.
 
+### Runde 3 (25.09.2026)
+- **Abteilung in der Listenansicht** ein-/ausblendbar: Einstellungen → Darstellung → „Abteilung in der Listenansicht zeigen“
+  (`einstellungen.abteilungInListe`, Standard an). Der Farbstreifen bleibt auch ohne Beschriftung.
+- **„Ganze Liste löschen“** unter der Liste (nur Listenansicht, nur wenn die Liste nicht leer ist). Löscht nach Rückfrage
+  (`confirm`) alle Artikel einschließlich Stammartikel; der Stammartikel-Status im Verlauf bleibt. Danach „Rückgängig“ im Hinweis.
+- Selbsttest 105/105. `sw.js` VERSION `einkauf-5`.
+
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
 |---|---|---|
