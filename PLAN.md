@@ -70,6 +70,16 @@ Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone d
   wird das DOM vor dem Ende des asynchronen Tests ausgegeben. `sw.js` VERSION `einkauf-6`.
 - Offen, nur auf dem iPhone prüfbar: Teilen-Menü, Öffnen aus WhatsApp/iMessage, Einfügen in die Home-Bildschirm-App.
 
+### Runde 5 (25.09.2026): Schnellauswahl-Modus
+- Einstellungen → Schnellauswahl → **Anzeigen: „Beim Antippen“** (wie bisher: bei aktivem Eingabefeld oder leerer Liste) oder
+  **„Immer“** (`einstellungen.chips.modus`). Im Modus „Immer“ sind die Chips unter dem Eingabefeld immer sichtbar, darunter ein
+  Griff. Nach oben wischen (auf den Chips oder dem Griff) klappt sie ein, dann bleibt eine Leiste „Schnellauswahl ⌄“. Antippen
+  oder nach unten wischen holt sie zurück. Der Zustand wird gespeichert (`chips.eingeklappt`). Bei aktivem Eingabefeld
+  erscheinen die Chips immer. Die Logik steckt in `chipsZustand()`.
+- Ein Klick direkt nach einer Wischgeste trägt keinen Chip ein. Langes Drücken wird abgebrochen, sobald der Finger wandert.
+- Globale Regel `[hidden] { display: none !important; }` ergänzt (`.chips` mit `display: flex` hatte `hidden` überstimmt).
+- Selbsttest 122/122. `sw.js` VERSION `einkauf-7`.
+
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
 |---|---|---|

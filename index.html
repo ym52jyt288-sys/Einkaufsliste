@@ -58,6 +58,7 @@
     color-scheme: dark;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; background: var(--bg); color: var(--fg); }
   body {
     font: 17px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
@@ -88,7 +89,7 @@
   .geteilt-kopf small { display: block; font-size: 13px; color: var(--muted); }
   .geteilt-kopf .zurueck { color: var(--accent); min-height: 44px; padding: 0 4px; }
   body.geteilt-modus .geteilt-kopf { display: flex; }
-  body.geteilt-modus :is(.kopfzeile .segment, #btnTeilen, #btnEinstellungen, #formEingabe, #vorschlaege, #chips) { display: none !important; }
+  body.geteilt-modus :is(.kopfzeile .segment, #btnTeilen, #btnEinstellungen, #formEingabe, #vorschlaege, #chips, #chipsGriff) { display: none !important; }
   body.geteilt-modus .kopfzeile { margin-bottom: 0; }
   .teilen-text { width: 100%; min-height: 180px; font-size: 14px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--bg2); }
 
@@ -115,6 +116,12 @@
     font-size: 15px; background: var(--bg);
   }
   .chip:active { background: var(--accent-weich); border-color: var(--accent); }
+  /* Modus „Immer“: nach oben wischen blendet aus, der Griff holt die Chips zurück */
+  #chips.wischbar, .chips-griff { touch-action: none; }
+  .chips-griff { display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%; min-height: 22px; margin-top: 6px; color: var(--muted); font-size: 13px; }
+  .chips-griff::before { content: ''; width: 36px; height: 4px; border-radius: 2px; background: var(--line); }
+  .chips-griff.zu { min-height: 30px; margin-top: 4px; }
+  .chips-griff.zu::before { display: none; }
 
   /* Liste */
   main { padding: 0 16px; }
@@ -325,6 +332,7 @@
   </form>
   <ul class="vorschlaege" id="vorschlaege" hidden></ul>
   <div class="chips" id="chips" hidden></div>
+  <button type="button" class="chips-griff" id="chipsGriff" hidden></button>
 </header>
 
 <main id="main"></main>
@@ -403,7 +411,7 @@ function standardEinstellungen() {
     abteilungInListe: true,                                 // Abteilungsname neben dem Artikel in der Listenansicht
     thema: 'system',                                        // system | light | dark
     farben: { an: true, schema: 'markt', stil: 'streifen' }, // stil: streifen | flaeche
-    chips: { an: true, anzahl: 12, angeheftet: [], ausgeblendet: [] },
+    chips: { an: true, anzahl: 12, angeheftet: [], ausgeblendet: [], modus: 'antippen', eingeklappt: false }, // modus: antippen | immer
   };
 }
 
@@ -1003,6 +1011,25 @@ function render() {
   renderHilfe();
 }
 
+// Schnellauswahl nur in der Listenansicht – im Laden zählt jeder Zentimeter Bildschirm.
+// griff: 'auf' = Chips sichtbar und wegwischbar, 'zu' = eingeklappt, Leiste zum Zurückholen, null = kein Griff
+function chipsZustand(feldAktiv) {
+  const c = S.einstellungen.chips;
+  if (!c.an || S.einstellungen.ansicht !== 'liste') return { zeigen: false, griff: null };
+  if (c.modus === 'immer') {
+    if (feldAktiv) return { zeigen: true, griff: null };
+    return c.eingeklappt ? { zeigen: false, griff: 'zu' } : { zeigen: true, griff: 'auf' };
+  }
+  return { zeigen: feldAktiv || !S.liste.some(i => !i.pausiert), griff: null };
+}
+
+function chipsEinklappen(zu) {
+  if (S.einstellungen.chips.eingeklappt === zu) return;
+  S.einstellungen.chips.eingeklappt = zu;
+  sichereEinstellungen();
+  renderHilfe();
+}
+
 function renderHilfe() {
   const feld = $('#eingabe');
   const text = feld.value;
@@ -1014,13 +1041,18 @@ function renderHilfe() {
     vs.innerHTML = liste.map((v, i) => `<li><button type="button" data-vorschlag="${i}">${esc(v.name)}<span class="hinweis">${esc(v.hinweis || '')}</span></button></li>`).join('');
     vs._liste = liste;
     chips.hidden = true;
+    $('#chipsGriff').hidden = true;
   } else {
     vs.hidden = true;
-    // Schnellauswahl nur in der Listenansicht – im Laden zählt jeder Zentimeter Bildschirm
-    const zeigen = S.einstellungen.chips.an && S.einstellungen.ansicht === 'liste'
-      && (document.activeElement === feld || !S.liste.some(i => !i.pausiert));
+    const { zeigen, griff } = chipsZustand(document.activeElement === feld);
     const liste = zeigen ? haeufige() : [];
     chips.hidden = !liste.length;
+    chips.classList.toggle('wischbar', griff === 'auf');
+    const g = $('#chipsGriff');
+    g.hidden = !griff || (griff === 'auf' && !liste.length);
+    g.className = `chips-griff ${griff || ''}`;
+    g.innerHTML = griff === 'zu' ? 'Schnellauswahl <svg class="ico" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M6 9l6 6 6-6"/></svg>' : '';
+    g.setAttribute('aria-label', griff === 'zu' ? 'Schnellauswahl zeigen' : 'Schnellauswahl ausblenden');
     chips.innerHTML = liste.map(c => `<button type="button" class="chip${c.gepinnt ? ' gepinnt' : ''}" data-chip="${esc(c.name)}">${esc(c.name)}</button>`).join('');
   }
 }
@@ -1106,6 +1138,9 @@ $('#vorschlaege').addEventListener('click', e => {
     b._langGedrueckt = false;
     timer = setTimeout(() => { b._langGedrueckt = true; oeffneChipMenue(b.dataset.chip); }, 500);
   });
+  let startY = 0;
+  $('#chips').addEventListener('pointerdown', e => { startY = e.clientY; });
+  $('#chips').addEventListener('pointermove', e => { if (Math.abs(e.clientY - startY) > 10) clearTimeout(timer); });
   for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) $('#chips').addEventListener(ev, () => clearTimeout(timer));
   $('#chips').addEventListener('contextmenu', e => e.preventDefault());
 })();
@@ -1123,8 +1158,29 @@ function oeffneChipMenue(name) {
 }
 $('#chips').addEventListener('click', e => {
   const b = e.target.closest('[data-chip]');
-  if (b && !b._langGedrueckt) eintragen([{ name: b.dataset.chip }]);
+  if (b && !b._langGedrueckt && !$('#chips')._gewischt) eintragen([{ name: b.dataset.chip }]);
 });
+$('#chipsGriff').addEventListener('click', () => { if (!$('#chipsGriff')._gewischt) chipsEinklappen(!S.einstellungen.chips.eingeklappt); });
+
+/* Schnellauswahl im Modus „Immer“: nach oben wischen blendet aus, am Griff nach unten wischen holt sie zurück */
+(function chipsWischen() {
+  let start = null;
+  for (const el of [$('#chips'), $('#chipsGriff')]) {
+    el.addEventListener('touchstart', e => {
+      if (S.einstellungen.chips.modus !== 'immer' || e.touches.length > 1) return;
+      start = { x: e.touches[0].clientX, y: e.touches[0].clientY, el };
+    }, { passive: true });
+    el.addEventListener('touchend', e => {
+      if (!start) return;
+      const t = e.changedTouches[0], dx = t.clientX - start.x, dy = t.clientY - start.y, quelle = start.el;
+      start = null;
+      if (Math.abs(dy) < 25 || Math.abs(dy) < Math.abs(dx)) return;
+      quelle._gewischt = true;
+      setTimeout(() => { quelle._gewischt = false; }, 350);
+      chipsEinklappen(dy < 0);
+    });
+  }
+})();
 
 $$('.segment button').forEach(b => b.addEventListener('click', () => {
   S.einstellungen.ansicht = b.dataset.ansicht;
@@ -1353,6 +1409,11 @@ function oeffneEinstellungen() {
       <div class="abschnitt">Schnellauswahl</div>
       <label class="schalter"><div>Schnellauswahl zeigen<small>Nur in der Listenansicht, wenn das Eingabefeld leer ist</small></div><input type="checkbox" id="eChips"${S.einstellungen.chips.an ? ' checked' : ''}></label>
       <div id="eChipWahl"${S.einstellungen.chips.an ? '' : ' hidden'}>
+        <div class="feld"><span>Anzeigen</span><div class="segment klein" id="eChipModus">${[['antippen', 'Beim Antippen'], ['immer', 'Immer']].map(([id, n]) =>
+          `<button type="button" data-chip-modus="${id}" class="${S.einstellungen.chips.modus === id ? 'an' : ''}">${n}</button>`).join('')}</div>
+          <p class="text-muted" style="margin:6px 0 0">${S.einstellungen.chips.modus === 'immer'
+            ? 'Immer unter dem Eingabefeld. Nach oben wischen blendet sie aus, antippen oder nach unten wischen holt sie zurück.'
+            : 'Erscheint, sobald du ins Eingabefeld tippst, und bei leerer Liste.'}</p></div>
         <div class="feld"><span>Anzahl</span><div class="segment klein" id="eAnzahl">${[6, 9, 12, 18].map(n =>
           `<button type="button" data-anzahl="${n}" class="${S.einstellungen.chips.anzahl === n ? 'an' : ''}">${n}</button>`).join('')}</div></div>
         <form class="eingabe" id="ePinForm" style="margin-top:6px"><input id="ePinName" type="text" placeholder="Artikel anheften" autocapitalize="sentences" autocorrect="off" enterkeyhint="done"></form>
@@ -1394,6 +1455,8 @@ function oeffneEinstellungen() {
     if (schema) { e1.farben.schema = schema.dataset.schema; sichereEinstellungen(); wendeDarstellungAn(); zeichne(); return; }
     const stil = e.target.closest('[data-stil]');
     if (stil) { e1.farben.stil = stil.dataset.stil; sichereEinstellungen(); wendeDarstellungAn(); zeichne(); return; }
+    const chipModus = e.target.closest('[data-chip-modus]');
+    if (chipModus) { e1.chips.modus = chipModus.dataset.chipModus; e1.chips.eingeklappt = false; sichereEinstellungen(); zeichne(); return; }
     const anzahl = e.target.closest('[data-anzahl]');
     if (anzahl) { e1.chips.anzahl = +anzahl.dataset.anzahl; sichereEinstellungen(); zeichne(); return; }
     const ca = e.target.closest('[data-chip-aktion]');
@@ -2261,6 +2324,23 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
   geteiltAbhaken(S.geteilt.artikel[0]);
   pruefe('Geteilte Liste: abhaken ändert nur die geteilte Liste', [S.geteilt.artikel[0].erledigt, S.liste.find(i => i.name === 'Käse').erledigt], [true, false]);
   S.geteilt = null; S.liste = []; render();
+
+  // Schnellauswahl: Anzeige-Modus
+  const c = S.einstellungen.chips;
+  S.einstellungen.ansicht = 'liste'; c.an = true; S.liste = []; hinzufuegen('Milch');
+  c.modus = 'antippen';
+  pruefe('Chips beim Antippen: Feld inaktiv', chipsZustand(false), { zeigen: false, griff: null });
+  pruefe('Chips beim Antippen: Feld aktiv', chipsZustand(true), { zeigen: true, griff: null });
+  c.modus = 'immer'; c.eingeklappt = false;
+  pruefe('Chips immer: sichtbar mit Griff', chipsZustand(false), { zeigen: true, griff: 'auf' });
+  chipsEinklappen(true);
+  pruefe('Chips immer: weggewischt', chipsZustand(false), { zeigen: false, griff: 'zu' });
+  pruefe('Chips immer: weggewischt, Feld aktiv', chipsZustand(true), { zeigen: true, griff: null });
+  chipsEinklappen(false);
+  pruefe('Chips immer: zurückgeholt', chipsZustand(false), { zeigen: true, griff: 'auf' });
+  S.einstellungen.ansicht = 'laden';
+  pruefe('Chips immer: nie in der Laden-Ansicht', chipsZustand(false), { zeigen: false, griff: null });
+  S.einstellungen = standardEinstellungen(); S.liste = []; render();
 
   const fehler = ergebnisse.filter(e => !e.ok);
   document.body.innerHTML = `<div class="testbericht"><h2>Selbsttest: ${ergebnisse.length - fehler.length}/${ergebnisse.length} bestanden</h2>
