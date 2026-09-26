@@ -106,6 +106,15 @@ Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone d
   Profilname „Rewe Sendlinger Straße“). `sw.js` VERSION `einkauf-8`.
 - Offen, nur auf dem iPhone prüfbar: Karte mit Fingergesten im Blatt, Standortfreigabe beim Öffnen der Karte, Fotoerkennung mit Mengen.
 
+### Bugfix 26.09.2026: Rezept ohne Zeilenumbrüche
+- Bisher wurde eine einzelne Zeile nur an Kommas getrennt. Ohne Kommas war sie länger als 70 Zeichen und wurde verworfen
+  („Keine Zutaten erkannt“). Neu ist `rezeptTeile()`: Es trennt an Aufzählungszeichen (• · - …) und bei einzeiligem Text (oder
+  Zeilen über 70 Zeichen) vor jeder neuen Mengenangabe. Ab „Zubereitung:“ wird abgeschnitten, sofern davor schon Zahlen
+  stehen. Entfernt werden „für 4 Personen“, Zeitangaben („20 Min“) und Zubereitungswörter („fein gehackt“).
+- Einzeilig: Zutaten ohne Menge hintereinander („Salz Pfeffer“) werden getrennt, wenn jedes Wort ein Katalogbegriff ist
+  (`trenneBekannte`). Bei mehrzeiligem Text nicht, damit „Milchreis“-artige Namen heil bleiben.
+- Selbsttest 142/142. `sw.js` VERSION `einkauf-9`.
+
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
 |---|---|---|

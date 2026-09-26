@@ -2021,17 +2021,46 @@ function rezeptMenge(zeile) {
 }
 
 // Liefert [{ name, menge, einheit }]; menge ist null, wenn keine einkaufbare Menge dasteht
+// Zerlegt den Rezepttext in Zutatenzeilen. Fehlen Zeilenumbrüche (z. B. Live-Text aus einem Foto),
+// wird an Aufzählungszeichen, Kommas und vor jeder neuen Mengenangabe getrennt.
+function rezeptTeile(text) {
+  let t = String(text).replace(/\r/g, '');
+  // Alles ab „Zubereitung:“ ist Anleitung – aber nur, wenn davor schon Zutaten stehen (nicht „Zubereitung: 20 Min“ oben im Rezept)
+  const anleitung = t.search(/(?:^|\s)(?:zubereitung|anleitung|so geht'?s)\b\s*:?/i);
+  if (anleitung > 0 && /\d/.test(t.slice(0, anleitung))) t = t.slice(0, anleitung);
+  t = t.replace(/\([^)]*\)/g, ' ').replace(/\b(?:für|for)\s+\d+\s*(?:personen|portionen|stück|stk)\b/gi, ' ');
+  const zeilen = t.split('\n').filter(z => z.trim());
+  const einzeilig = zeilen.length === 1;
+  return {
+    einzeilig,
+    teile: zeilen.flatMap(z => {
+      let teile = z.split(/\s[•·▢□☐◦○●✓✔*]\s*|\s[-–—]\s(?=\S)/);
+      if (einzeilig) teile = teile.flatMap(x => x.split(/;|(?<!\d),|,(?!\d)/));
+      if (einzeilig || z.length > 70) teile = teile.flatMap(x => x.split(/(?<=[^\d\s\-–,.\/])\s+(?=(?:ca\.?\s*)?[\d½¼¾⅓⅔⅛])/));
+      return teile;
+    }),
+  };
+}
+
+// „Salz Pfeffer“ ohne Trennzeichen: in einzelne Artikel teilen, wenn jedes Wort für sich ein Katalogbegriff ist
+function trenneBekannte(name) {
+  const woerter = name.split(/\s+/);
+  if (woerter.length < 2 || exakt(kompakt(name))) return [name];
+  return woerter.every(w => w.length >= 3 && exakt(kompakt(w))) ? woerter : [name];
+}
+
 function parseRezept(text) {
-  const zeilen = String(text).replace(/\r/g, '').split('\n');
-  // Nur eine Zeile mit Kommas (z. B. aus einem Fließtext): an Kommas trennen
-  const teile = zeilen.filter(z => z.trim()).length === 1 ? zeilen[0].split(/;|(?<!\d),|,(?!\d)/) : zeilen;
+  const { teile, einzeilig } = rezeptTeile(text);
   const aus = [];
   for (let z of teile) {
     z = z.replace(/^[\s•·\-–—*▢□☐◦○●✓✔]+/, '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
     if (!z || z.endsWith(':') || z.length > 70) continue;
     if (/^(zutaten|zubereitung|anleitung|schritt|portion|für \d|personen|nährwerte|tipp|dazu|außerdem)/i.test(z)) continue;
+    // Zubereitungshinweis ohne Zutat, z. B. der Rest von „Knoblauch, fein gehackt“ im Fließtext
+    if (/^(fein|grob|frisch|klein|gehackt|gerieben|gewürfelt|geschnitten|geschält|gepresst|zerdrückt|halbiert|geviertelt|zimmerwarm|in (scheiben|würfel|streifen|ringe))\b/i.test(z)) continue;
     const mg = rezeptMenge(z);
     z = z.split(/(?<!\d),|,(?!\d)/)[0];
+    z = z.replace(/\s+((fein|grob|frisch)\s+)?(gehackt|gerieben|gewürfelt|geschnitten|geschält|gepresst|zerdrückt|halbiert)\b.*$/i, '');
     z = z.replace(/\b(nach (belieben|geschmack|bedarf)|zum (garnieren|bestreuen|servieren|braten|anbraten)|optional|zum Abschmecken|für die Form)\b.*$/i, '').trim();
     for (let i = 0; i < 6; i++) {
       const vorher = z;
@@ -2041,7 +2070,9 @@ function parseRezept(text) {
       if (z === vorher) break;
     }
     if (!z || /^\d/.test(z) || z.length < 2) continue;
-    const namen = z.split(/\s+(?:und|oder|&)\s+|\s*\/\s*/).map(t => t.trim()).filter(t => t.length >= 2);
+    if (/^(min(uten|\.)?|std\.?|stunden?|kcal|kj|grad|°)(\s|$)/i.test(z)) continue;
+    const namen = z.split(/\s+(?:und|oder|&)\s+|\s*\/\s*/).map(t => t.trim()).filter(t => t.length >= 2)
+      .flatMap(n => einzeilig ? trenneBekannte(n) : [n]);
     for (const name of namen) {
       const mit = namen.length === 1 && mg;
       aus.push({ name, menge: mit ? mg.menge : null, einheit: mit ? mg.einheit : null });
@@ -2615,6 +2646,15 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
   pruefe('Rezept-Parser', parseRezept(rezept).map(z => z.name), ['Spaghetti', 'Knoblauch', 'Basilikum', 'Olivenöl', 'Tomaten', 'Salz', 'Pfeffer', 'Parmesan', 'Zwiebel']);
   const art = rezeptArtikel(parseRezept(rezept));
   pruefe('Rezept: Vorrat abgewählt', art.filter(a => !a.an).map(a => a.name), ['Olivenöl', 'Salz', 'Pfeffer']);
+  const erwartet = ['Spaghetti', 'Knoblauch', 'Basilikum', 'Olivenöl', 'Tomaten', 'Salz', 'Pfeffer', 'Parmesan', 'Zwiebel'];
+  const einzeilig = 'Zutaten für 4 Personen: 400 g Spaghetti 2 Zehen Knoblauch, fein gehackt 1 Bund Basilikum 3 EL Olivenöl 1 Dose gehackte Tomaten (400 g) ½ TL Salz Pfeffer nach Belieben 100 g Parmesan, frisch gerieben 1 große Zwiebel Zubereitung: Die Nudeln 10 Minuten kochen, 2 Zwiebeln würfeln.';
+  pruefe('Rezept ohne Zeilenumbrüche', parseRezept(einzeilig).map(z => z.name), erwartet);
+  pruefe('Rezept ohne Zeilenumbrüche: Mengen', parseRezept(einzeilig).filter(z => z.menge).map(z => `${z.menge} ${z.einheit} ${z.name}`),
+    ['400 g Spaghetti', '1 stk Basilikum', '1 stk Tomaten', '100 g Parmesan', '1 stk Zwiebel']);
+  pruefe('Rezept ohne Trennzeichen', parseRezept('400 g Spaghetti 2 Zehen Knoblauch fein gehackt 1 Bund Basilikum 3 EL Olivenöl 1 Dose gehackte Tomaten ½ TL Salz Pfeffer 100 g Parmesan 1 große Zwiebel').map(z => z.name), erwartet);
+  pruefe('Rezept mit Aufzählungszeichen in einer Zeile', parseRezept('• 400 g Spaghetti • 2 Zehen Knoblauch • 1 Bund Basilikum • 3 EL Olivenöl • 1 Dose gehackte Tomaten • Salz • Pfeffer • 100 g Parmesan • 1 Zwiebel').map(z => z.name), erwartet);
+  pruefe('Rezept: Zubereitungszeit oben bricht nicht ab', parseRezept('Zubereitung: 20 Min 500 g Hackfleisch 2 Paprika').map(z => z.name), ['Hackfleisch', 'Paprika']);
+  pruefe('Rezept: Milchreis bleibt bei mehreren Zeilen zusammen', parseRezept('250 g Milchreis\n1 l Milch').map(z => z.name), ['Milchreis', 'Milch']);
   pruefe('Rezept: Salz und Pfeffer getrennt', parseRezept('Salz und Pfeffer').map(z => z.name), ['Salz', 'Pfeffer']);
   pruefe('Rezept: Mengen', parseRezept(rezept).map(z => [z.name, z.menge, z.einheit]), [
     ['Spaghetti', 400, 'g'], ['Knoblauch', null, null], ['Basilikum', 1, 'stk'], ['Olivenöl', null, null], ['Tomaten', 1, 'stk'],
