@@ -115,6 +115,16 @@ Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone d
   (`trenneBekannte`). Bei mehrzeiligem Text nicht, damit „Milchreis“-artige Namen heil bleiben.
 - Selbsttest 142/142. `sw.js` VERSION `einkauf-9`.
 
+### Runde 7 (26.09.2026): Prüfblatt bearbeitbar
+- Im Prüfblatt „Was brauchst du?“ ist jede Zeile ein Textfeld mit Menge und Name („400 g Spaghetti“). Beim Ändern liest
+  `pruefAendern()` die Menge per `parseMenge` und bestimmt die Abteilung neu. Die Abteilung darunter lässt sich antippen: ein
+  unsichtbares `<select>` über Text und Pfeil. Eine von Hand gewählte Abteilung wird beim Hinzufügen gelernt (`setzeAbteilung`).
+  Geänderte Namen gehen auch ins gespeicherte Rezept.
+- Bugfix „Zitronensaft“ → „Saft“: `rezeptArtikel` hat bei einem Treffer am Wortende (`art: 'suffix'`) den ganzen Namen durch
+  den Katalogbegriff ersetzt. Jetzt wird nur bei `exakt`/`fuzzy` umbenannt. Zitronensaft, Limettensaft und
+  Zitronensaftkonzentrat stehen jetzt im Katalog (Öl, Essig & Gewürze).
+- Selbsttest 146/146. `sw.js` VERSION `einkauf-10`.
+
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
 |---|---|---|

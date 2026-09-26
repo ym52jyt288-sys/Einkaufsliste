@@ -134,7 +134,7 @@ const KATALOG = {
   `,
   oel: `
     Olivenöl|Natives Olivenöl|Olivenöl extra vergine, Öl|Rapsöl|Sonnenblumenöl|Speiseöl|Bratöl|Pflanzenöl, Kokosöl, Sesamöl, Walnussöl|Leinöl|Kürbiskernöl,
-    Balsamico|Balsamessig|Aceto Balsamico|Balsamicoessig|Crema di Balsamico|Balsamico Creme, Essig|Weißweinessig|Apfelessig|Rotweinessig|Branntweinessig|Kräuteressig,
+    Balsamico|Balsamessig|Aceto Balsamico|Balsamicoessig|Crema di Balsamico|Balsamico Creme, Essig|Weißweinessig|Apfelessig|Rotweinessig|Branntweinessig|Kräuteressig, Zitronensaft|Limettensaft|Zitronensaftkonzentrat,
     Salz|Meersalz|Jodsalz|Speisesalz|Fleur de Sel, Pfeffer|Pfefferkörner|Schwarzer Pfeffer|Pfeffermühle, Gewürze|Gewürz,
     Paprikapulver|Paprika edelsüß|Paprika rosenscharf|Geräuchertes Paprikapulver, Currypulver|Curry, Kurkuma|Kurkumapulver, Kreuzkümmel|Cumin,
     Kümmel, Zimt|Zimtstangen, Muskat|Muskatnuss, Oregano|Getrockneter Oregano, Chiliflocken|Chilipulver|Cayennepfeffer, Knoblauchpulver|Knoblauchgranulat,
