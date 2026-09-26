@@ -610,6 +610,9 @@ function korrigiere(name) {
   if (!r || !r.ganz) return name;
   if (r.art === 'fuzzy') return r.e.fehler ? r.e.name : r.e.text;
   if (r.art === 'exakt' && r.e.fehler) return r.e.name;
+  // Nur über ein angehängtes „e“ gefunden („Kaffe“ → „Kaffee“): abgeschnittener Name, keine Beugung
+  const k = kompakt(name);
+  if (r.art === 'exakt' && !INDEX.has(k) && INDEX.get(k + 'e') === r.e) return r.e.text;
   return name;
 }
 
@@ -796,8 +799,9 @@ function eintragVon(name) {
   return r && r.ganz && (r.art === 'exakt' || r.art === 'fuzzy') ? r.e.name : null;
 }
 
-function vorschlaege(text) {
-  if (text.trim().startsWith('#')) {
+// anheften: Vorschläge für das Anheften in den Einstellungen – ohne Rezepte und ohne schon Angeheftetes
+function vorschlaege(text, { anheften = false } = {}) {
+  if (!anheften && text.trim().startsWith('#')) {
     const k = kompakt(text.trim().replace(/^#+/, '')), w = norm(text.trim().replace(/^#+/, ''));
     return S.rezepte.filter(x => kompakt(x.name).startsWith(k) || norm(x.name).split(' ').some(t => t.startsWith(w)))
       .slice(0, 5).map(x => ({ name: '#' + x.name, art: 'rezept', hinweis: `Rezept · ${x.zutaten.length} Zutaten`, rezept: x }));
@@ -805,9 +809,9 @@ function vorschlaege(text) {
   const { name } = parseMenge(text);
   const t = kompakt(name);
   const tw = norm(name);
-  if (t.length < 2) return [];
+  if (!t) return [];
   const aus = [];
-  const gesehen = new Set();   // kompakte Namen
+  const gesehen = new Set(anheften ? S.einstellungen.chips.angeheftet.map(kompakt) : []);   // kompakte Namen
   const eintraege = new Set(); // Katalogeinträge: „Tomate“ und „Tomaten“ nur einmal
   const nimm = (n, art, hinweis, eintrag) => {
     const k = kompakt(n);
@@ -817,7 +821,7 @@ function vorschlaege(text) {
     aus.push({ name: n, art, hinweis });
   };
   const offenKeys = new Set(offene().map(i => kompakt(i.name)));
-  const hinweisFuer = n => offenKeys.has(kompakt(n)) ? 'schon auf der Liste' : ABT_NAME[klassifiziere(n).abt];
+  const hinweisFuer = n => !anheften && offenKeys.has(kompakt(n)) ? 'schon auf der Liste' : ABT_NAME[klassifiziere(n).abt];
 
   // Verlauf: Anfang des Namens oder eines Worts
   const ausVerlauf = Object.entries(S.verlauf)
@@ -1137,7 +1141,7 @@ $('#formEingabe').addEventListener('submit', e => {
   }
   let eintraege = zerlegeEingabe(text);
   // Ein einzelner unbekannter Begriff: den ersten Vorschlag (Ergänzung oder Korrektur) übernehmen
-  if (eintraege.length === 1 && !istBekannt(eintraege[0].name)) {
+  if (eintraege.length === 1 && kompakt(eintraege[0].name).length >= 2 && !istBekannt(eintraege[0].name)) {
     const v = vorschlaege(text)[0];
     if (v && kompakt(v.name) !== kompakt(eintraege[0].name)) eintraege = [{ ...eintraege[0], name: v.name }];
   }
@@ -1456,7 +1460,8 @@ function oeffneEinstellungen() {
             : 'Erscheint, sobald du ins Eingabefeld tippst, und bei leerer Liste.'}</p></div>
         <div class="feld"><span>Anzahl</span><div class="segment klein" id="eAnzahl">${[6, 9, 12, 18].map(n =>
           `<button type="button" data-anzahl="${n}" class="${S.einstellungen.chips.anzahl === n ? 'an' : ''}">${n}</button>`).join('')}</div></div>
-        <form class="eingabe" id="ePinForm" style="margin-top:6px"><input id="ePinName" type="text" placeholder="Artikel anheften" autocapitalize="sentences" autocorrect="off" enterkeyhint="done"></form>
+        <form class="eingabe" id="ePinForm" style="margin-top:6px"><input id="ePinName" type="text" placeholder="Artikel anheften" autocapitalize="sentences" autocorrect="off" enterkeyhint="done" autocomplete="off"></form>
+        <ul class="vorschlaege" id="ePinVorschlaege" hidden></ul>
         ${chipVerwaltungHTML()}
       </div>
 
@@ -1486,14 +1491,37 @@ function oeffneEinstellungen() {
     `;
   };
   zeichne();
+  // Anheften: Autovervollständigung wie beim Eingabefeld der Liste
+  const pinVorschlaege = () => {
+    const vs = $('#ePinVorschlaege', b), feld = $('#ePinName', b);
+    const liste = feld.value.trim() ? vorschlaege(feld.value, { anheften: true }) : [];
+    vs.hidden = !liste.length;
+    vs.innerHTML = liste.map(v => `<li><button type="button" data-pin-vorschlag="${esc(v.name)}">${esc(v.name)}<span class="hinweis">${esc(v.hinweis || '')}</span></button></li>`).join('');
+  };
+  const pinne = n => {
+    if (!n) return;
+    hefteAn(n); zeichne();
+    $('#ePinName', b).focus();
+  };
+  b.addEventListener('input', e => { if (e.target.id === 'ePinName') pinVorschlaege(); });
+  // pointerdown verhindert, dass das Feld den Fokus verliert und die Tastatur zuklappt
+  b.addEventListener('pointerdown', e => { if (e.target.closest('[data-pin-vorschlag]')) e.preventDefault(); });
   b.addEventListener('submit', e => {
     if (e.target.id !== 'ePinForm') return;
     e.preventDefault();
-    const n = gross(korrigiere($('#ePinName', b).value.trim()));
-    if (n) { hefteAn(n); zeichne(); }
+    const text = $('#ePinName', b).value.trim();
+    let n = gross(korrigiere(parseMenge(text).name));
+    // Unbekannter Begriff: den ersten Vorschlag übernehmen, wie beim Eingabefeld der Liste
+    if (kompakt(n).length >= 2 && !istBekannt(n)) {
+      const v = vorschlaege(text, { anheften: true })[0];
+      if (v) n = v.name;
+    }
+    pinne(n);
   });
   b.addEventListener('click', e => {
     const e1 = S.einstellungen;
+    const pv = e.target.closest('[data-pin-vorschlag]');
+    if (pv) return pinne(pv.dataset.pinVorschlag);
     const thema = e.target.closest('[data-thema]');
     if (thema) { e1.thema = thema.dataset.thema; sichereEinstellungen(); wendeDarstellungAn(); zeichne(); return; }
     const schema = e.target.closest('[data-schema]');
@@ -2608,6 +2636,11 @@ async function selbsttest() {
   pruefe('Korrektur Halumi', korrigiere('Halumi'), 'Halloumi');
   pruefe('Korrektur Schupfnudelm', korrigiere('Schupfnudelm'), 'Schupfnudeln');
   pruefe('Korrektur Ruccola', korrigiere('Ruccola'), 'Rucola');
+  pruefe('Korrektur Kaffe', korrigiere('Kaffe'), 'Kaffee');
+  pruefe('Keine Korrektur Tomate/Tomaten', [korrigiere('Tomate'), korrigiere('Tomaten')], ['Tomate', 'Tomaten']);
+  pruefe('Vorschläge ab dem ersten Buchstaben', vorschlaege('q').length > 0, true);
+  pruefe('Vorschläge fürs Anheften ohne Angeheftetes', (() => { const c = S.einstellungen.chips, alt = c.angeheftet;
+    c.angeheftet = ['Quark']; const v = vorschlaege('Qu', { anheften: true }).map(x => x.name); c.angeheftet = alt; return v.includes('Quark'); })(), false);
   pruefe('Keine Korrektur bei Mehrwort', korrigiere('Hafermilch mit Soja Barrista Bereef'), 'Hafermilch mit Soja Barrista Bereef');
   pruefe('Vorschlag Tomatenkonz', vorschlaege('Tomatenkonz')[0]?.name, 'Tomatenkonzentrat');
 

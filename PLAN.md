@@ -125,6 +125,18 @@ Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone d
   Zitronensaftkonzentrat stehen jetzt im Katalog (Öl, Essig & Gewürze).
 - Selbsttest 146/146. `sw.js` VERSION `einkauf-10`.
 
+### Runde 8 (26.09.2026): Autovervollständigung
+- **Vorschläge ab dem ersten Buchstaben** beim Eintragen (vorher ab zwei). Enter übernimmt den ersten Vorschlag weiterhin erst
+  ab zwei Zeichen, damit „Q“ + Enter nicht zu „Quark“ wird.
+- **Anheften in den Einstellungen** hat dieselbe Autovervollständigung (`vorschlaege(text, { anheften: true })`: ohne Rezepte,
+  ohne schon Angeheftetes, Hinweis immer die Abteilung). Antippen heftet an, das Feld bleibt aktiv für den nächsten Artikel.
+  Enter übernimmt bei unbekanntem Begriff den ersten Vorschlag.
+- Bugfix: Ein abgeschnittener Name, der nur über ein angehängtes „e“ im Katalog stand („Kaffe“), blieb unkorrigiert. Jetzt
+  korrigiert `korrigiere()` ihn zum Katalognamen; Beugungen wie Tomate/Tomaten bleiben unverändert.
+- Skriptgesteuerter UI-Durchlauf (Eingabe, Vorschläge, Chips, Detailblatt, Laden-Ansicht, Teilen, Rezept, Einstellungen,
+  Profil, Abschluss, Liste leeren) ohne JavaScript-Fehler.
+- Selbsttest 150/150. `sw.js` VERSION `einkauf-11`.
+
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
 |---|---|---|
