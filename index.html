@@ -91,6 +91,16 @@
   body.geteilt-modus .geteilt-kopf { display: flex; }
   body.geteilt-modus :is(.kopfzeile .segment, #btnTeilen, #btnEinstellungen, #formEingabe, #vorschlaege, #chips, #chipsGriff) { display: none !important; }
   body.geteilt-modus .kopfzeile { margin-bottom: 0; }
+  /* Karte (Laden-Standort) */
+  .karte { position: relative; z-index: 0; height: 50vh; min-height: 260px; margin-top: 10px; border-radius: 12px; overflow: hidden; background: var(--bg2); }
+  .karte.dunkel .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
+  .karte .leaflet-control-attribution { font-size: 10px; }
+  .karte-status { margin: 8px 0 0; font-size: 13px; }
+  .karte-treffer button { display: block; width: 100%; text-align: left; min-height: 44px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+  .karte-treffer small { display: block; color: var(--muted); font-size: 13px; }
+  .nadel span { display: block; width: 26px; height: 26px; margin: -3px 0 0 -1px; background: var(--danger); border: 3px solid #fff;
+    border-radius: 50% 50% 50% 0; transform: rotate(-45deg); box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+  .leaflet-tooltip.markt-name { font-size: 12px; padding: 1px 6px; }
   .teilen-text { width: 100%; min-height: 180px; font-size: 14px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--bg2); }
 
   .eingabe { display: flex; align-items: center; gap: 4px; background: var(--bg2); border-radius: 12px; padding-left: 12px; }
@@ -403,6 +413,7 @@ const S = {
   liste: [], verlauf: {}, korrekturen: {}, eans: {}, profile: [], aktivesProfil: 'supermarkt',
   einstellungen: null,
   geteilt: null,   // Liste, die jemand anderes geteilt hat: { id, t, artikel: [...] }
+  rezepte: [],     // gespeicherte Rezepte: { id, name, zutaten: [{ name, menge, einheit, abteilung }] }
 };
 
 function standardEinstellungen() {
@@ -423,6 +434,7 @@ function ladeAlles() {
   S.profile = lade('profile', null) || standardProfile();
   S.aktivesProfil = lade('aktivesProfil', S.profile[0].id);
   S.geteilt = lade('geteilt', null);
+  S.rezepte = lade('rezepte', []);
   const std = standardEinstellungen(), gel = lade('einstellungen', {});
   S.einstellungen = { ...std, ...gel, farben: { ...std.farben, ...(gel.farben || {}) }, chips: { ...std.chips, ...(gel.chips || {}) } };
   for (const i of S.liste) if (!ABT_IDS.includes(i.abteilung)) i.abteilung = klassifiziere(i.name).abt;
@@ -439,6 +451,7 @@ const sichereListe = () => sichere('liste', S.liste);
 const sichereVerlauf = () => sichere('verlauf', S.verlauf);
 const sichereProfile = () => { sichere('profile', S.profile); sichere('aktivesProfil', S.aktivesProfil); };
 const sichereEinstellungen = () => sichere('einstellungen', S.einstellungen);
+const sichereRezepte = () => sichere('rezepte', S.rezepte);
 
 /* ============================================================
    Katalog, Normalisierung und Klassifizierung
@@ -777,6 +790,11 @@ function eintragVon(name) {
 }
 
 function vorschlaege(text) {
+  if (text.trim().startsWith('#')) {
+    const k = kompakt(text.trim().replace(/^#+/, '')), w = norm(text.trim().replace(/^#+/, ''));
+    return S.rezepte.filter(x => kompakt(x.name).startsWith(k) || norm(x.name).split(' ').some(t => t.startsWith(w)))
+      .slice(0, 5).map(x => ({ name: '#' + x.name, art: 'rezept', hinweis: `Rezept · ${x.zutaten.length} Zutaten`, rezept: x }));
+  }
   const { name } = parseMenge(text);
   const t = kompakt(name);
   const tw = norm(name);
@@ -1096,6 +1114,20 @@ $('#formEingabe').addEventListener('submit', e => {
   const text = feld.value.trim();
   if (!text) return;
   if (linkAus(text)) return uebernimmLinkAusFeld();
+  if (text.includes('#')) {
+    const teile = text.split(/[,;\n]+/).map(t => t.trim()).filter(Boolean);
+    const tags = teile.filter(t => t.startsWith('#'));
+    if (tags.length) {
+      const gefunden = tags.map(findeRezept);
+      const fehlt = tags.filter((t, i) => !gefunden[i]);
+      if (fehlt.length) return zeigeToast(S.rezepte.length ? `Kein Rezept ${fehlt.join(', ')}` : 'Noch keine Rezepte gespeichert');
+      feld.value = ''; feld.blur();
+      const rest = teile.filter(t => !t.startsWith('#'));
+      if (rest.length) eintragen(zerlegeEingabe(rest.join(',')));
+      renderHilfe();
+      return rezepteAbrufen([...new Set(gefunden)]);
+    }
+  }
   let eintraege = zerlegeEingabe(text);
   // Ein einzelner unbekannter Begriff: den ersten Vorschlag (Ergänzung oder Korrektur) übernehmen
   if (eintraege.length === 1 && !istBekannt(eintraege[0].name)) {
@@ -1125,6 +1157,7 @@ $('#vorschlaege').addEventListener('click', e => {
   const b = e.target.closest('[data-vorschlag]');
   if (!b) return;
   const v = $('#vorschlaege')._liste[+b.dataset.vorschlag];
+  if (v.art === 'rezept') { $('#eingabe').value = ''; $('#eingabe').blur(); renderHilfe(); return rezepteAbrufen([v.rezept]); }
   const p = parseMenge($('#eingabe').value);
   $('#eingabe').value = '';
   eintragen([{ ...p, name: v.name }]);
@@ -1425,6 +1458,11 @@ function oeffneEinstellungen() {
         <button type="button" class="zurueck" data-stamm-weg="${esc(kompakt(v.name))}" style="color:var(--danger)">Entfernen</button></li>`).join('')}</ul>`
         : '<p class="text-muted">Noch keine. Artikel antippen und „Wird immer benötigt“ einschalten.</p>'}
 
+      <div class="abschnitt">Rezepte</div>
+      ${S.rezepte.length ? `<ul class="liste-einst">${S.rezepte.map(x => `<li><button type="button" class="fuellen" data-rezept="${x.id}">#${esc(x.name)}
+        <span class="klein">· ${x.zutaten.length} Zutaten</span></button></li>`).join('')}</ul>`
+        : '<p class="text-muted">Noch keine. Beim Übernehmen eines Rezepts einen Namen vergeben, dann im Eingabefeld mit #Name abrufen.</p>'}
+
       <div class="abschnitt">Rezept-Fotos</div>
       <label class="feld"><span>Claude-API-Schlüssel (bleibt nur auf diesem Gerät)</span>
         <input type="password" id="eApiKey" value="${esc(S.einstellungen.apiKey)}" placeholder="sk-ant-…" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
@@ -1468,6 +1506,8 @@ function oeffneEinstellungen() {
       if (ca.dataset.chipAktion === 'zeig') { e1.chips.ausgeblendet = e1.chips.ausgeblendet.filter(k => k !== kompakt(n)); sichereEinstellungen(); }
       zeichne(); return;
     }
+    const rzKnopf = e.target.closest('[data-rezept]');
+    if (rzKnopf) return oeffneRezeptBearbeiten(S.rezepte.find(x => x.id === rzKnopf.dataset.rezept), zeichne);
     const p = e.target.closest('[data-profil]');
     if (p) return oeffneProfil(S.profile.find(x => x.id === p.dataset.profil), zeichne);
     if (e.target.closest('#eNeuesProfil')) {
@@ -1518,8 +1558,10 @@ function oeffneProfil(p, nachher) {
         <input type="checkbox" aria-label="In diesem Laden vorhanden"${p.ausgeblendet.includes(a) ? '' : ' checked'}>
         <span class="abtname" style="flex:1">${esc(ABT_NAME[a])}</span><span class="griff" aria-label="Verschieben">${ICON_GRIFF}</span></li>`).join('')}</ul>
       <div class="abschnitt">Standort</div>
-      <p class="text-muted">${p.ort ? `Gespeichert (±${Math.round(p.ort.genau || 0)} m).` : 'Nicht gespeichert. Im Laden stehend übernehmen, dann wählt die App diesen Laden automatisch.'}</p>
+      <p class="text-muted">${!p.ort ? 'Nicht gespeichert. Auf der Karte wählen oder im Laden stehend übernehmen, dann wählt die App diesen Laden automatisch.'
+        : p.ort.quelle === 'karte' ? `Auf der Karte gewählt${p.ort.adresse ? `: ${esc(p.ort.adresse)}` : ''}.` : `Gespeichert (±${Math.round(p.ort.genau || 0)} m).`}</p>
       <div class="knopfreihe">
+        <button type="button" class="knopf zweit" id="pKarte">Auf der Karte wählen</button>
         <button type="button" class="knopf zweit" id="pOrt">Aktuellen Standort übernehmen</button>
         ${p.ort ? '<button type="button" class="knopf zweit" id="pOrtWeg">Standort entfernen</button>' : ''}
         ${S.profile.length > 1 ? '<button type="button" class="knopf gefahr" id="pLoeschen">Laden löschen</button>' : ''}
@@ -1547,6 +1589,7 @@ function oeffneProfil(p, nachher) {
       } catch (err) { zeigeToast('Standort nicht verfügbar'); zeichne(); }
     }
     if (e.target.closest('#pOrtWeg')) { delete p.ort; sichereProfile(); zeichne(); }
+    if (e.target.closest('#pKarte')) oeffneKarte(p, zeichne);
     if (e.target.closest('#pLoeschen') && confirm(`„${p.name}“ löschen?`)) {
       S.profile = S.profile.filter(x => x !== p);
       if (S.aktivesProfil === p.id) S.aktivesProfil = S.profile[0].id;
@@ -1593,7 +1636,7 @@ function ziehbar(ul, beiEnde) {
 /* Sicherung */
 async function exportieren() {
   const daten = { version: 1, exportiert: new Date().toISOString(), liste: S.liste, verlauf: S.verlauf, korrekturen: S.korrekturen,
-    eans: S.eans, profile: S.profile, aktivesProfil: S.aktivesProfil, einstellungen: { ...S.einstellungen, apiKey: '' } };
+    eans: S.eans, profile: S.profile, aktivesProfil: S.aktivesProfil, rezepte: S.rezepte, einstellungen: { ...S.einstellungen, apiKey: '' } };
   const name = `einkaufsliste-${new Date().toISOString().slice(0, 10)}.json`;
   const datei = new File([JSON.stringify(daten, null, 1)], name, { type: 'application/json' });
   if (navigator.canShare && navigator.canShare({ files: [datei] })) {
@@ -1610,8 +1653,9 @@ async function importieren(datei, nachher) {
     if (!confirm('Sicherung einspielen? Die aktuellen Daten werden ersetzt (der API-Schlüssel bleibt).')) return;
     S.liste = d.liste; S.verlauf = d.verlauf || {}; S.korrekturen = d.korrekturen || {}; S.eans = d.eans || {};
     S.profile = d.profile; S.aktivesProfil = d.aktivesProfil || d.profile[0].id;
+    S.rezepte = Array.isArray(d.rezepte) ? d.rezepte : S.rezepte;
     S.einstellungen = { ...S.einstellungen, ...(d.einstellungen || {}), apiKey: S.einstellungen.apiKey };
-    sichereListe(); sichereVerlauf(); sichere('korrekturen', S.korrekturen); sichere('eans', S.eans); sichereProfile(); sichereEinstellungen();
+    sichereListe(); sichereVerlauf(); sichere('korrekturen', S.korrekturen); sichere('eans', S.eans); sichereProfile(); sichereEinstellungen(); sichereRezepte();
     zeigeToast('Sicherung eingespielt'); nachher(); render();
   } catch (e) { zeigeToast('Datei konnte nicht gelesen werden'); }
 }
@@ -1619,6 +1663,173 @@ async function importieren(datei, nachher) {
 /* ============================================================
    Standort
    ============================================================ */
+
+/* ============================================================
+   Karte: Laden-Standort wählen (Leaflet, Kacheln von OpenStreetMap,
+   Märkte über Overpass, ersatzweise Nominatim; Suche über Nominatim)
+   ============================================================ */
+
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+const MARKT_ARTEN = ['supermarket', 'chemist', 'convenience', 'discount', 'organic', 'greengrocer'];
+
+async function ladeLeaflet() {
+  if (window.L) return;
+  const css = document.createElement('link');
+  css.rel = 'stylesheet'; css.href = 'vendor/leaflet/leaflet.css';
+  document.head.appendChild(css);
+  await ladeSkript('vendor/leaflet/leaflet.js');
+}
+
+// Ein Markt aus OSM-Tags; vorschlag ist der Profilname, z. B. „REWE Sendlinger Straße“
+function marktAusTags(tags, lat, lon) {
+  const name = tags.name || tags.brand;
+  if (!name || lat == null || lon == null) return null;
+  const strasse = tags['addr:street'] || '';
+  const adresse = [strasse && `${strasse}${tags['addr:housenumber'] ? ' ' + tags['addr:housenumber'] : ''}`, tags['addr:city']].filter(Boolean).join(', ');
+  const ort = strasse || tags['addr:suburb'] || tags['addr:city'] || '';
+  return { lat: +lat, lon: +lon, name, adresse, vorschlag: ort && !name.includes(ort) ? `${name} ${ort}` : name };
+}
+const maerkteAusOverpass = json => (json.elements || [])
+  .map(e => marktAusTags(e.tags || {}, e.lat ?? e.center?.lat, e.lon ?? e.center?.lon)).filter(Boolean);
+const maerkteAusNominatim = liste => liste.filter(x => x.category === 'shop').map(x => {
+  const a = x.address || {};
+  return marktAusTags({ name: x.name, 'addr:street': a.road, 'addr:housenumber': a.house_number,
+    'addr:suburb': a.suburb, 'addr:city': a.city || a.town || a.village }, x.lat, x.lon);
+}).filter(Boolean);
+
+async function sucheMaerkte(box) {
+  const q = `[out:json][timeout:10];nwr["shop"~"^(${MARKT_ARTEN.join('|')})$"](${box.s},${box.w},${box.n},${box.e});out center tags 200;`;
+  for (const url of OVERPASS) {
+    const d = await holeJSON(url, 9000, { method: 'POST', body: new URLSearchParams({ data: q }) });
+    if (d && Array.isArray(d.elements)) return maerkteAusOverpass(d);
+  }
+  // Overpass ist oft überlastet – dann Nominatim (höchstens eine Anfrage pro Sekunde)
+  const alle = [];
+  for (const [i, art] of ['supermarket', 'chemist'].entries()) {
+    if (i) await new Promise(ok => setTimeout(ok, 1100));
+    const d = await holeJSON(`https://nominatim.openstreetmap.org/search?${new URLSearchParams({
+      q: art, format: 'jsonv2', addressdetails: 1, limit: 40, bounded: 1, viewbox: [box.w, box.n, box.e, box.s].join() })}`, 8000);
+    if (d) alle.push(...maerkteAusNominatim(d));
+  }
+  if (!alle.length) throw new Error('keine Antwort');
+  return alle;
+}
+
+async function oeffneKarte(p, nachher) {
+  const b = oeffneBlatt(`
+    <div class="blatt-kopf"><h3>Standort wählen</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
+    <form class="eingabe" id="kSuche"><input id="kSuchText" type="search" placeholder="Adresse oder Markt suchen" enterkeyhint="search" autocomplete="off" autocorrect="off"></form>
+    <ul class="karte-treffer liste-einst" id="kTreffer" hidden></ul>
+    <div class="karte${istDunkel() ? ' dunkel' : ''}" id="karte"></div>
+    <p class="text-muted karte-status" id="kStatus">Karte wird geladen</p>
+    <div id="kWahl"></div>
+    <div class="knopfreihe"><button type="button" class="knopf" id="kOk" disabled>Standort übernehmen</button></div>`, { voll: true });
+  b._beimSchliessen = nachher;
+  const status = t => { $('#kStatus', b).textContent = t; };
+  try { await ladeLeaflet(); } catch (e) { return status('Die Karte konnte nicht geladen werden. Bitte Internetverbindung prüfen.'); }
+  if (!b.isConnected) return;
+
+  const karte = L.map($('#karte', b), { zoomControl: false }).setView(p.ort ? [p.ort.lat, p.ort.lon] : [51.16, 10.45], p.ort ? 17 : 6);
+  karte.attributionControl.setPrefix(false);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(karte);
+  b._beimSchliessen = () => { karte.remove(); nachher(); };
+  setTimeout(() => karte.invalidateSize(), 260);
+  const akzent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  const marktEbene = L.layerGroup().addTo(karte);
+  let wahl = null, nadel = null;
+
+  const setzeWahl = (lat, lon, markt = null) => {
+    wahl = { lat, lon, markt };
+    if (nadel) nadel.setLatLng([lat, lon]);
+    else nadel = L.marker([lat, lon], { interactive: false, icon: L.divIcon({ className: 'nadel', html: '<span></span>', iconSize: [26, 26], iconAnchor: [13, 30] }) }).addTo(karte);
+    const standardName = /^(Neuer Laden|Laden|Supermarkt|Drogerie)$/.test(p.name);
+    $('#kWahl', b).innerHTML = markt
+      ? `<p style="margin:12px 0 0"><strong>${esc(markt.name)}</strong>${markt.adresse ? `<br><span class="text-muted">${esc(markt.adresse)}</span>` : ''}</p>
+         <label class="schalter"><div>Namen übernehmen<small>${esc(markt.vorschlag)}</small></div><input type="checkbox" id="kName"${standardName ? ' checked' : ''}></label>`
+      : '<p class="text-muted" style="margin:12px 0 0">Nadel gesetzt. Tippe auf einen Markt-Punkt, um auch den Namen zu übernehmen.</p>';
+    $('#kOk', b).disabled = false;
+  };
+  if (p.ort) setzeWahl(p.ort.lat, p.ort.lon);
+  karte.on('click', e => setzeWahl(e.latlng.lat, e.latlng.lng));
+
+  // Märkte im sichtbaren Ausschnitt nachladen (erst ab Zoomstufe 14, nicht erneut für schon geladene Bereiche)
+  let timer, geladen = null, anfrage = 0;
+  const ladeMaerkte = () => {
+    clearTimeout(timer);
+    if (karte.getZoom() < 14) return status('Zum Anzeigen der Märkte näher heranzoomen oder oben suchen.');
+    if (geladen && geladen.contains(karte.getBounds())) return;
+    timer = setTimeout(async () => {
+      const g = karte.getBounds().pad(0.3), nr = ++anfrage;
+      status('Märkte werden gesucht …');
+      try {
+        const liste = await sucheMaerkte({ s: g.getSouth().toFixed(5), w: g.getWest().toFixed(5), n: g.getNorth().toFixed(5), e: g.getEast().toFixed(5) });
+        if (nr !== anfrage || !b.isConnected) return;
+        geladen = g;
+        marktEbene.clearLayers();
+        for (const m of liste) {
+          L.circleMarker([m.lat, m.lon], { radius: 9, color: '#fff', weight: 2, fillColor: akzent, fillOpacity: 1 })
+            .bindTooltip(m.name, { permanent: liste.length <= 30, direction: 'top', offset: [0, -8], className: 'markt-name' })
+            .on('click', e => { L.DomEvent.stopPropagation(e); setzeWahl(m.lat, m.lon, m); })
+            .addTo(marktEbene);
+        }
+        status(liste.length ? `${liste.length} ${liste.length === 1 ? 'Markt' : 'Märkte'}: Punkt antippen oder Nadel per Tippen auf die Karte setzen.`
+          : 'Hier keine Märkte gefunden. Nadel per Tippen auf die Karte setzen.');
+      } catch (e) {
+        if (nr === anfrage) status('Märkte gerade nicht abrufbar. Nadel per Tippen auf die Karte setzen.');
+      }
+    }, 600);
+  };
+  karte.on('moveend', ladeMaerkte);
+  if (p.ort) ladeMaerkte();
+  else {
+    status('Standort wird bestimmt …');
+    standort().then(pos => { if (b.isConnected && !wahl) karte.setView([pos.coords.latitude, pos.coords.longitude], 16); })
+      .catch(() => status('Adresse oder Markt oben suchen, oder die Karte verschieben und heranzoomen.'));
+  }
+
+  // Suche nach Adresse oder Marktname
+  let treffer = [];
+  b.addEventListener('submit', async e => {
+    if (e.target.id !== 'kSuche') return;
+    e.preventDefault();
+    const q = $('#kSuchText', b).value.trim();
+    if (!q) return;
+    $('#kSuchText', b).blur();
+    const ul = $('#kTreffer', b);
+    ul.hidden = false;
+    ul.innerHTML = '<li><span class="laedt"></span>Suche …</li>';
+    const g = karte.getBounds();
+    const d = await holeJSON(`https://nominatim.openstreetmap.org/search?${new URLSearchParams({
+      q, format: 'jsonv2', addressdetails: 1, limit: 6, 'accept-language': 'de', viewbox: [g.getWest(), g.getNorth(), g.getEast(), g.getSouth()].join() })}`, 8000);
+    if (!b.isConnected) return;
+    if (!d) { ul.innerHTML = '<li class="text-muted">Suche gerade nicht erreichbar</li>'; return; }
+    treffer = d.map(x => {
+      const markt = maerkteAusNominatim([x])[0] || null;
+      return { lat: +x.lat, lon: +x.lon, titel: x.name || x.display_name.split(',')[0], markt,
+        text: markt && markt.adresse ? markt.adresse : x.display_name.split(',').slice(1, 4).join(',').trim() };
+    });
+    ul.innerHTML = treffer.length ? treffer.map((t, i) => `<li><button type="button" data-treffer="${i}">${esc(t.titel)}<small>${esc(t.text)}</small></button></li>`).join('')
+      : '<li class="text-muted">Nichts gefunden</li>';
+  });
+  b.addEventListener('click', e => {
+    const t = e.target.closest('[data-treffer]');
+    if (t) {
+      const x = treffer[+t.dataset.treffer];
+      $('#kTreffer', b).hidden = true;
+      karte.setView([x.lat, x.lon], 17);
+      setzeWahl(x.lat, x.lon, x.markt);
+      return;
+    }
+    if (e.target.closest('#kOk') && wahl) {
+      p.ort = { lat: wahl.lat, lon: wahl.lon, genau: null, quelle: 'karte', adresse: wahl.markt ? wahl.markt.adresse || wahl.markt.name : '' };
+      if (wahl.markt && $('#kName', b) && $('#kName', b).checked) p.name = wahl.markt.vorschlag;
+      sichereProfile();
+      schliesseBlatt(b);
+      zeigeToast(`Standort gespeichert: ${p.name}`);
+    }
+  });
+}
 
 function standort() {
   return new Promise((ok, fehler) => {
@@ -1713,11 +1924,11 @@ function abteilungAusTags(tags, standard) {
   return standard;
 }
 
-async function holeJSON(url, ms = 7000) {
+async function holeJSON(url, ms = 7000, optionen = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
-    const r = await fetch(url, { signal: ctrl.signal });
+    const r = await fetch(url, { ...optionen, signal: ctrl.signal });
     if (!r.ok) return null;
     return await r.json();
   } catch (e) { return null; } finally { clearTimeout(t); }
@@ -1793,16 +2004,34 @@ const EINHEITEN = ['g', 'gr', 'gramm', 'kg', 'mg', 'ml', 'cl', 'dl', 'l', 'liter
   'frische', 'frischer', 'frisches', 'frisch', 'getrocknete', 'getrockneter', 'getrocknetes', 'gehackte', 'gehackter', 'tl.', 'el.', 'cup', 'cups', 'tbsp', 'tsp', 'oz'];
 const EINHEIT_RE = new RegExp(`^(?:${EINHEITEN.map(e => e.replace('.', '\\.')).join('|')})\\.?(?=\\s|$)`, 'i');
 
+// Menge am Zeilenanfang, soweit man sie so einkauft: g/kg/ml/l oder Stückzahl.
+// Küchenmaße (EL, TL, Zehe, Prise …) ergeben keine Menge.
+const REZEPT_GEWICHT = { g: ['g', 1], gr: ['g', 1], gramm: ['g', 1], kg: ['kg', 1], kilo: ['kg', 1],
+  ml: ['ml', 1], cl: ['ml', 10], dl: ['ml', 100], l: ['l', 1], liter: ['l', 1], ltr: ['l', 1] };
+const REZEPT_KUECHE = /^(el|tl|essl[öo]ffel|teel[öo]ffel|msp|messerspitzen?|prisen?|zehen?|scheiben?|tassen?|handvoll|zweige?|stiele?|bl[äa]tt(er)?|schuss|spritzer|etwas|cups?|tbsp|tsp|oz|mg)$/i;
+const BRUECHE = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3, '⅛': 0.125 };
+function rezeptMenge(zeile) {
+  const m = zeile.match(/^(?:ca\.?\s*)?(\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛])(?:\s*[-–]\s*(\d+(?:[.,]\d+)?))?\s*([a-zäöüß]+)?/i);
+  if (!m) return null;
+  const n = BRUECHE[m[2] || m[1]] ?? parseFloat((m[2] || m[1]).replace(',', '.'));
+  const wort = (m[3] || '').toLowerCase();
+  if (REZEPT_GEWICHT[wort]) { const [einheit, f] = REZEPT_GEWICHT[wort]; return { menge: Math.round(n * f * 100) / 100, einheit }; }
+  if (REZEPT_KUECHE.test(wort)) return null;
+  return { menge: Math.max(1, Math.ceil(n)), einheit: 'stk' };
+}
+
+// Liefert [{ name, menge, einheit }]; menge ist null, wenn keine einkaufbare Menge dasteht
 function parseRezept(text) {
   const zeilen = String(text).replace(/\r/g, '').split('\n');
   // Nur eine Zeile mit Kommas (z. B. aus einem Fließtext): an Kommas trennen
-  const teile = zeilen.filter(z => z.trim()).length === 1 ? zeilen[0].split(/[,;]/) : zeilen;
+  const teile = zeilen.filter(z => z.trim()).length === 1 ? zeilen[0].split(/;|(?<!\d),|,(?!\d)/) : zeilen;
   const aus = [];
   for (let z of teile) {
     z = z.replace(/^[\s•·\-–—*▢□☐◦○●✓✔]+/, '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
     if (!z || z.endsWith(':') || z.length > 70) continue;
     if (/^(zutaten|zubereitung|anleitung|schritt|portion|für \d|personen|nährwerte|tipp|dazu|außerdem)/i.test(z)) continue;
-    z = z.split(',')[0];
+    const mg = rezeptMenge(z);
+    z = z.split(/(?<!\d),|,(?!\d)/)[0];
     z = z.replace(/\b(nach (belieben|geschmack|bedarf)|zum (garnieren|bestreuen|servieren|braten|anbraten)|optional|zum Abschmecken|für die Form)\b.*$/i, '').trim();
     for (let i = 0; i < 6; i++) {
       const vorher = z;
@@ -1812,9 +2041,10 @@ function parseRezept(text) {
       if (z === vorher) break;
     }
     if (!z || /^\d/.test(z) || z.length < 2) continue;
-    for (const teil of z.split(/\s+(?:und|oder|&)\s+|\s*\/\s*/)) {
-      const t = teil.trim();
-      if (t.length >= 2) aus.push(t);
+    const namen = z.split(/\s+(?:und|oder|&)\s+|\s*\/\s*/).map(t => t.trim()).filter(t => t.length >= 2);
+    for (const name of namen) {
+      const mit = namen.length === 1 && mg;
+      aus.push({ name, menge: mit ? mg.menge : null, einheit: mit ? mg.einheit : null });
     }
   }
   return aus;
@@ -1835,7 +2065,8 @@ function rezeptArtikel(namen) {
     gesehen.add(key);
     const abt = roh.abteilung && ABT_IDS.includes(roh.abteilung) && !S.korrekturen[key] ? roh.abteilung : klassifiziere(name).abt;
     const grund = offenKeys.has(key) ? 'auf der Liste' : vorrat.has(key) ? 'Vorrat' : '';
-    aus.push({ name, abt, an: !grund, grund });
+    const menge = roh.menge > 0 ? roh.menge : null;
+    aus.push({ name, abt, an: !grund, grund, menge, einheit: menge ? (EINHEITEN_MENGE.includes(roh.einheit) ? roh.einheit : 'stk') : null });
   }
   return aus;
 }
@@ -1844,6 +2075,8 @@ function oeffneRezept() {
   const mitKey = !!S.einstellungen.apiKey;
   const b = oeffneBlatt(`
     <div class="blatt-kopf"><h3>Rezept übernehmen</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
+    ${S.rezepte.length ? `<div class="feld"><span>Gespeicherte Rezepte</span><div class="chips">${S.rezepte.map(x =>
+      `<button type="button" class="chip" data-rezept-abruf="${x.id}">#${esc(x.name)}</button>`).join('')}</div></div>` : ''}
     <p class="text-muted">Im Foto oder Screenshot die Zutaten markieren (Text gedrückt halten), kopieren und hier einfügen.</p>
     <label class="feld"><span>Zutaten</span><textarea id="rText" placeholder="200 g Spaghetti&#10;2 Zehen Knoblauch&#10;1 Bund Basilikum"></textarea></label>
     <div class="knopfreihe">
@@ -1852,6 +2085,11 @@ function oeffneRezept() {
     </div>
     <input type="file" id="rDatei" accept="image/*" hidden>
     <p class="text-muted" id="rStatus"></p>`);
+  b.addEventListener('click', e => {
+    const x = e.target.closest('[data-rezept-abruf]');
+    const rz = x && S.rezepte.find(y => y.id === x.dataset.rezeptAbruf);
+    if (rz) { schliesseBlatt(b); setTimeout(() => rezepteAbrufen([rz]), 220); }
+  });
   $('#rWeiter', b).onclick = () => {
     const namen = parseRezept($('#rText', b).value);
     if (!namen.length) return zeigeToast('Keine Zutaten erkannt');
@@ -1881,32 +2119,126 @@ function oeffneRezept() {
   };
 }
 
-function oeffnePruefung(artikel) {
+function oeffnePruefung(artikel, { titel = 'Was brauchst du?', speichern = true } = {}) {
   const b = oeffneBlatt(`
-    <div class="blatt-kopf"><h3>Was brauchst du?</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
+    <div class="blatt-kopf"><h3>${esc(titel)}</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
     <p class="text-muted">Abwählen, was noch im Vorrat ist.</p>
     <ul class="liste-einst pruef">${artikel.map((a, i) => `<li><label><input type="checkbox" data-i="${i}"${a.an ? ' checked' : ''}>
-      <span>${esc(a.name)}<span class="sub text-muted" style="display:block;font-size:13px">${esc(ABT_NAME[a.abt])}</span></span>
+      <span>${a.menge && mengeText(a) ? `<b>${esc(mengeText(a))}</b> ` : ''}${esc(a.name)}<span class="sub text-muted" style="display:block;font-size:13px">${esc(ABT_NAME[a.abt])}</span></span>
       ${a.grund ? `<span class="marke">${esc(a.grund)}</span>` : ''}</label></li>`).join('')}</ul>
+    ${speichern ? `<label class="feld"><span>Als Rezept speichern (optional, alle Zutaten)</span>
+      <input type="text" id="pRezept" placeholder="Name, z. B. Chili sin Carne" autocapitalize="sentences" autocorrect="off" enterkeyhint="done"></label>` : ''}
     <div class="knopfreihe"><button type="button" class="knopf" id="pOk"></button></div>`);
+  const rezeptName = () => speichern ? $('#pRezept', b).value.trim().replace(/^#+\s*/, '') : '';
   const zaehle = () => {
     const n = $$('input[data-i]:checked', b).length;
     const k = $('#pOk', b);
-    k.textContent = n === 1 ? '1 Artikel hinzufügen' : `${n} Artikel hinzufügen`;
-    k.disabled = !n;
+    const anzahl = n === 1 ? '1 Artikel hinzufügen' : `${n} Artikel hinzufügen`;
+    k.textContent = rezeptName() ? (n ? `${anzahl} und Rezept speichern` : 'Nur Rezept speichern') : anzahl;
+    k.disabled = !n && !rezeptName();
   };
   zaehle();
   b.addEventListener('change', zaehle);
+  b.addEventListener('input', zaehle);
   $('#pOk', b).onclick = () => {
+    const name = rezeptName();
+    if (name && !rezeptSpeichern(name, artikel)) return;
     let letztes = null;
     for (const cb of $$('input[data-i]:checked', b)) {
       const a = artikel[+cb.dataset.i];
-      letztes = hinzufuegen(a.name, null, { abteilung: a.abt }) || letztes;
+      letztes = hinzufuegen(a.name, a.menge || null, { abteilung: a.abt, einheit: a.einheit || undefined }) || letztes;
     }
     sichereListe(); sichereVerlauf();
     schliesseBlatt(b); render();
     if (letztes) blitze(letztes.id);
+    if (name) zeigeToast(`Rezept gespeichert, abrufen mit #${name}`);
   };
+}
+
+/* ============================================================
+   Gespeicherte Rezepte: abrufen mit #Name
+   ============================================================ */
+
+function rezeptSpeichern(name, artikel, ersetzt = null) {
+  const key = kompakt(name);
+  const vorhanden = S.rezepte.find(x => kompakt(x.name) === key && x !== ersetzt);
+  if (vorhanden && !confirm(`Es gibt schon ein Rezept „#${vorhanden.name}“. Ersetzen?`)) return false;
+  S.rezepte = S.rezepte.filter(x => x !== vorhanden);
+  S.rezepte.push({ id: uid(), name, zutaten: artikel.map(a => ({
+    name: a.name, menge: a.menge || null, einheit: a.menge ? (a.einheit || 'stk') : null, abteilung: a.abt || a.abteilung })) });
+  S.rezepte.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  sichereRezepte();
+  return true;
+}
+
+// „#chili“ findet „Chili sin Carne“, wenn es eindeutig ist
+function findeRezept(tag) {
+  const k = kompakt(String(tag).replace(/^#+/, ''));
+  if (!k) return null;
+  const genau = S.rezepte.find(x => kompakt(x.name) === k);
+  if (genau) return genau;
+  const anfang = S.rezepte.filter(x => kompakt(x.name).startsWith(k));
+  return anfang.length === 1 ? anfang[0] : null;
+}
+
+// Zutaten mehrerer Rezepte zusammenfassen: gleiche Zutat einmal, Mengen gleicher Einheit addiert
+function rezeptZutaten(rezepte) {
+  const gesamt = new Map();
+  for (const z of rezepte.flatMap(x => x.zutaten)) {
+    const k = kompakt(z.name), g = gesamt.get(k);
+    if (!g) gesamt.set(k, { ...z });
+    else if (g.menge && z.menge && g.einheit === z.einheit) g.menge = Math.round((g.menge + z.menge) * 100) / 100;
+  }
+  return [...gesamt.values()];
+}
+
+function rezepteAbrufen(rezepte) {
+  oeffnePruefung(rezeptArtikel(rezeptZutaten(rezepte)), { titel: rezepte.map(x => '#' + x.name).join(', '), speichern: false });
+}
+
+function oeffneRezeptBearbeiten(rz, nachher) {
+  const b = oeffneBlatt('<div id="rez"></div>', { voll: true });
+  const zeichne = () => {
+    $('#rez', b).innerHTML = `
+      <div class="blatt-kopf"><button type="button" class="zurueck" data-schliessen>Zurück</button><h3></h3></div>
+      <label class="feld"><span>Name (abrufen mit #Name)</span><input type="text" id="rzName" value="${esc(rz.name)}" autocapitalize="sentences" autocorrect="off"></label>
+      <div class="abschnitt">Zutaten</div>
+      <ul class="liste-einst">${rz.zutaten.map((z, i) => `<li><span style="flex:1">${esc(artikelText(z))}
+        <span class="text-muted" style="display:block;font-size:13px">${esc(ABT_NAME[z.abteilung] || '')}</span></span>
+        <button type="button" class="zurueck" data-zutat-weg="${i}" style="color:var(--danger)">Entfernen</button></li>`).join('')}</ul>
+      <form class="eingabe" id="rzNeu" style="margin-top:10px"><input id="rzNeuName" type="text" placeholder="Zutat, z. B. 500 g Hackfleisch" autocapitalize="sentences" autocorrect="off" enterkeyhint="done"></form>
+      <div class="knopfreihe">
+        <button type="button" class="knopf" id="rzListe"${rz.zutaten.length ? '' : ' disabled'}>Auf die Liste</button>
+        <button type="button" class="knopf gefahr" id="rzLoeschen">Rezept löschen</button>
+      </div>`;
+  };
+  zeichne();
+  b.addEventListener('change', e => {
+    if (e.target.id !== 'rzName') return;
+    const name = e.target.value.trim().replace(/^#+\s*/, '');
+    const doppelt = S.rezepte.find(x => x !== rz && kompakt(x.name) === kompakt(name));
+    if (!name || doppelt) { zeigeToast(doppelt ? `„#${doppelt.name}“ gibt es schon` : 'Name fehlt'); e.target.value = rz.name; return; }
+    rz.name = name; S.rezepte.sort((a, c) => a.name.localeCompare(c.name, 'de')); sichereRezepte();
+  });
+  b.addEventListener('submit', e => {
+    if (e.target.id !== 'rzNeu') return;
+    e.preventDefault();
+    for (const p of zerlegeEingabe($('#rzNeuName', b).value)) {
+      const name = gross(korrigiere(p.name));
+      rz.zutaten.push({ name, menge: p.explizit ? p.menge : null, einheit: p.explizit ? p.einheit : null, abteilung: klassifiziere(name).abt });
+    }
+    sichereRezepte(); zeichne();
+    $('#rzNeuName', b).focus();
+  });
+  b.addEventListener('click', e => {
+    const weg = e.target.closest('[data-zutat-weg]');
+    if (weg) { rz.zutaten.splice(+weg.dataset.zutatWeg, 1); sichereRezepte(); zeichne(); return; }
+    if (e.target.closest('#rzListe')) { schliesseBlatt(b); setTimeout(() => rezepteAbrufen([rz]), 220); return; }
+    if (e.target.closest('#rzLoeschen') && confirm(`Rezept „#${rz.name}“ löschen?`)) {
+      S.rezepte = S.rezepte.filter(x => x !== rz); sichereRezepte(); schliesseBlatt(b);
+    }
+  });
+  b._beimSchliessen = nachher;
 }
 
 async function bildAlsJPEG(datei, maxKante = 1568) {
@@ -1947,8 +2279,13 @@ async function zutatenAusFoto(datei) {
                 type: 'array',
                 items: {
                   type: 'object',
-                  properties: { name: { type: 'string' }, abteilung: { type: 'string', enum: ABT_IDS } },
-                  required: ['name', 'abteilung'],
+                  properties: {
+                    name: { type: 'string' },
+                    menge: { type: 'number' },
+                    einheit: { type: 'string', enum: EINHEITEN_MENGE },
+                    abteilung: { type: 'string', enum: ABT_IDS },
+                  },
+                  required: ['name', 'menge', 'einheit', 'abteilung'],
                   additionalProperties: false,
                 },
               },
@@ -1966,7 +2303,8 @@ async function zutatenAusFoto(datei) {
           { type: 'text', text:
 `Das Bild zeigt ein Rezept (Foto oder Screenshot). Liste alle Zutaten als Einkaufsartikel auf Deutsch auf.
 - Nur den Artikelnamen, so wie man ihn auf einen Einkaufszettel schreibt: "Zwiebeln" statt "2 Zwiebeln, fein gewürfelt", "Knoblauch" statt "3 Zehen Knoblauch".
-- Keine Mengen, Einheiten oder Zubereitungshinweise. Doppelte Zutaten nur einmal.
+- Keine Zubereitungshinweise im Namen. Doppelte Zutaten nur einmal.
+- menge und einheit nur, wenn man die Zutat so einkauft: Gramm (g), Kilogramm (kg), Milliliter (ml), Liter (l) oder Stückzahl (stk, auch für Dose, Packung, Bund, Becher). Bei Küchenmaßen wie EL, TL, Prise, Zehe oder ohne Angabe: menge 0 und einheit "stk".
 - Ordne jede Zutat genau einer Supermarkt-Abteilung zu (id verwenden):
 ${abteilungen}
 Enthält das Bild kein Rezept, gib eine leere Liste zurück.` },
@@ -2274,10 +2612,50 @@ async function selbsttest() {
 - 1 große Zwiebel
 Zubereitung:
 Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen und servieren.`;
-  pruefe('Rezept-Parser', parseRezept(rezept), ['Spaghetti', 'Knoblauch', 'Basilikum', 'Olivenöl', 'Tomaten', 'Salz', 'Pfeffer', 'Parmesan', 'Zwiebel']);
+  pruefe('Rezept-Parser', parseRezept(rezept).map(z => z.name), ['Spaghetti', 'Knoblauch', 'Basilikum', 'Olivenöl', 'Tomaten', 'Salz', 'Pfeffer', 'Parmesan', 'Zwiebel']);
   const art = rezeptArtikel(parseRezept(rezept));
   pruefe('Rezept: Vorrat abgewählt', art.filter(a => !a.an).map(a => a.name), ['Olivenöl', 'Salz', 'Pfeffer']);
-  pruefe('Rezept: Salz und Pfeffer getrennt', parseRezept('Salz und Pfeffer'), ['Salz', 'Pfeffer']);
+  pruefe('Rezept: Salz und Pfeffer getrennt', parseRezept('Salz und Pfeffer').map(z => z.name), ['Salz', 'Pfeffer']);
+  pruefe('Rezept: Mengen', parseRezept(rezept).map(z => [z.name, z.menge, z.einheit]), [
+    ['Spaghetti', 400, 'g'], ['Knoblauch', null, null], ['Basilikum', 1, 'stk'], ['Olivenöl', null, null], ['Tomaten', 1, 'stk'],
+    ['Salz', null, null], ['Pfeffer', null, null], ['Parmesan', 100, 'g'], ['Zwiebel', 1, 'stk']]);
+  pruefe('Rezept: weitere Mengen', ['2 Zwiebeln', '1,5 kg Kartoffeln', '250ml Sahne', '2-3 Tomaten', '½ Zitrone', '5 cl Rum', '1 Prise Zucker', '400g Hackfleisch']
+    .map(z => { const x = parseRezept(z)[0]; return [x.name, x.menge, x.einheit]; }),
+    [['Zwiebeln', 2, 'stk'], ['Kartoffeln', 1.5, 'kg'], ['Sahne', 250, 'ml'], ['Tomaten', 3, 'stk'], ['Zitrone', 1, 'stk'], ['Rum', 50, 'ml'], ['Zucker', null, null], ['Hackfleisch', 400, 'g']]);
+
+  // Gespeicherte Rezepte
+  S.rezepte = []; S.liste = [];
+  const echtConfirm2 = window.confirm;
+  window.confirm = () => true;
+  rezeptSpeichern('Spaghetti Napoli', rezeptArtikel(parseRezept(rezept)));
+  pruefe('Rezept gespeichert mit allen Zutaten (auch Vorrat)', S.rezepte[0].zutaten.length, 9);
+  pruefe('Rezept: Menge gespeichert', S.rezepte[0].zutaten.find(z => z.name === 'Spaghetti'), { name: 'Spaghetti', menge: 400, einheit: 'g', abteilung: 'nudeln' });
+  pruefe('Rezept finden: genau', findeRezept('#spaghetti napoli')?.name, 'Spaghetti Napoli');
+  pruefe('Rezept finden: eindeutiger Anfang', findeRezept('#Spag')?.name, 'Spaghetti Napoli');
+  rezeptSpeichern('Chili', [{ name: 'Hackfleisch', menge: 500, einheit: 'g', abt: 'fleisch' }, { name: 'Spaghetti', menge: 100, einheit: 'g', abt: 'nudeln' }]);
+  pruefe('Rezept finden: unbekannt', findeRezept('#Pizza'), null);
+  pruefe('Rezepte zusammengefasst: Mengen addiert', rezeptZutaten(S.rezepte).find(z => z.name === 'Spaghetti').menge, 500);
+  rezeptSpeichern('chili', [{ name: 'Bohnen', menge: null, einheit: null, abt: 'konserven' }]);
+  pruefe('Rezept gleichen Namens ersetzt', S.rezepte.map(x => [x.name, x.zutaten.length]), [['chili', 1], ['Spaghetti Napoli', 9]]);
+  pruefe('Vorschläge für #', vorschlaege('#spa').map(v => v.name), ['#Spaghetti Napoli']);
+  const abruf = rezeptArtikel(rezeptZutaten([findeRezept('#Spaghetti Napoli')]));
+  pruefe('Rezept abrufen: Vorrat abgewählt', abruf.filter(a => !a.an).map(a => a.name), ['Olivenöl', 'Salz', 'Pfeffer']);
+  hinzufuegen('Hackfleisch', 400, { einheit: 'g' });
+  pruefe('Rezept: Menge auf der Liste', mengeText(S.liste[0]), '400 g');
+  window.confirm = echtConfirm2;
+  S.rezepte = []; S.liste = [];
+
+  // Karte: Märkte aus OpenStreetMap-Antworten
+  pruefe('Karte: Overpass', maerkteAusOverpass({ elements: [
+    { type: 'node', lat: 48.1, lon: 11.5, tags: { shop: 'supermarket', name: 'REWE', 'addr:street': 'Hauptstraße', 'addr:housenumber': '5', 'addr:city': 'München' } },
+    { type: 'way', center: { lat: 48.2, lon: 11.6 }, tags: { shop: 'chemist', brand: 'dm' } },
+    { type: 'node', lat: 48.3, lon: 11.7, tags: { shop: 'supermarket' } }] }),
+    [{ lat: 48.1, lon: 11.5, name: 'REWE', adresse: 'Hauptstraße 5, München', vorschlag: 'REWE Hauptstraße' },
+     { lat: 48.2, lon: 11.6, name: 'dm', adresse: '', vorschlag: 'dm' }]);
+  pruefe('Karte: Nominatim', maerkteAusNominatim([
+    { category: 'shop', type: 'supermarket', name: 'Edeka', lat: '48.13', lon: '11.56', address: { road: 'Karlsplatz', house_number: '1', city: 'München' } },
+    { category: 'highway', name: 'Karlsplatz', lat: '48.1', lon: '11.5' }]),
+    [{ lat: 48.13, lon: 11.56, name: 'Edeka', adresse: 'Karlsplatz 1, München', vorschlag: 'Edeka Karlsplatz' }]);
 
   // Open Food Facts
   pruefe('OFF: Hafermilch', abteilungAusTags(['en:beverages', 'en:plant-based-foods', 'en:plant-based-milk-alternatives', 'en:oat-based-drinks'], null), 'pflanzendrink');

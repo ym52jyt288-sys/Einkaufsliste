@@ -80,6 +80,32 @@ Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone d
 - Globale Regel `[hidden] { display: none !important; }` ergänzt (`.chips` mit `display: flex` hatte `hidden` überstimmt).
 - Selbsttest 122/122. `sw.js` VERSION `einkauf-7`.
 
+### Runde 6 (26.09.2026): Karte für den Laden-Standort, gespeicherte Rezepte
+- **Karte** (Laden-Profil → „Auf der Karte wählen“): Leaflet 1.9.4 in `vendor/leaflet/` (nur JS und CSS, wird erst beim Öffnen
+  geladen, nicht vorab im Offline-Cache). Kacheln von `tile.openstreetmap.org`, im Dunkelmodus per CSS-Filter invertiert.
+  - Die Karte startet am gespeicherten Ort, sonst am aktuellen Standort (sonst Deutschland). Ab Zoomstufe 14 werden Märkte
+    (`shop` = supermarket, chemist, convenience, discount, organic, greengrocer) als Punkte geladen: zuerst Overpass
+    (`overpass-api.de`, `overpass.private.coffee`), als Ersatz Nominatim (`supermarket`, `chemist`, bounded). Overpass war beim
+    Test oft überlastet (504).
+  - Punkt antippen → Nadel, Adresse und „Namen übernehmen“ (z. B. „REWE Sendlinger Straße“, vorausgewählt, wenn das Profil
+    noch „Supermarkt“, „Drogerie“ oder „Neuer Laden“ heißt). Auf die Karte tippen setzt die Nadel frei. Suchfeld: Nominatim,
+    nur beim Absenden (Nutzungsregeln: keine Suche während des Tippens).
+  - Gespeichert wird `p.ort = { lat, lon, genau: null, quelle: 'karte', adresse }`. Die automatische Ladenwahl (250 m) bleibt unverändert.
+- **Rezepte**: Das Prüfblatt hat das Feld „Als Rezept speichern“. Gespeichert werden **alle** erkannten Zutaten, auch Vorrat
+  und abgewählte (`S.rezepte`, Schlüssel `ek.rezepte`, auch in der Sicherung).
+  - Abrufen mit `#Name` im Eingabefeld (Groß-/Kleinschreibung und Leerzeichen egal, eindeutiger Anfang genügt). Mehrere
+    Rezepte mit Komma möglich, gleiche Zutaten werden zusammengefasst und Mengen gleicher Einheit addiert. Beim Tippen von `#`
+    erscheinen die Rezepte als Vorschläge. Danach kommt das Prüfblatt (Vorrat und schon Vorhandenes abgewählt).
+  - Das Rezept-Blatt zeigt gespeicherte Rezepte oben als Chips. Einstellungen → Rezepte: umbenennen, Zutaten entfernen oder
+    hinzufügen, auf die Liste, löschen.
+  - **Mengen**: `rezeptMenge()` übernimmt g/kg/ml/l (cl, dl → ml) und Stückzahlen (auch Dose, Bund, Packung; Brüche und
+    Spannen aufgerundet). Küchenmaße (EL, TL, Zehe, Prise …) ergeben keine Menge. Die Fotoerkennung liefert jetzt auch
+    `menge`/`einheit` (0 = keine).
+  - Nebenbei: Dezimalkommas („1,5 kg“) werden beim Zerlegen einzeiliger Rezepte nicht mehr getrennt.
+- Selbsttest 136/136. Karte mit echten Daten geprüft (München Stachus: 11 Märkte, Suche „REWE Sendlinger Straße“ →
+  Profilname „Rewe Sendlinger Straße“). `sw.js` VERSION `einkauf-8`.
+- Offen, nur auf dem iPhone prüfbar: Karte mit Fingergesten im Blatt, Standortfreigabe beim Öffnen der Karte, Fotoerkennung mit Mengen.
+
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
 |---|---|---|
