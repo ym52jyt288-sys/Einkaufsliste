@@ -9,6 +9,7 @@ Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone d
 |---|---|
 | `index.html` | App (HTML/CSS/JS inline), Selbsttest mit `index.html?test` |
 | `katalog.js` | Abteilungen, ~1.500 Begriffe mit Synonymen, Vorratsliste, Open-Food-Facts-Zuordnung. `~` vor einem Synonym = Falschschreibung, die zum Hauptnamen korrigiert wird |
+| `sprache-en.js`, `sprache-fr.js`, `sprache-es.js` | Sprachpakete: Oberflächentexte (Schlüssel = deutscher Text), eigener Artikelkatalog je Sprache, Startverlauf, Vorrat |
 | `sw.js` | Offline-Cache. **Bei jeder Änderung `VERSION` erhöhen**, sonst behält das iPhone die alte Fassung |
 | `manifest.webmanifest`, `icon.svg` → `icon-180.png`, `icon-512.png` | Home-Bildschirm |
 | `vendor/zxing.min.js` | @zxing/library 0.21.3 (UMD), Barcode-Erkennung, da Safari kein `BarcodeDetector` hat |
@@ -136,6 +137,30 @@ Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone d
 - Skriptgesteuerter UI-Durchlauf (Eingabe, Vorschläge, Chips, Detailblatt, Laden-Ansicht, Teilen, Rezept, Einstellungen,
   Profil, Abschluss, Liste leeren) ohne JavaScript-Fehler.
 - Selbsttest 150/150. `sw.js` VERSION `einkauf-11`.
+
+### Runde 9 (26.09.2026): Mehrsprachig (Deutsch, Englisch, Französisch, Spanisch)
+- **Sprache** unter Einstellungen → Sprache: Automatisch (Gerätesprache, sonst Englisch) oder fest. Die Wahl steht in
+  `einstellungen.sprache`; ein Wechsel lädt die Seite neu, weil Katalog-Index und feste Texte an der Sprache hängen.
+  Zum Testen: `index.html?sprache=en` (wird nicht gespeichert). Der Selbsttest läuft immer auf Deutsch.
+- **Texte**: `t` als Tag (`` t`Text ${x}` ``) oder `t('Text')`. Schlüssel ist der deutsche Text, Werte werden zu `{0}`, `{1}` …
+  Ein Wert im Sprachpaket kann `{ one, other }` sein (Einzahl/Mehrzahl nach dem ersten Wert). Deutsche Einzahl: `DE_EINZAHL`.
+  Feste HTML-Texte übersetzt `uebersetzeSeite()` beim Start. Abteilungen, Bereiche und Farbschemata werden über ihren
+  deutschen Namen übersetzt (`ABT_NAME`).
+- **Artikelerkennung**: Jede Sprache hat einen eigenen Katalog (gleiches Format wie `katalog.js`, gleiche Abteilungs-IDs).
+  `baueIndex(sprache)` nimmt den Katalog der Sprache und zusätzlich den deutschen, aber nur für exakte Treffer (Artikel von
+  vor dem Wechsel). Vorschläge, Abkürzungen und Tippfehler nutzen nur die gewählte Sprache (`INDEX_KEYS`).
+  Jeder Begriff steht zusätzlich ohne Füllwörter im Index („Pomme de terre“ → `pommeterre`), passend zu `erkenne()`.
+  Stoppwörter und TK-Wörter enthalten jetzt alle vier Sprachen, `staemme()` kennt Plural auf -x, -ies und -ces.
+  Achtung bei Stoppwörtern: „the“ musste raus, weil „Thé“ zu „the“ normalisiert wird.
+- **Mengen und Rezepte**: Einheiten (pcs, grammes, gramos, litres …), Küchenmaße (tbsp, c. à soupe, cucharada …), Überschriften,
+  Zubereitungswörter und „und/and/et/y“ in allen vier Sprachen; „1 lb“ wird zu 454 g. Dezimaltrennzeichen im Englischen: Punkt.
+- Claude-Fotoerkennung liefert die Artikelnamen in der gewählten Sprache, Open Food Facts bevorzugt `product_name_<sprache>`,
+  die Kartensuche nutzt `accept-language`.
+- Geprüft: Selbsttest 220/220. Neu sind u. a. vollständige Übersetzungen, passende Platzhalter, keine überflüssigen Texte,
+  Einsortierung und Rezepte je Sprache. Skriptgesteuerter UI-Durchlauf in en/fr/es ohne JavaScript-Fehler und ohne
+  deutsche Reste. Sprachwechsel über die Einstellungen geprüft. Screenshots in Handybreite geprüft.
+- Offen: Die Übersetzungen und Kataloge hat Claude geschrieben; eine Durchsicht durch Muttersprachler steht aus.
+- `sw.js` VERSION `einkauf-12`, Sprachpakete im Cache und wie `katalog.js` „erst Netz“.
 
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |

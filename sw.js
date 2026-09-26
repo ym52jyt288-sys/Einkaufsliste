@@ -1,7 +1,7 @@
 // Service Worker: hält die App offline verfügbar (z. B. bei schlechtem Empfang im Laden).
 // Bei jeder Änderung an den Dateien VERSION erhöhen, damit das iPhone die neue Fassung lädt.
-const VERSION = 'einkauf-11';
-const DATEIEN = ['./', 'index.html', 'katalog.js', 'vendor/zxing.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
+const VERSION = 'einkauf-12';
+const DATEIEN = ['./', 'index.html', 'katalog.js', 'sprache-en.js', 'sprache-fr.js', 'sprache-es.js', 'vendor/zxing.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(DATEIEN)).then(() => self.skipWaiting()));
@@ -18,8 +18,8 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
-  // Seite und Katalog: erst Netz (damit Updates ankommen), sonst Cache
-  if (e.request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('katalog.js')) {
+  // Seite, Katalog und Sprachpakete: erst Netz (damit Updates ankommen), sonst Cache
+  if (e.request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('katalog.js') || /sprache-\w+\.js$/.test(url.pathname)) {
     e.respondWith(
       fetch(e.request)
         .then(r => { const kopie = r.clone(); caches.open(VERSION).then(c => c.put(e.request, kopie)); return r; })

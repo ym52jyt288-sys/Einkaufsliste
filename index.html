@@ -361,6 +361,9 @@
 <div class="toast" id="toast" role="status"><span id="toastText"></span><button type="button" id="toastAktion"></button></div>
 
 <script src="katalog.js"></script>
+<script src="sprache-en.js"></script>
+<script src="sprache-fr.js"></script>
+<script src="sprache-es.js"></script>
 <script>
 'use strict';
 
@@ -374,7 +377,45 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const gross = s => s ? s.charAt(0).toLocaleUpperCase('de') + s.slice(1) : s;
 
-const ICON_STAMM = '<svg class="ico stamm-ico" viewBox="0 0 24 24" aria-label="Stammartikel"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>';
+/* ============================================================
+   Sprache
+   Die Texte stehen auf Deutsch im Code; t`…` schlägt die Übersetzung im Sprachpaket nach
+   (sprache-en.js usw.). Schlüssel ist der deutsche Text, eingesetzte Werte heißen dort {0}, {1} …
+   ============================================================ */
+
+const SPRACHPAKETE = window.SPRACHPAKETE || {};
+const SPRACHEN = { de: 'Deutsch', en: 'English', fr: 'Français', es: 'Español' };
+const geraeteSprache = () => (navigator.languages || [navigator.language || '']).map(l => String(l).slice(0, 2).toLowerCase()).find(l => SPRACHEN[l]) || 'en';
+function ermittleSprache() {
+  const url = new URLSearchParams(location.search);
+  if (SPRACHEN[url.get('sprache')]) return url.get('sprache');
+  if (url.has('test')) return 'de';
+  try { const e = JSON.parse(localStorage.getItem('ek.einstellungen') || '{}'); if (SPRACHEN[e.sprache]) return e.sprache; } catch (e) {}
+  return geraeteSprache();
+}
+let SPRACHE = ermittleSprache();
+const gebietsschema = () => (navigator.language || '').toLowerCase().startsWith(SPRACHE) ? navigator.language
+  : { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' }[SPRACHE];
+// Deutsche Einzahl, wo sich das Wort ändert (die Schlüssel stehen in der Mehrzahl)
+const DE_EINZAHL = { 'Rezept · {0} Zutaten': 'Rezept · {0} Zutat', '{0} Zutaten': '{0} Zutat', '{0} Abteilungen': '{0} Abteilung' };
+function t(teile, ...werte) {
+  const key = typeof teile === 'string' ? teile : teile.reduce((k, x, i) => k + (i ? `{${i - 1}}` : '') + x, '');
+  let text = (SPRACHE !== 'de' && SPRACHPAKETE[SPRACHE] && SPRACHPAKETE[SPRACHE].texte[key]) || key;
+  if (typeof text === 'object') text = werte[0] === 1 ? text.one : text.other;   // Einzahl/Mehrzahl nach dem ersten Wert
+  else if (text === key && werte[0] === 1 && DE_EINZAHL[key]) text = DE_EINZAHL[key];
+  return werte.length ? text.replace(/\{(\d+)\}/g, (m, i) => werte[i] ?? m) : text;
+}
+// Feste Texte im HTML (Kopfzeile, Knopf unten) übersetzen
+function uebersetzeSeite() {
+  document.documentElement.lang = SPRACHE;
+  document.title = t`Einkaufsliste`;
+  for (const el of $$('header *, #abschluss *')) {
+    for (const attr of ['aria-label', 'placeholder']) if (el.hasAttribute(attr)) el.setAttribute(attr, t(el.getAttribute(attr)));
+    if (!el.children.length && el.textContent.trim()) el.textContent = t(el.textContent.trim());
+  }
+}
+
+const ICON_STAMM = '<svg class="ico stamm-ico" viewBox="0 0 24 24" aria-label="' + t('Stammartikel') + '"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>';
 const ICON_HAKEN = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 const ICON_GRIFF = '<svg class="ico" viewBox="0 0 24 24"><path d="M5 9h14M5 15h14"/></svg>';
 
@@ -393,16 +434,16 @@ let TESTMODUS = false;
 function sichere(schluessel, wert) {
   if (TESTMODUS) return;
   try { localStorage.setItem(SPEICHER_PREFIX + schluessel, JSON.stringify(wert)); }
-  catch (e) { zeigeToast('Speichern fehlgeschlagen'); }
+  catch (e) { zeigeToast(t`Speichern fehlgeschlagen`); }
 }
 
 const ABT_IDS = ABTEILUNGEN.map(a => a.id);
-const ABT_NAME = Object.fromEntries(ABTEILUNGEN.map(a => [a.id, a.name]));
+const ABT_NAME = Object.fromEntries(ABTEILUNGEN.map(a => [a.id, t(a.name)]));
 
 function standardProfile() {
   return [
-    { id: 'supermarkt', name: 'Supermarkt', reihenfolge: [...ABT_IDS], ausgeblendet: [] },
-    { id: 'drogerie', name: 'Drogerie', reihenfolge: ['drogerie', 'haushalt', ...ABT_IDS.filter(a => a !== 'drogerie' && a !== 'haushalt')],
+    { id: 'supermarkt', name: t`Supermarkt`, reihenfolge: [...ABT_IDS], ausgeblendet: [] },
+    { id: 'drogerie', name: t`Drogerie`, reihenfolge: ['drogerie', 'haushalt', ...ABT_IDS.filter(a => a !== 'drogerie' && a !== 'haushalt')],
       ausgeblendet: ABT_IDS.filter(a => a !== 'drogerie' && a !== 'haushalt' && a !== 'sonstiges') },
   ];
 }
@@ -426,6 +467,7 @@ const S = {
 function standardEinstellungen() {
   return {
     ansicht: 'liste', apiKey: '', standort: false,
+    sprache: 'auto',                                        // auto (Gerätesprache) | de | en | fr | es
     abteilungInListe: true,                                 // Abteilungsname neben dem Artikel in der Listenansicht
     thema: 'system',                                        // system | light | dark
     farben: { an: true, schema: 'markt', stil: 'streifen' }, // stil: streifen | flaeche
@@ -448,7 +490,7 @@ function ladeAlles() {
   if (!S.verlauf) {
     S.verlauf = {};
     const jetzt = Date.now();
-    for (const name of STARTVERLAUF) {
+    for (const name of SPRACHE === 'de' ? STARTVERLAUF : (SPRACHPAKETE[SPRACHE] || {}).start || []) {
       S.verlauf[kompakt(name)] = { name, anzahl: 1, zuletzt: jetzt, abteilung: klassifiziere(name).abt };
     }
     sichere('verlauf', S.verlauf);
@@ -466,6 +508,7 @@ const sichereRezepte = () => sichere('rezepte', S.rezepte);
 
 function norm(s) {
   return String(s || '').toLowerCase()
+    .replace(/œ/g, 'oe').replace(/æ/g, 'ae')
     .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[-'’]/g, '')
@@ -473,37 +516,66 @@ function norm(s) {
 }
 const kompakt = s => norm(s).replace(/ /g, '');
 
-// Schlüssel (kompakt) → { name: Hauptname, text: Schreibweise, abt, fehler }
-const INDEX = new Map();
-(function baueIndex() {
-  for (const abt of ABT_IDS) {
-    const roh = KATALOG[abt] || '';
-    for (const eintrag of roh.split(/[,\n]/).map(t => t.trim()).filter(Boolean)) {
-      const varianten = eintrag.split('|').map(v => v.trim()).filter(Boolean);
-      const hauptname = varianten[0].replace(/^~/, '');
-      for (const v of varianten) {
-        const fehler = v.startsWith('~');
-        const text = v.replace(/^~/, '');
-        const key = kompakt(text);
-        if (key && !INDEX.has(key)) INDEX.set(key, { name: hauptname, text, abt, fehler, key });
-      }
-    }
-  }
-})();
-const INDEX_KEYS = [...INDEX.keys()];
-
 const STOPWOERTER = new Set(['bio', 'laktosefrei', 'laktosefreie', 'laktosefreier', 'laktosefreies', 'lactosefrei', 'minus', 'l',
   'ohne', 'mit', 'und', 'extra', 'light', 'frisch', 'frische', 'frischer', 'frisches', 'gross', 'grosse', 'grosser', 'klein',
   'kleine', 'kleiner', 'packung', 'pack', 'stk', 'stueck', 'st', 'x', 'vegan', 'vegane', 'veganer', 'veganes', 'natur', 'zero',
-  'von', 'vom', 'fuer', 'in', 'im', 'der', 'die', 'das', 'ein', 'eine', 'g', 'kg', 'ml']);
-const TK_WOERTER = new Set(['tk', 'tiefkuehl', 'tiefgekuehlt', 'tiefgekuehlte', 'gefroren', 'gefrorene', 'tiefkuehlware']);
+  'von', 'vom', 'fuer', 'in', 'im', 'der', 'die', 'das', 'ein', 'eine', 'g', 'kg', 'ml',
+  // Englisch, Französisch, Spanisch
+  'organic', 'fresh', 'free', 'lactose', 'with', 'without', 'and', 'of', 'a', 'an', 'for', 'large', 'small', 'pcs', 'pc',
+  'bio', 'frais', 'fraiche', 'fraiches', 'sans', 'avec', 'et', 'de', 'du', 'des', 'la', 'le', 'les', 'au', 'aux', 'd', 'l', 'en', 'pour',
+  'gros', 'grosse', 'petit', 'petite', 'petits', 'petites', 'lactosa', 'sin', 'con', 'y', 'del', 'el', 'los', 'las', 'para', 'al',
+  'fresco', 'fresca', 'frescos', 'frescas', 'ecologico', 'ecologica', 'grande', 'grandes', 'pequeno', 'pequena', 'ud', 'uds']);
+const TK_WOERTER = new Set(['tk', 'tiefkuehl', 'tiefgekuehlt', 'tiefgekuehlte', 'gefroren', 'gefrorene', 'tiefkuehlware',
+  'frozen', 'surgele', 'surgeles', 'surgelee', 'surgelees', 'congele', 'congeles', 'congelee', 'congelees',
+  'congelado', 'congelados', 'congelada', 'congeladas']);
+
+// Schlüssel (kompakt) → { name: Hauptname, text: Schreibweise, abt, fehler, key }
+// Der Katalog der gewählten Sprache zuerst. Bei einer anderen Sprache als Deutsch zählen deutsche Begriffe nur als exakte
+// Treffer (Artikel von vor dem Sprachwechsel); Vorschläge, Abkürzungen und Tippfehler nutzen nur die gewählte Sprache.
+const INDEX = new Map();
+let INDEX_KEYS = [];
+function baueIndex(sprache = SPRACHE) {
+  INDEX.clear();
+  const eigene = [];
+  const kataloge = [[sprache, sprache === 'de' ? KATALOG : (SPRACHPAKETE[sprache] || {}).katalog || {}]];
+  if (sprache !== 'de') kataloge.push(['de', KATALOG]);
+  for (const [spr, katalog] of kataloge) {
+    const ohneStopp = [];
+    const setze = (key, eintrag) => {
+      if (!key || INDEX.has(key)) return;
+      INDEX.set(key, { ...eintrag, key });
+      if (spr === sprache) eigene.push(key);
+    };
+    for (const abt of ABT_IDS) {
+      for (const eintrag of (katalog[abt] || '').split(/[,\n]/).map(x => x.trim()).filter(Boolean)) {
+        const varianten = eintrag.split('|').map(v => v.trim()).filter(Boolean);
+        const hauptname = varianten[0].replace(/^~/, '');
+        for (const v of varianten) {
+          const text = v.replace(/^~/, '');
+          const e = { name: hauptname, text, abt, fehler: v.startsWith('~') };
+          setze(kompakt(text), e);
+          ohneStopp.push([norm(text).split(' ').filter(w => !STOPWOERTER.has(w)).join(''), e]);
+        }
+      }
+    }
+    // Zusätzlich ohne Füllwörter („Pomme de terre“ → „pommeterre“), wie erkenne() den Namen sieht
+    for (const [key, e] of ohneStopp) setze(key, e);
+  }
+  INDEX_KEYS = eigene;
+}
+baueIndex();
 const TK_TAUGLICH = new Set(['gemuese', 'obst', 'fisch', 'fleisch', 'brot', 'kuehlveg']);
 
 function staemme(t) {
   const s = new Set([t]);
   for (const end of ['n', 'e', 's']) if (t.endsWith(end)) s.add(t.slice(0, -1));
   for (const end of ['en', 'er', 'es', 'ns']) if (t.endsWith(end)) s.add(t.slice(0, -2));
-  for (const end of ['n', 'e', 'en', 's']) s.add(t + end);
+  for (const end of ['n', 'e', 'en', 's', 'es', 'x']) s.add(t + end);
+  if (t.endsWith('x')) s.add(t.slice(0, -1));
+  if (t.endsWith('ies')) s.add(t.slice(0, -3) + 'y');
+  if (t.endsWith('y')) s.add(t.slice(0, -1) + 'ies');
+  if (t.endsWith('ces')) s.add(t.slice(0, -3) + 'z');
+  if (t.endsWith('z')) s.add(t.slice(0, -1) + 'ces');
   return [...s].filter(x => x.length >= 2);
 }
 function exakt(key) {
@@ -623,7 +695,7 @@ function korrigiere(name) {
 // „2 Milch“, „3x Eier“, „500 g Hack“, „1,5l Milch“, „Hack 500g“ → { menge, einheit, name, explizit }
 function parseMenge(text) {
   const t = String(text).trim();
-  const EINH = '(x|×|stk\\.?|stück|g|gr|gramm|kg|kilo|ml|l|liter|ltr)';
+  const EINH = '(x|×|stk\\.?|stück|pcs|pc|pce|pièces?|pieces?|uds?\\.?|unidad(?:es)?|g|gr|gramm|grammes?|gramos?|grams?|kg|kilo|ml|l|liter|litres?|litros?|liters?|ltr)';
   let m = t.match(new RegExp(`^(\\d+(?:[.,]\\d+)?)\\s*${EINH}?\\s+(.+)$`, 'i'));
   if (m) return { menge: parseFloat(m[1].replace(',', '.')), einheit: einheitAus(m[2]), name: m[3].trim(), explizit: true };
   m = t.match(new RegExp(`^(.+?)\\s+(\\d+(?:[.,]\\d+)?)\\s*(g|gr|kg|ml|l|liter)\\.?$`, 'i'));
@@ -631,18 +703,18 @@ function parseMenge(text) {
   return { menge: 1, einheit: 'stk', name: t, explizit: false };
 }
 const EINHEITEN_MENGE = ['stk', 'g', 'kg', 'ml', 'l'];
-const EINHEIT_NAME = { stk: 'Stück', g: 'g', kg: 'kg', ml: 'ml', l: 'l' };
+const EINHEIT_NAME = { stk: t`Stück`, g: 'g', kg: 'kg', ml: 'ml', l: 'l' };
 const EINHEIT_SCHRITT = { stk: 1, g: 50, kg: 0.5, ml: 100, l: 0.5 };
 const EINHEIT_START = { stk: 1, g: 500, kg: 1, ml: 500, l: 1 };
 function einheitAus(roh) {
   const e = String(roh || '').toLowerCase().replace('.', '');
-  if (/^(g|gr|gramm)$/.test(e)) return 'g';
+  if (/^(g|gr|gramm|grammes?|gramos?|grams?)$/.test(e)) return 'g';
   if (/^(kg|kilo)$/.test(e)) return 'kg';
   if (/^ml$/.test(e)) return 'ml';
-  if (/^(l|liter|ltr)$/.test(e)) return 'l';
+  if (/^(l|liter|ltr|litres?|litros?|liters?)$/.test(e)) return 'l';
   return 'stk';
 }
-const zahlText = n => String(Math.round(n * 1000) / 1000).replace('.', ',');
+const zahlText = n => String(Math.round(n * 1000) / 1000).replace('.', SPRACHE === 'en' ? '.' : ',');
 // Anzeige: Stück nur ab 2, Gewicht/Volumen immer mit Einheit
 function mengeText(item) {
   const e = item.einheit || 'stk';
@@ -652,7 +724,7 @@ function mengeText(item) {
 }
 
 function zerlegeEingabe(text) {
-  return String(text).split(/[,;\n]+|\s+und\s+|\s+&\s+/i).map(t => t.trim()).filter(Boolean).map(parseMenge).filter(x => x.name);
+  return String(text).split(/[,;\n]+|\s+(?:und|and|et|y)\s+|\s+&\s+/i).map(t => t.trim()).filter(Boolean).map(parseMenge).filter(x => x.name);
 }
 
 /* ============================================================
@@ -725,22 +797,22 @@ function entfernen(id) {
   if (item.stamm) {
     item.pausiert = true;
     sichereListe(); render();
-    zeigeToast(`${item.name}: diesmal nicht`, 'Rückgängig', () => { item.pausiert = false; sichereListe(); render(); });
+    zeigeToast(t`${item.name}: diesmal nicht`, t`Rückgängig`, () => { item.pausiert = false; sichereListe(); render(); });
   } else {
     S.liste.splice(idx, 1);
     sichereListe(); render();
-    zeigeToast(`${item.name} gelöscht`, 'Rückgängig', () => { S.liste.splice(Math.min(idx, S.liste.length), 0, item); sichereListe(); render(); });
+    zeigeToast(t`${item.name} gelöscht`, t`Rückgängig`, () => { S.liste.splice(Math.min(idx, S.liste.length), 0, item); sichereListe(); render(); });
   }
 }
 
 function listeLeeren() {
   const n = S.liste.length;
-  const mitStamm = S.liste.some(i => i.stamm) ? ' Auch die Stammartikel werden entfernt.' : '';
-  if (!n || !confirm(`Die ganze Einkaufsliste löschen (${n} Artikel)?${mitStamm}`)) return;
+  const mitStamm = S.liste.some(i => i.stamm) ? ' ' + t`Auch die Stammartikel werden entfernt.` : '';
+  if (!n || !confirm(t`Die ganze Einkaufsliste löschen (${n} Artikel)?` + mitStamm)) return;
   const vorher = S.liste;
   S.liste = [];
   sichereListe(); render();
-  zeigeToast('Liste gelöscht', 'Rückgängig', () => { S.liste = vorher; sichereListe(); render(); });
+  zeigeToast(t`Liste gelöscht`, t`Rückgängig`, () => { S.liste = vorher; sichereListe(); render(); });
 }
 
 function einkaufAbschliessen() {
@@ -762,7 +834,7 @@ function einkaufAbschliessen() {
   const anzahl = vorher.filter(i => i.erledigt).length;
   S.liste = neu;
   sichereListe(); render();
-  zeigeToast(`Einkauf abgeschlossen (${anzahl})`, 'Rückgängig', () => { S.liste = vorher; sichereListe(); render(); });
+  zeigeToast(t`Einkauf abgeschlossen (${anzahl})`, t`Rückgängig`, () => { S.liste = vorher; sichereListe(); render(); });
 }
 
 function setzeAbteilung(item, abt) {
@@ -804,12 +876,12 @@ function vorschlaege(text, { anheften = false } = {}) {
   if (!anheften && text.trim().startsWith('#')) {
     const k = kompakt(text.trim().replace(/^#+/, '')), w = norm(text.trim().replace(/^#+/, ''));
     return S.rezepte.filter(x => kompakt(x.name).startsWith(k) || norm(x.name).split(' ').some(t => t.startsWith(w)))
-      .slice(0, 5).map(x => ({ name: '#' + x.name, art: 'rezept', hinweis: `Rezept · ${x.zutaten.length} Zutaten`, rezept: x }));
+      .slice(0, 5).map(x => ({ name: '#' + x.name, art: 'rezept', hinweis: t`Rezept · ${x.zutaten.length} Zutaten`, rezept: x }));
   }
   const { name } = parseMenge(text);
-  const t = kompakt(name);
+  const tk = kompakt(name);
   const tw = norm(name);
-  if (!t) return [];
+  if (!tk) return [];
   const aus = [];
   const gesehen = new Set(anheften ? S.einstellungen.chips.angeheftet.map(kompakt) : []);   // kompakte Namen
   const eintraege = new Set(); // Katalogeinträge: „Tomate“ und „Tomaten“ nur einmal
@@ -821,36 +893,36 @@ function vorschlaege(text, { anheften = false } = {}) {
     aus.push({ name: n, art, hinweis });
   };
   const offenKeys = new Set(offene().map(i => kompakt(i.name)));
-  const hinweisFuer = n => !anheften && offenKeys.has(kompakt(n)) ? 'schon auf der Liste' : ABT_NAME[klassifiziere(n).abt];
+  const hinweisFuer = n => !anheften && offenKeys.has(kompakt(n)) ? t`schon auf der Liste` : ABT_NAME[klassifiziere(n).abt];
 
   // Verlauf: Anfang des Namens oder eines Worts
   const ausVerlauf = Object.entries(S.verlauf)
-    .filter(([k, v]) => k.startsWith(t) || norm(v.name).split(' ').some(w => w.startsWith(tw)))
+    .filter(([k, v]) => k.startsWith(tk) || norm(v.name).split(' ').some(w => w.startsWith(tw)))
     .sort((a, b) => (b[1].anzahl - a[1].anzahl) || (b[1].zuletzt - a[1].zuletzt));
   for (const [, v] of ausVerlauf) nimm(v.name, 'verlauf', hinweisFuer(v.name), eintragVon(v.name));
 
   // Katalog: je Eintrag ein Vorschlag – der Hauptname, wenn er zum Getippten passt, sonst die kürzeste passende Schreibweise
   const proEintrag = new Map();
   for (const k of INDEX_KEYS) {
-    if (!k.startsWith(t)) continue;
+    if (!k.startsWith(tk)) continue;
     const e = INDEX.get(k);
     const bisher = proEintrag.get(e.name);
     if (!bisher || k.length < bisher.key.length) proEintrag.set(e.name, e);
   }
   const ausKatalog = [...proEintrag.values()].map(e => {
     const haupt = kompakt(e.name);
-    const text = haupt.startsWith(t) || e.fehler ? e.name : e.text;
+    const text = haupt.startsWith(tk) || e.fehler ? e.name : e.text;
     return { text, e, laenge: kompakt(text).length };
   }).sort((a, b) => a.laenge - b.laenge);
   for (const { text, e } of ausKatalog) nimm(text, 'praefix', ABT_NAME[e.abt], e.name);
 
   // Tippfehler
-  if (aus.length < 5 && t.length >= 5 && !INDEX.has(t)) {
-    const f = naechsterTreffer(t);
-    if (f) nimm(f.e.fehler ? f.e.name : f.e.text, 'fuzzy', 'Korrektur', f.e.name);
+  if (aus.length < 5 && tk.length >= 5 && !INDEX.has(tk)) {
+    const f = naechsterTreffer(tk);
+    if (f) nimm(f.e.fehler ? f.e.name : f.e.text, 'fuzzy', t`Korrektur`, f.e.name);
   }
   // Exakt Getipptes nicht als Vorschlag wiederholen
-  return aus.filter(v => kompakt(v.name) !== t || v.art === 'verlauf').slice(0, 5);
+  return aus.filter(v => kompakt(v.name) !== tk || v.art === 'verlauf').slice(0, 5);
 }
 
 // Schnellauswahl: angeheftete Artikel zuerst, dann die häufigsten – ohne Stammartikel (die kommen ohnehin
@@ -933,8 +1005,8 @@ function tonFuer(schema, abt) {
 }
 // Legende eines Schemas: Liste von { name, ton }
 function legende(schema) {
-  if (schema.zonen) return schema.zonen.map(z => ({ name: z.name, ton: z.ton }));
-  return BEREICHE.map(b => ({ name: b.name, ton: schema.bereiche[b.id] }));
+  if (schema.zonen) return schema.zonen.map(z => ({ name: t(z.name), ton: z.ton }));
+  return BEREICHE.map(b => ({ name: t(b.name), ton: schema.bereiche[b.id] }));
 }
 const aktuellesSchema = () => FARBSCHEMATA.find(f => f.id === S.einstellungen.farben.schema) || FARBSCHEMATA[0];
 const zf = abt => `--zf:var(--z-${abt})`;
@@ -974,12 +1046,12 @@ function zeileHTML(item, mitAbteilung) {
   const m = mengeText(item);
   const menge = m ? `<span class="menge">${esc(m)}</span>` : '';
   const sub = item.notiz ? `<span class="sub">${esc(item.notiz)}</span>` : '';
-  const zuordnen = item.abteilung === 'sonstiges' && !item.erledigt && !S.geteilt ? '<button type="button" class="zuordnen" data-aktion="zuordnen">zuordnen</button>' : '';
+  const zuordnen = item.abteilung === 'sonstiges' && !item.erledigt && !S.geteilt ? `<button type="button" class="zuordnen" data-aktion="zuordnen">${t`zuordnen`}</button>` : '';
   const abt = mitAbteilung && item.abteilung !== 'sonstiges' ? `<span class="punkt"></span><span>${esc(ABT_NAME[item.abteilung] || '')}</span>` : '';
   return `<li class="zeile" data-id="${item.id}" style="${zf(item.abteilung)}">
-    <div class="wisch${item.stamm ? ' pause' : ''}">${item.stamm ? 'Diesmal nicht' : 'Löschen'}</div>
+    <div class="wisch${item.stamm ? ' pause' : ''}">${item.stamm ? t`Diesmal nicht` : t`Löschen`}</div>
     <div class="item${item.erledigt ? ' erledigt' : ''}">
-      <button type="button" class="check" data-aktion="abhaken" aria-label="${item.erledigt ? 'Zurückholen' : 'Abhaken'}"><span>${ICON_HAKEN}</span></button>
+      <button type="button" class="check" data-aktion="abhaken" aria-label="${item.erledigt ? t`Zurückholen` : t`Abhaken`}"><span>${ICON_HAKEN}</span></button>
       <div class="txt" data-aktion="details">${menge}<span class="name">${esc(item.name)}</span>${sub}</div>
       <div class="rechts">${zuordnen}${abt}${item.stamm ? ICON_STAMM : ''}</div>
     </div>
@@ -1004,12 +1076,12 @@ function render() {
 
   if (ansicht === 'laden') {
     const p = aktivesProfil();
-    html += `<div class="ladenwahl">Laden <select id="profilWahl" aria-label="Laden wählen">${S.profile.map(x =>
+    html += `<div class="ladenwahl">${t`Laden`} <select id="profilWahl" aria-label="${t`Laden wählen`}">${S.profile.map(x =>
       `<option value="${x.id}"${x.id === p.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>`;
   }
 
   if (!sichtbar.length) {
-    html += `<div class="leer">Die Liste ist leer.<br>Oben eintragen, scannen oder ein Rezept übernehmen.</div>`;
+    html += `<div class="leer">${t`Die Liste ist leer.`}<br>${t`Oben eintragen, scannen oder ein Rezept übernehmen.`}</div>`;
   } else if (ansicht === 'liste') {
     html += `<ul class="artikel">${sortiert(sichtbar).map(i => zeileHTML(i, S.einstellungen.abteilungInListe)).join('')}</ul>`;
   } else {
@@ -1021,22 +1093,22 @@ function render() {
     const versteckt = reihenfolge.filter(a => p.ausgeblendet.includes(a));
     const anzahlVersteckt = versteckt.reduce((s, a) => s + gruppen(a).filter(i => !i.erledigt).length, 0);
     if (versteckt.some(a => gruppen(a).length)) {
-      html += `<details class="versteckt"><summary>Nicht in diesem Laden (${anzahlVersteckt})</summary>${versteckt.map(gruppe).join('')}</details>`;
+      html += `<details class="versteckt"><summary>${t`Nicht in diesem Laden (${anzahlVersteckt})`}</summary>${versteckt.map(gruppe).join('')}</details>`;
     }
   }
 
   if (pausiert.length) {
-    html += `<div class="pausiert">Diesmal nicht: ${pausiert.map(i => `<button type="button" data-zurueck="${i.id}">${esc(i.name)}</button>`).join(', ')}</div>`;
+    html += `<div class="pausiert">${t`Diesmal nicht:`} ${pausiert.map(i => `<button type="button" data-zurueck="${i.id}">${esc(i.name)}</button>`).join(', ')}</div>`;
   }
 
   if (ansicht === 'liste' && S.liste.length) {
-    html += `<button type="button" class="knopf gefahr liste-leeren" id="btnListeLeeren">Ganze Liste löschen</button>`;
+    html += `<button type="button" class="knopf gefahr liste-leeren" id="btnListeLeeren">${t`Ganze Liste löschen`}</button>`;
   }
 
   $('#main').innerHTML = html;
   const nErledigt = S.liste.filter(i => i.erledigt).length;
   $('#abschluss').hidden = !nErledigt;
-  $('#btnAbschluss').textContent = `Einkauf abschließen · ${nErledigt} erledigt`;
+  $('#btnAbschluss').textContent = t`Einkauf abschließen · ${nErledigt} erledigt`;
   renderHilfe();
 }
 
@@ -1080,8 +1152,8 @@ function renderHilfe() {
     const g = $('#chipsGriff');
     g.hidden = !griff || (griff === 'auf' && !liste.length);
     g.className = `chips-griff ${griff || ''}`;
-    g.innerHTML = griff === 'zu' ? 'Schnellauswahl <svg class="ico" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M6 9l6 6 6-6"/></svg>' : '';
-    g.setAttribute('aria-label', griff === 'zu' ? 'Schnellauswahl zeigen' : 'Schnellauswahl ausblenden');
+    g.innerHTML = griff === 'zu' ? t`Schnellauswahl` + ' <svg class="ico" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M6 9l6 6 6-6"/></svg>' : '';
+    g.setAttribute('aria-label', griff === 'zu' ? t`Schnellauswahl zeigen` : t`Schnellauswahl ausblenden`);
     chips.innerHTML = liste.map(c => `<button type="button" class="chip${c.gepinnt ? ' gepinnt' : ''}" data-chip="${esc(c.name)}">${esc(c.name)}</button>`).join('');
   }
 }
@@ -1131,7 +1203,7 @@ $('#formEingabe').addEventListener('submit', e => {
     if (tags.length) {
       const gefunden = tags.map(findeRezept);
       const fehlt = tags.filter((t, i) => !gefunden[i]);
-      if (fehlt.length) return zeigeToast(S.rezepte.length ? `Kein Rezept ${fehlt.join(', ')}` : 'Noch keine Rezepte gespeichert');
+      if (fehlt.length) return zeigeToast(S.rezepte.length ? t`Kein Rezept ${fehlt.join(', ')}` : t`Noch keine Rezepte gespeichert`);
       feld.value = ''; feld.blur();
       const rest = teile.filter(t => !t.startsWith('#'));
       if (rest.length) eintragen(zerlegeEingabe(rest.join(',')));
@@ -1190,12 +1262,12 @@ $('#vorschlaege').addEventListener('click', e => {
 })();
 function oeffneChipMenue(name) {
   const gepinnt = S.einstellungen.chips.angeheftet.some(n => kompakt(n) === kompakt(name));
-  const b = oeffneBlatt(`<div class="blatt-kopf"><h3>${esc(name)}</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
+  const b = oeffneBlatt(`<div class="blatt-kopf"><h3>${esc(name)}</h3><button type="button" class="zurueck" data-schliessen>${t`Abbrechen`}</button></div>
     <div class="knopfreihe">
-      <button type="button" class="knopf zweit" id="cPin">${gepinnt ? 'Nicht mehr anheften' : 'Immer in der Schnellauswahl zeigen'}</button>
-      <button type="button" class="knopf zweit" id="cWeg">Nicht mehr vorschlagen</button>
+      <button type="button" class="knopf zweit" id="cPin">${gepinnt ? t`Nicht mehr anheften` : t`Immer in der Schnellauswahl zeigen`}</button>
+      <button type="button" class="knopf zweit" id="cWeg">${t`Nicht mehr vorschlagen`}</button>
     </div>
-    <p class="text-muted">Verwalten unter Einstellungen → Schnellauswahl.</p>`);
+    <p class="text-muted">${t`Verwalten unter Einstellungen → Schnellauswahl.`}</p>`);
   $('#cPin', b).onclick = () => { gepinnt ? loeseAn(name) : hefteAn(name); schliesseBlatt(b); };
   $('#cWeg', b).onclick = () => { blendeAus(name); schliesseBlatt(b); };
   b._beimSchliessen = renderHilfe;
@@ -1327,20 +1399,20 @@ function schliesseBlatt(hint) {
     if (hint._beimSchliessen) hint._beimSchliessen();
   }, 200);
 }
-const abteilungsOptionen = aktiv => ABTEILUNGEN.map(a => `<option value="${a.id}"${a.id === aktiv ? ' selected' : ''}>${esc(a.name)}</option>`).join('');
+const abteilungsOptionen = aktiv => ABT_IDS.map(a => `<option value="${a}"${a === aktiv ? ' selected' : ''}>${esc(ABT_NAME[a])}</option>`).join('');
 
 function oeffneDetails(item) {
   const b = oeffneBlatt(`
-    <div class="blatt-kopf"><h3>Artikel</h3><button type="button" class="zurueck" data-schliessen>Fertig</button></div>
-    <label class="feld"><span>Name</span><input type="text" id="dName" value="${esc(item.name)}"></label>
-    <div class="feld"><span>Menge</span>
-      <div class="stepper"><button type="button" id="dMinus" aria-label="Weniger">−</button><input id="dMenge" inputmode="decimal" aria-label="Menge"><span class="einheit" id="dEinheit"></span><button type="button" id="dPlus" aria-label="Mehr">+</button></div>
+    <div class="blatt-kopf"><h3>${t`Artikel`}</h3><button type="button" class="zurueck" data-schliessen>${t`Fertig`}</button></div>
+    <label class="feld"><span>${t`Name`}</span><input type="text" id="dName" value="${esc(item.name)}"></label>
+    <div class="feld"><span>${t`Menge`}</span>
+      <div class="stepper"><button type="button" id="dMinus" aria-label="${t`Weniger`}">−</button><input id="dMenge" inputmode="decimal" aria-label="${t`Menge`}"><span class="einheit" id="dEinheit"></span><button type="button" id="dPlus" aria-label="${t`Mehr`}">+</button></div>
       <div class="einheiten" id="dEinheiten">${EINHEITEN_MENGE.map(e => `<button type="button" data-einheit="${e}">${EINHEIT_NAME[e]}</button>`).join('')}</div>
     </div>
-    <label class="feld"><span>Abteilung</span><select id="dAbt">${abteilungsOptionen(item.abteilung)}</select></label>
-    <label class="feld"><span>Marke / Notiz</span><input type="text" id="dNotiz" value="${esc(item.notiz || '')}" placeholder="z. B. Alnatura, 1,5 %"></label>
-    <label class="schalter"><div>Wird immer benötigt<small>Steht nach jedem Einkauf von selbst wieder auf der Liste</small></div><input type="checkbox" id="dStamm"${item.stamm ? ' checked' : ''}></label>
-    <div class="knopfreihe"><button type="button" class="knopf gefahr" id="dLoeschen">Von der Liste löschen</button></div>
+    <label class="feld"><span>${t`Abteilung`}</span><select id="dAbt">${abteilungsOptionen(item.abteilung)}</select></label>
+    <label class="feld"><span>${t`Marke / Notiz`}</span><input type="text" id="dNotiz" value="${esc(item.notiz || '')}" placeholder="${t`z. B. Alnatura, 1,5 %`}"></label>
+    <label class="schalter"><div>${t`Wird immer benötigt`}<small>${t`Steht nach jedem Einkauf von selbst wieder auf der Liste`}</small></div><input type="checkbox" id="dStamm"${item.stamm ? ' checked' : ''}></label>
+    <div class="knopfreihe"><button type="button" class="knopf gefahr" id="dLoeschen">${t`Von der Liste löschen`}</button></div>
   `);
   const einheit = () => item.einheit || 'stk';
   const menge = () => item.menge || EINHEIT_START[einheit()];
@@ -1371,7 +1443,7 @@ function oeffneDetails(item) {
     const idx = S.liste.indexOf(item);
     if (idx >= 0) S.liste.splice(idx, 1);
     sichereListe(); schliesseBlatt(b);
-    zeigeToast(`${item.name} gelöscht`, 'Rückgängig', () => { S.liste.splice(Math.max(0, idx), 0, item); sichereListe(); render(); });
+    zeigeToast(t`${item.name} gelöscht`, t`Rückgängig`, () => { S.liste.splice(Math.max(0, idx), 0, item); sichereListe(); render(); });
   };
   b._beimSchliessen = () => {
     const neu = $('#dName', b).value.trim();
@@ -1390,10 +1462,10 @@ function oeffneDetails(item) {
 
 function oeffneAbteilungWahl(item) {
   const b = oeffneBlatt(`
-    <div class="blatt-kopf"><h3>${esc(item.name)}</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
-    <p class="text-muted">Abteilung wählen. Die App merkt sich das für diesen Artikel.</p>
-    <ul class="liste-einst">${ABTEILUNGEN.filter(a => a.id !== 'sonstiges').map(a =>
-      `<li><button type="button" class="fuellen" data-abt="${a.id}">${esc(a.name)}</button></li>`).join('')}</ul>
+    <div class="blatt-kopf"><h3>${esc(item.name)}</h3><button type="button" class="zurueck" data-schliessen>${t`Abbrechen`}</button></div>
+    <p class="text-muted">${t`Abteilung wählen. Die App merkt sich das für diesen Artikel.`}</p>
+    <ul class="liste-einst">${ABT_IDS.filter(a => a !== 'sonstiges').map(a =>
+      `<li><button type="button" class="fuellen" data-abt="${a}">${esc(ABT_NAME[a])}</button></li>`).join('')}</ul>
   `);
   b.addEventListener('click', e => {
     const x = e.target.closest('[data-abt]');
@@ -1418,76 +1490,82 @@ function chipVerwaltungHTML() {
   const knopf = (aktion, name, text, farbe) => `<button type="button" class="zurueck" data-chip-aktion="${aktion}" data-name="${esc(name)}"${farbe ? ` style="color:${farbe}"` : ''}>${text}</button>`;
   const ausgeblendet = c.ausgeblendet.map(k => (S.verlauf[k] || {}).name || k);
   return `
-    ${c.angeheftet.length ? `<p class="text-muted" style="margin:14px 0 2px">Angeheftet, immer zuerst</p><ul class="liste-einst">${c.angeheftet.map(n => zeile(n, knopf('los', n, 'Lösen'))).join('')}</ul>` : ''}
-    <p class="text-muted" style="margin:14px 0 2px">Danach automatisch die häufigsten Käufe, ohne Stammartikel. Auch in der Schnellauswahl: Chip lange drücken.</p>
-    ${auto.length ? `<ul class="liste-einst">${auto.map(x => zeile(x.name, knopf('pin', x.name, 'Anheften') + knopf('weg', x.name, 'Ausblenden', 'var(--danger)'))).join('')}</ul>` : '<p class="text-muted">Noch nichts gekauft.</p>'}
-    ${ausgeblendet.length ? `<p class="text-muted" style="margin:14px 0 2px">Ausgeblendet</p><ul class="liste-einst">${ausgeblendet.map(n => zeile(n, knopf('zeig', n, 'Wieder zeigen'))).join('')}</ul>` : ''}`;
+    ${c.angeheftet.length ? `<p class="text-muted" style="margin:14px 0 2px">${t`Angeheftet, immer zuerst`}</p><ul class="liste-einst">${c.angeheftet.map(n => zeile(n, knopf('los', n, t`Lösen`))).join('')}</ul>` : ''}
+    <p class="text-muted" style="margin:14px 0 2px">${t`Danach automatisch die häufigsten Käufe, ohne Stammartikel. Auch in der Schnellauswahl: Chip lange drücken.`}</p>
+    ${auto.length ? `<ul class="liste-einst">${auto.map(x => zeile(x.name, knopf('pin', x.name, t`Anheften`) + knopf('weg', x.name, t`Ausblenden`, 'var(--danger)'))).join('')}</ul>` : `<p class="text-muted">${t`Noch nichts gekauft.`}</p>`}
+    ${ausgeblendet.length ? `<p class="text-muted" style="margin:14px 0 2px">${t`Ausgeblendet`}</p><ul class="liste-einst">${ausgeblendet.map(n => zeile(n, knopf('zeig', n, t`Wieder zeigen`))).join('')}</ul>` : ''}`;
 }
 
 function oeffneEinstellungen() {
   const b = oeffneBlatt('<div id="einst"></div>', { voll: true });
   const zeichne = () => {
-    const stamm = Object.values(S.verlauf).filter(v => v.stamm).sort((x, y) => x.name.localeCompare(y.name, 'de'));
+    const stamm = Object.values(S.verlauf).filter(v => v.stamm).sort((x, y) => x.name.localeCompare(y.name, SPRACHE));
+    const sprachWahl = [['auto', t`Automatisch (${SPRACHEN[geraeteSprache()]})`], ...Object.entries(SPRACHEN)];
     $('#einst', b).innerHTML = `
-      <div class="blatt-kopf"><h3>Einstellungen</h3><button type="button" class="zurueck" data-schliessen>Fertig</button></div>
-      <div class="abschnitt">Läden</div>
+      <div class="blatt-kopf"><h3>${t`Einstellungen`}</h3><button type="button" class="zurueck" data-schliessen>${t`Fertig`}</button></div>
+      <div class="abschnitt">${t`Läden`}</div>
       <ul class="liste-einst">${S.profile.map(p => `<li><button type="button" class="fuellen" data-profil="${p.id}">${esc(p.name)}
-        <span class="klein">${p.ort ? ' · Standort gespeichert' : ''}${p.ausgeblendet.length ? ` · ${ABT_IDS.length - p.ausgeblendet.length} Abteilungen` : ''}</span></button></li>`).join('')}
-        <li><button type="button" class="fuellen" id="eNeuesProfil" style="color:var(--accent)">Laden hinzufügen</button></li></ul>
-      <label class="schalter"><div>Laden per Standort wählen<small>Beim Öffnen im Laden passendes Profil einstellen</small></div><input type="checkbox" id="eStandort"${S.einstellungen.standort ? ' checked' : ''}></label>
+        <span class="klein">${p.ort ? ' · ' + t`Standort gespeichert` : ''}${p.ausgeblendet.length ? ' · ' + t`${ABT_IDS.length - p.ausgeblendet.length} Abteilungen` : ''}</span></button></li>`).join('')}
+        <li><button type="button" class="fuellen" id="eNeuesProfil" style="color:var(--accent)">${t`Laden hinzufügen`}</button></li></ul>
+      <label class="schalter"><div>${t`Laden per Standort wählen`}<small>${t`Beim Öffnen im Laden passendes Profil einstellen`}</small></div><input type="checkbox" id="eStandort"${S.einstellungen.standort ? ' checked' : ''}></label>
 
-      <div class="abschnitt">Darstellung</div>
-      <div class="segment klein" id="eThema">${[['system', 'Automatisch'], ['light', 'Hell'], ['dark', 'Dunkel']].map(([id, n]) =>
+      <div class="abschnitt">${t`Sprache`}</div>
+      <label class="feld"><select id="eSprache" aria-label="${t`Sprache`}">${sprachWahl.map(([id, n]) =>
+        `<option value="${id}"${(S.einstellungen.sprache || 'auto') === id ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
+      <p class="text-muted">${t`Gilt für Texte, Abteilungen und die Erkennung der Artikel. Schon eingetragene Artikel behalten ihren Namen.`}</p>
+
+      <div class="abschnitt">${t`Darstellung`}</div>
+      <div class="segment klein" id="eThema">${[['system', t`Automatisch`], ['light', t`Hell`], ['dark', t`Dunkel`]].map(([id, n]) =>
         `<button type="button" data-thema="${id}" class="${S.einstellungen.thema === id ? 'an' : ''}">${n}</button>`).join('')}</div>
-      <label class="schalter" style="margin-top:8px"><div>Abteilungen farbig markieren<small>Farbe je Bereich im Laden, die Beschriftung bleibt</small></div><input type="checkbox" id="eFarben"${S.einstellungen.farben.an ? ' checked' : ''}></label>
-      <label class="schalter"><div>Abteilung in der Listenansicht zeigen<small>Name der Abteilung rechts neben dem Artikel</small></div><input type="checkbox" id="eAbtListe"${S.einstellungen.abteilungInListe ? ' checked' : ''}></label>
+      <label class="schalter" style="margin-top:8px"><div>${t`Abteilungen farbig markieren`}<small>${t`Farbe je Bereich im Laden, die Beschriftung bleibt`}</small></div><input type="checkbox" id="eFarben"${S.einstellungen.farben.an ? ' checked' : ''}></label>
+      <label class="schalter"><div>${t`Abteilung in der Listenansicht zeigen`}<small>${t`Name der Abteilung rechts neben dem Artikel`}</small></div><input type="checkbox" id="eAbtListe"${S.einstellungen.abteilungInListe ? ' checked' : ''}></label>
       <div id="eFarbWahl"${S.einstellungen.farben.an ? '' : ' hidden'}>
         <div class="wahl" style="margin-top:12px">${FARBSCHEMATA.map(f => `<button type="button" data-schema="${f.id}" class="${aktuellesSchema().id === f.id ? 'an' : ''}">
-          <span class="titel">${esc(f.name)}</span><span class="text-muted">${esc(f.text)}</span>
+          <span class="titel">${esc(t(f.name))}</span><span class="text-muted">${esc(t(f.text))}</span>
           <span class="muster">${legende(f).map(l => `<span><i style="--c:${FARBTOENE[l.ton][istDunkel() ? 1 : 0]}"></i>${esc(l.name)}</span>`).join('')}</span>
         </button>`).join('')}</div>
-        <div class="segment klein" id="eStil">${[['streifen', 'Streifen'], ['flaeche', 'Farbige Zeilen']].map(([id, n]) =>
+        <div class="segment klein" id="eStil">${[['streifen', t`Streifen`], ['flaeche', t`Farbige Zeilen`]].map(([id, n]) =>
           `<button type="button" data-stil="${id}" class="${S.einstellungen.farben.stil === id ? 'an' : ''}">${n}</button>`).join('')}</div>
       </div>
 
-      <div class="abschnitt">Schnellauswahl</div>
-      <label class="schalter"><div>Schnellauswahl zeigen<small>Nur in der Listenansicht, wenn das Eingabefeld leer ist</small></div><input type="checkbox" id="eChips"${S.einstellungen.chips.an ? ' checked' : ''}></label>
+      <div class="abschnitt">${t`Schnellauswahl`}</div>
+      <label class="schalter"><div>${t`Schnellauswahl zeigen`}<small>${t`Nur in der Listenansicht, wenn das Eingabefeld leer ist`}</small></div><input type="checkbox" id="eChips"${S.einstellungen.chips.an ? ' checked' : ''}></label>
       <div id="eChipWahl"${S.einstellungen.chips.an ? '' : ' hidden'}>
-        <div class="feld"><span>Anzeigen</span><div class="segment klein" id="eChipModus">${[['antippen', 'Beim Antippen'], ['immer', 'Immer']].map(([id, n]) =>
+        <div class="feld"><span>${t`Anzeigen`}</span><div class="segment klein" id="eChipModus">${[['antippen', t`Beim Antippen`], ['immer', t`Immer`]].map(([id, n]) =>
           `<button type="button" data-chip-modus="${id}" class="${S.einstellungen.chips.modus === id ? 'an' : ''}">${n}</button>`).join('')}</div>
           <p class="text-muted" style="margin:6px 0 0">${S.einstellungen.chips.modus === 'immer'
-            ? 'Immer unter dem Eingabefeld. Nach oben wischen blendet sie aus, antippen oder nach unten wischen holt sie zurück.'
-            : 'Erscheint, sobald du ins Eingabefeld tippst, und bei leerer Liste.'}</p></div>
-        <div class="feld"><span>Anzahl</span><div class="segment klein" id="eAnzahl">${[6, 9, 12, 18].map(n =>
+            ? t`Immer unter dem Eingabefeld. Nach oben wischen blendet sie aus, antippen oder nach unten wischen holt sie zurück.`
+            : t`Erscheint, sobald du ins Eingabefeld tippst, und bei leerer Liste.`}</p></div>
+        <div class="feld"><span>${t`Anzahl`}</span><div class="segment klein" id="eAnzahl">${[6, 9, 12, 18].map(n =>
           `<button type="button" data-anzahl="${n}" class="${S.einstellungen.chips.anzahl === n ? 'an' : ''}">${n}</button>`).join('')}</div></div>
-        <form class="eingabe" id="ePinForm" style="margin-top:6px"><input id="ePinName" type="text" placeholder="Artikel anheften" autocapitalize="sentences" autocorrect="off" enterkeyhint="done" autocomplete="off"></form>
+        <form class="eingabe" id="ePinForm" style="margin-top:6px"><input id="ePinName" type="text" placeholder="${t`Artikel anheften`}" autocapitalize="sentences" autocorrect="off" enterkeyhint="done" autocomplete="off"></form>
         <ul class="vorschlaege" id="ePinVorschlaege" hidden></ul>
         ${chipVerwaltungHTML()}
       </div>
 
-      <div class="abschnitt">Stammartikel</div>
+      <div class="abschnitt">${t`Stammartikel`}</div>
       ${stamm.length ? `<ul class="liste-einst">${stamm.map(v => `<li><span class="fuellen" style="flex:1">${esc(v.name)}</span>
-        <button type="button" class="zurueck" data-stamm-weg="${esc(kompakt(v.name))}" style="color:var(--danger)">Entfernen</button></li>`).join('')}</ul>`
-        : '<p class="text-muted">Noch keine. Artikel antippen und „Wird immer benötigt“ einschalten.</p>'}
+        <button type="button" class="zurueck" data-stamm-weg="${esc(kompakt(v.name))}" style="color:var(--danger)">${t`Entfernen`}</button></li>`).join('')}</ul>`
+        : `<p class="text-muted">${t`Noch keine. Artikel antippen und „Wird immer benötigt“ einschalten.`}</p>`}
 
-      <div class="abschnitt">Rezepte</div>
+      <div class="abschnitt">${t`Rezepte`}</div>
       ${S.rezepte.length ? `<ul class="liste-einst">${S.rezepte.map(x => `<li><button type="button" class="fuellen" data-rezept="${x.id}">#${esc(x.name)}
-        <span class="klein">· ${x.zutaten.length} Zutaten</span></button></li>`).join('')}</ul>`
-        : '<p class="text-muted">Noch keine. Beim Übernehmen eines Rezepts einen Namen vergeben, dann im Eingabefeld mit #Name abrufen.</p>'}
+        <span class="klein">· ${t`${x.zutaten.length} Zutaten`}</span></button></li>`).join('')}</ul>`
+        : `<p class="text-muted">${t`Noch keine. Beim Übernehmen eines Rezepts einen Namen vergeben, dann im Eingabefeld mit #Name abrufen.`}</p>`}
 
-      <div class="abschnitt">Rezept-Fotos</div>
-      <label class="feld"><span>Claude-API-Schlüssel (bleibt nur auf diesem Gerät)</span>
+      <div class="abschnitt">${t`Rezept-Fotos`}</div>
+      <label class="feld"><span>${t`Claude-API-Schlüssel (bleibt nur auf diesem Gerät)`}</span>
         <input type="password" id="eApiKey" value="${esc(S.einstellungen.apiKey)}" placeholder="sk-ant-…" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-      <p class="text-muted">Ohne Schlüssel funktioniert „Text einfügen“ weiterhin. Mit Schlüssel kostet ein Rezeptfoto etwa 2–3 Cent.</p>
+      <p class="text-muted">${t`Ohne Schlüssel funktioniert „Zutaten übernehmen“ per Text weiterhin. Mit Schlüssel kostet ein Rezeptfoto etwa 2–3 Cent.`}</p>
 
-      <div class="abschnitt">Daten</div>
+      <div class="abschnitt">${t`Daten`}</div>
       <div class="knopfreihe">
-        <button type="button" class="knopf zweit" id="eExport">Sicherung exportieren</button>
-        <button type="button" class="knopf zweit" id="eImport">Sicherung importieren</button>
-        <button type="button" class="knopf gefahr" id="eVerlaufLeeren">Verlauf und gelernte Zuordnungen löschen</button>
+        <button type="button" class="knopf zweit" id="eExport">${t`Sicherung exportieren`}</button>
+        <button type="button" class="knopf zweit" id="eImport">${t`Sicherung importieren`}</button>
+        <button type="button" class="knopf gefahr" id="eVerlaufLeeren">${t`Verlauf und gelernte Zuordnungen löschen`}</button>
       </div>
       <input type="file" id="eImportDatei" accept="application/json,.json" hidden>
-      <p class="text-muted" style="margin-top:20px">${Object.keys(S.verlauf).length} Artikel im Verlauf · ${Object.keys(S.korrekturen).length} gelernte Zuordnungen · ${INDEX.size} Katalogbegriffe</p>
+      <p class="text-muted" style="margin-top:20px">${t`${Object.keys(S.verlauf).length} Artikel im Verlauf · ${Object.keys(S.korrekturen).length} gelernte Zuordnungen · ${INDEX_KEYS.length} Katalogbegriffe`}</p>
     `;
   };
   zeichne();
@@ -1546,7 +1624,7 @@ function oeffneEinstellungen() {
     const p = e.target.closest('[data-profil]');
     if (p) return oeffneProfil(S.profile.find(x => x.id === p.dataset.profil), zeichne);
     if (e.target.closest('#eNeuesProfil')) {
-      const neu = { id: uid(), name: 'Neuer Laden', reihenfolge: [...aktivesProfil().reihenfolge], ausgeblendet: [] };
+      const neu = { id: uid(), name: t`Neuer Laden`, reihenfolge: [...aktivesProfil().reihenfolge], ausgeblendet: [] };
       S.profile.push(neu); sichereProfile();
       return oeffneProfil(neu, zeichne);
     }
@@ -1561,7 +1639,7 @@ function oeffneEinstellungen() {
     if (e.target.closest('#eExport')) return exportieren();
     if (e.target.closest('#eImport')) return $('#eImportDatei', b).click();
     if (e.target.closest('#eVerlaufLeeren')) {
-      if (!confirm('Verlauf, gelernte Abteilungen und gespeicherte Barcodes löschen? Die aktuelle Liste bleibt.')) return;
+      if (!confirm(t`Verlauf, gelernte Abteilungen und gespeicherte Barcodes löschen? Die aktuelle Liste bleibt.`)) return;
       for (const i of S.liste) if (i.stamm) merkeVerlauf(i);
       S.verlauf = Object.fromEntries(Object.entries(S.verlauf).filter(([, v]) => v.stamm));
       S.korrekturen = {}; S.eans = {};
@@ -1574,6 +1652,11 @@ function oeffneEinstellungen() {
     if (e.target.id === 'eAbtListe') { S.einstellungen.abteilungInListe = e.target.checked; sichereEinstellungen(); }
     if (e.target.id === 'eChips') { S.einstellungen.chips.an = e.target.checked; sichereEinstellungen(); zeichne(); }
     if (e.target.id === 'eStandort') { S.einstellungen.standort = e.target.checked; sichereEinstellungen(); if (e.target.checked) waehleLadenPerStandort(true); }
+    if (e.target.id === 'eSprache') {
+      // Katalog und Texte hängen an der Sprache: neu laden ist am einfachsten und sichersten
+      S.einstellungen.sprache = e.target.value; sichereEinstellungen();
+      if (!TESTMODUS) location.reload();
+    }
     if (e.target.id === 'eApiKey') { S.einstellungen.apiKey = e.target.value.trim(); sichereEinstellungen(); }
     if (e.target.id === 'eImportDatei' && e.target.files[0]) importieren(e.target.files[0], zeichne);
   });
@@ -1585,26 +1668,26 @@ function oeffneProfil(p, nachher) {
   const zeichne = () => {
     const reihenfolge = [...p.reihenfolge, ...ABT_IDS.filter(a => !p.reihenfolge.includes(a))];
     $('#prof', b).innerHTML = `
-      <div class="blatt-kopf"><button type="button" class="zurueck" data-schliessen>Zurück</button><h3></h3></div>
-      <label class="feld"><span>Name</span><input type="text" id="pName" value="${esc(p.name)}" placeholder="z. B. REWE Hauptstraße"></label>
-      <div class="abschnitt">Laufweg</div>
-      <p class="text-muted">Am Griff ziehen, um die Reihenfolge zu ändern. Haken entfernen, wenn es die Abteilung in diesem Laden nicht gibt.</p>
+      <div class="blatt-kopf"><button type="button" class="zurueck" data-schliessen>${t`Zurück`}</button><h3></h3></div>
+      <label class="feld"><span>${t`Name`}</span><input type="text" id="pName" value="${esc(p.name)}" placeholder="${t`z. B. REWE Hauptstraße`}"></label>
+      <div class="abschnitt">${t`Laufweg`}</div>
+      <p class="text-muted">${t`Am Griff ziehen, um die Reihenfolge zu ändern. Haken entfernen, wenn es die Abteilung in diesem Laden nicht gibt.`}</p>
       <ul class="liste-einst" id="pAbts">${reihenfolge.map(a => `<li data-abt="${a}" class="${p.ausgeblendet.includes(a) ? 'aus' : ''}">
-        <input type="checkbox" aria-label="In diesem Laden vorhanden"${p.ausgeblendet.includes(a) ? '' : ' checked'}>
-        <span class="abtname" style="flex:1">${esc(ABT_NAME[a])}</span><span class="griff" aria-label="Verschieben">${ICON_GRIFF}</span></li>`).join('')}</ul>
-      <div class="abschnitt">Standort</div>
-      <p class="text-muted">${!p.ort ? 'Nicht gespeichert. Auf der Karte wählen oder im Laden stehend übernehmen, dann wählt die App diesen Laden automatisch.'
-        : p.ort.quelle === 'karte' ? `Auf der Karte gewählt${p.ort.adresse ? `: ${esc(p.ort.adresse)}` : ''}.` : `Gespeichert (±${Math.round(p.ort.genau || 0)} m).`}</p>
+        <input type="checkbox" aria-label="${t`In diesem Laden vorhanden`}"${p.ausgeblendet.includes(a) ? '' : ' checked'}>
+        <span class="abtname" style="flex:1">${esc(ABT_NAME[a])}</span><span class="griff" aria-label="${t`Verschieben`}">${ICON_GRIFF}</span></li>`).join('')}</ul>
+      <div class="abschnitt">${t`Standort`}</div>
+      <p class="text-muted">${!p.ort ? t`Nicht gespeichert. Auf der Karte wählen oder im Laden stehend übernehmen, dann wählt die App diesen Laden automatisch.`
+        : p.ort.quelle === 'karte' ? (p.ort.adresse ? t`Auf der Karte gewählt: ${esc(p.ort.adresse)}.` : t`Auf der Karte gewählt.`) : t`Gespeichert (±${Math.round(p.ort.genau || 0)} m).`}</p>
       <div class="knopfreihe">
-        <button type="button" class="knopf zweit" id="pKarte">Auf der Karte wählen</button>
-        <button type="button" class="knopf zweit" id="pOrt">Aktuellen Standort übernehmen</button>
-        ${p.ort ? '<button type="button" class="knopf zweit" id="pOrtWeg">Standort entfernen</button>' : ''}
-        ${S.profile.length > 1 ? '<button type="button" class="knopf gefahr" id="pLoeschen">Laden löschen</button>' : ''}
+        <button type="button" class="knopf zweit" id="pKarte">${t`Auf der Karte wählen`}</button>
+        <button type="button" class="knopf zweit" id="pOrt">${t`Aktuellen Standort übernehmen`}</button>
+        ${p.ort ? `<button type="button" class="knopf zweit" id="pOrtWeg">${t`Standort entfernen`}</button>` : ''}
+        ${S.profile.length > 1 ? `<button type="button" class="knopf gefahr" id="pLoeschen">${t`Laden löschen`}</button>` : ''}
       </div>`;
     ziehbar($('#pAbts', b), () => { p.reihenfolge = $$('#pAbts li', b).map(li => li.dataset.abt); sichereProfile(); });
   };
   zeichne();
-  b.addEventListener('input', e => { if (e.target.id === 'pName') { p.name = e.target.value.trim() || 'Laden'; sichereProfile(); } });
+  b.addEventListener('input', e => { if (e.target.id === 'pName') { p.name = e.target.value.trim() || t`Laden`; sichereProfile(); } });
   b.addEventListener('change', e => {
     const li = e.target.closest('#pAbts li');
     if (li && e.target.type === 'checkbox') {
@@ -1617,15 +1700,15 @@ function oeffneProfil(p, nachher) {
   b.addEventListener('click', async e => {
     if (e.target.closest('#pOrt')) {
       try {
-        e.target.disabled = true; e.target.innerHTML = '<span class="laedt"></span>Standort wird bestimmt';
+        e.target.disabled = true; e.target.innerHTML = '<span class="laedt"></span>' + t`Standort wird bestimmt`;
         const pos = await standort();
         p.ort = { lat: pos.coords.latitude, lon: pos.coords.longitude, genau: pos.coords.accuracy };
         sichereProfile(); zeichne();
-      } catch (err) { zeigeToast('Standort nicht verfügbar'); zeichne(); }
+      } catch (err) { zeigeToast(t`Standort nicht verfügbar`); zeichne(); }
     }
     if (e.target.closest('#pOrtWeg')) { delete p.ort; sichereProfile(); zeichne(); }
     if (e.target.closest('#pKarte')) oeffneKarte(p, zeichne);
-    if (e.target.closest('#pLoeschen') && confirm(`„${p.name}“ löschen?`)) {
+    if (e.target.closest('#pLoeschen') && confirm(t`„${p.name}“ löschen?`)) {
       S.profile = S.profile.filter(x => x !== p);
       if (S.aktivesProfil === p.id) S.aktivesProfil = S.profile[0].id;
       sichereProfile(); schliesseBlatt(b);
@@ -1685,14 +1768,15 @@ async function importieren(datei, nachher) {
   try {
     const d = JSON.parse(await datei.text());
     if (!d || !Array.isArray(d.liste) || !Array.isArray(d.profile)) throw new Error('Format');
-    if (!confirm('Sicherung einspielen? Die aktuellen Daten werden ersetzt (der API-Schlüssel bleibt).')) return;
+    if (!confirm(t`Sicherung einspielen? Die aktuellen Daten werden ersetzt (der API-Schlüssel bleibt).`)) return;
     S.liste = d.liste; S.verlauf = d.verlauf || {}; S.korrekturen = d.korrekturen || {}; S.eans = d.eans || {};
     S.profile = d.profile; S.aktivesProfil = d.aktivesProfil || d.profile[0].id;
     S.rezepte = Array.isArray(d.rezepte) ? d.rezepte : S.rezepte;
     S.einstellungen = { ...S.einstellungen, ...(d.einstellungen || {}), apiKey: S.einstellungen.apiKey };
     sichereListe(); sichereVerlauf(); sichere('korrekturen', S.korrekturen); sichere('eans', S.eans); sichereProfile(); sichereEinstellungen(); sichereRezepte();
-    zeigeToast('Sicherung eingespielt'); nachher(); render();
-  } catch (e) { zeigeToast('Datei konnte nicht gelesen werden'); }
+    if (ermittleSprache() !== SPRACHE) return location.reload();   // Sicherung mit anderer Sprache
+    zeigeToast(t`Sicherung eingespielt`); nachher(); render();
+  } catch (e) { zeigeToast(t`Datei konnte nicht gelesen werden`); }
 }
 
 /* ============================================================
@@ -1752,16 +1836,16 @@ async function sucheMaerkte(box) {
 
 async function oeffneKarte(p, nachher) {
   const b = oeffneBlatt(`
-    <div class="blatt-kopf"><h3>Standort wählen</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
-    <form class="eingabe" id="kSuche"><input id="kSuchText" type="search" placeholder="Adresse oder Markt suchen" enterkeyhint="search" autocomplete="off" autocorrect="off"></form>
+    <div class="blatt-kopf"><h3>${t`Standort wählen`}</h3><button type="button" class="zurueck" data-schliessen>${t`Abbrechen`}</button></div>
+    <form class="eingabe" id="kSuche"><input id="kSuchText" type="search" placeholder="${t`Adresse oder Markt suchen`}" enterkeyhint="search" autocomplete="off" autocorrect="off"></form>
     <ul class="karte-treffer liste-einst" id="kTreffer" hidden></ul>
     <div class="karte${istDunkel() ? ' dunkel' : ''}" id="karte"></div>
-    <p class="text-muted karte-status" id="kStatus">Karte wird geladen</p>
+    <p class="text-muted karte-status" id="kStatus">${t`Karte wird geladen`}</p>
     <div id="kWahl"></div>
-    <div class="knopfreihe"><button type="button" class="knopf" id="kOk" disabled>Standort übernehmen</button></div>`, { voll: true });
+    <div class="knopfreihe"><button type="button" class="knopf" id="kOk" disabled>${t`Standort übernehmen`}</button></div>`, { voll: true });
   b._beimSchliessen = nachher;
   const status = t => { $('#kStatus', b).textContent = t; };
-  try { await ladeLeaflet(); } catch (e) { return status('Die Karte konnte nicht geladen werden. Bitte Internetverbindung prüfen.'); }
+  try { await ladeLeaflet(); } catch (e) { return status(t`Die Karte konnte nicht geladen werden. Bitte Internetverbindung prüfen.`); }
   if (!b.isConnected) return;
 
   const karte = L.map($('#karte', b), { zoomControl: false }).setView(p.ort ? [p.ort.lat, p.ort.lon] : [51.16, 10.45], p.ort ? 17 : 6);
@@ -1778,11 +1862,11 @@ async function oeffneKarte(p, nachher) {
     wahl = { lat, lon, markt };
     if (nadel) nadel.setLatLng([lat, lon]);
     else nadel = L.marker([lat, lon], { interactive: false, icon: L.divIcon({ className: 'nadel', html: '<span></span>', iconSize: [26, 26], iconAnchor: [13, 30] }) }).addTo(karte);
-    const standardName = /^(Neuer Laden|Laden|Supermarkt|Drogerie)$/.test(p.name);
+    const standardName = ['Neuer Laden', 'Laden', 'Supermarkt', 'Drogerie'].some(n => p.name === n || p.name === t(n));
     $('#kWahl', b).innerHTML = markt
       ? `<p style="margin:12px 0 0"><strong>${esc(markt.name)}</strong>${markt.adresse ? `<br><span class="text-muted">${esc(markt.adresse)}</span>` : ''}</p>
-         <label class="schalter"><div>Namen übernehmen<small>${esc(markt.vorschlag)}</small></div><input type="checkbox" id="kName"${standardName ? ' checked' : ''}></label>`
-      : '<p class="text-muted" style="margin:12px 0 0">Nadel gesetzt. Tippe auf einen Markt-Punkt, um auch den Namen zu übernehmen.</p>';
+         <label class="schalter"><div>${t`Namen übernehmen`}<small>${esc(markt.vorschlag)}</small></div><input type="checkbox" id="kName"${standardName ? ' checked' : ''}></label>`
+      : `<p class="text-muted" style="margin:12px 0 0">${t`Nadel gesetzt. Tippe auf einen Markt-Punkt, um auch den Namen zu übernehmen.`}</p>`;
     $('#kOk', b).disabled = false;
   };
   if (p.ort) setzeWahl(p.ort.lat, p.ort.lon);
@@ -1792,11 +1876,11 @@ async function oeffneKarte(p, nachher) {
   let timer, geladen = null, anfrage = 0;
   const ladeMaerkte = () => {
     clearTimeout(timer);
-    if (karte.getZoom() < 14) return status('Zum Anzeigen der Märkte näher heranzoomen oder oben suchen.');
+    if (karte.getZoom() < 14) return status(t`Zum Anzeigen der Märkte näher heranzoomen oder oben suchen.`);
     if (geladen && geladen.contains(karte.getBounds())) return;
     timer = setTimeout(async () => {
       const g = karte.getBounds().pad(0.3), nr = ++anfrage;
-      status('Märkte werden gesucht …');
+      status(t`Märkte werden gesucht …`);
       try {
         const liste = await sucheMaerkte({ s: g.getSouth().toFixed(5), w: g.getWest().toFixed(5), n: g.getNorth().toFixed(5), e: g.getEast().toFixed(5) });
         if (nr !== anfrage || !b.isConnected) return;
@@ -1808,19 +1892,20 @@ async function oeffneKarte(p, nachher) {
             .on('click', e => { L.DomEvent.stopPropagation(e); setzeWahl(m.lat, m.lon, m); })
             .addTo(marktEbene);
         }
-        status(liste.length ? `${liste.length} ${liste.length === 1 ? 'Markt' : 'Märkte'}: Punkt antippen oder Nadel per Tippen auf die Karte setzen.`
-          : 'Hier keine Märkte gefunden. Nadel per Tippen auf die Karte setzen.');
+        status(liste.length === 1 ? t`1 Markt: Punkt antippen oder Nadel per Tippen auf die Karte setzen.`
+          : liste.length ? t`${liste.length} Märkte: Punkt antippen oder Nadel per Tippen auf die Karte setzen.`
+          : t`Hier keine Märkte gefunden. Nadel per Tippen auf die Karte setzen.`);
       } catch (e) {
-        if (nr === anfrage) status('Märkte gerade nicht abrufbar. Nadel per Tippen auf die Karte setzen.');
+        if (nr === anfrage) status(t`Märkte gerade nicht abrufbar. Nadel per Tippen auf die Karte setzen.`);
       }
     }, 600);
   };
   karte.on('moveend', ladeMaerkte);
   if (p.ort) ladeMaerkte();
   else {
-    status('Standort wird bestimmt …');
+    status(t`Standort wird bestimmt …`);
     standort().then(pos => { if (b.isConnected && !wahl) karte.setView([pos.coords.latitude, pos.coords.longitude], 16); })
-      .catch(() => status('Adresse oder Markt oben suchen, oder die Karte verschieben und heranzoomen.'));
+      .catch(() => status(t`Adresse oder Markt oben suchen, oder die Karte verschieben und heranzoomen.`));
   }
 
   // Suche nach Adresse oder Marktname
@@ -1833,24 +1918,24 @@ async function oeffneKarte(p, nachher) {
     $('#kSuchText', b).blur();
     const ul = $('#kTreffer', b);
     ul.hidden = false;
-    ul.innerHTML = '<li><span class="laedt"></span>Suche …</li>';
+    ul.innerHTML = '<li><span class="laedt"></span>' + t`Suche …` + '</li>';
     const g = karte.getBounds();
     const d = await holeJSON(`https://nominatim.openstreetmap.org/search?${new URLSearchParams({
-      q, format: 'jsonv2', addressdetails: 1, limit: 6, 'accept-language': 'de', viewbox: [g.getWest(), g.getNorth(), g.getEast(), g.getSouth()].join() })}`, 8000);
+      q, format: 'jsonv2', addressdetails: 1, limit: 6, 'accept-language': SPRACHE, viewbox: [g.getWest(), g.getNorth(), g.getEast(), g.getSouth()].join() })}`, 8000);
     if (!b.isConnected) return;
-    if (!d) { ul.innerHTML = '<li class="text-muted">Suche gerade nicht erreichbar</li>'; return; }
+    if (!d) { ul.innerHTML = `<li class="text-muted">${t`Suche gerade nicht erreichbar`}</li>`; return; }
     treffer = d.map(x => {
       const markt = maerkteAusNominatim([x])[0] || null;
       return { lat: +x.lat, lon: +x.lon, titel: x.name || x.display_name.split(',')[0], markt,
         text: markt && markt.adresse ? markt.adresse : x.display_name.split(',').slice(1, 4).join(',').trim() };
     });
     ul.innerHTML = treffer.length ? treffer.map((t, i) => `<li><button type="button" data-treffer="${i}">${esc(t.titel)}<small>${esc(t.text)}</small></button></li>`).join('')
-      : '<li class="text-muted">Nichts gefunden</li>';
+      : `<li class="text-muted">${t`Nichts gefunden`}</li>`;
   });
   b.addEventListener('click', e => {
-    const t = e.target.closest('[data-treffer]');
-    if (t) {
-      const x = treffer[+t.dataset.treffer];
+    const tr = e.target.closest('[data-treffer]');
+    if (tr) {
+      const x = treffer[+tr.dataset.treffer];
       $('#kTreffer', b).hidden = true;
       karte.setView([x.lat, x.lon], 17);
       setzeWahl(x.lat, x.lon, x.markt);
@@ -1861,7 +1946,7 @@ async function oeffneKarte(p, nachher) {
       if (wahl.markt && $('#kName', b) && $('#kName', b).checked) p.name = wahl.markt.vorschlag;
       sichereProfile();
       schliesseBlatt(b);
-      zeigeToast(`Standort gespeichert: ${p.name}`);
+      zeigeToast(t`Standort gespeichert: ${p.name}`);
     }
   });
 }
@@ -1879,7 +1964,7 @@ function entfernungMeter(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 async function waehleLadenPerStandort(mitMeldung) {
-  if (!S.profile.some(p => p.ort)) { if (mitMeldung) zeigeToast('Erst bei einem Laden den Standort speichern'); return; }
+  if (!S.profile.some(p => p.ort)) { if (mitMeldung) zeigeToast(t`Erst bei einem Laden den Standort speichern`); return; }
   try {
     const pos = await standort();
     const hier = { lat: pos.coords.latitude, lon: pos.coords.longitude };
@@ -1887,9 +1972,9 @@ async function waehleLadenPerStandort(mitMeldung) {
     if (treffer && treffer.m <= 250) {
       S.aktivesProfil = treffer.p.id; S.einstellungen.ansicht = 'laden';
       sichereProfile(); sichereEinstellungen(); render();
-      zeigeToast(`Laden: ${treffer.p.name}`);
-    } else if (mitMeldung) zeigeToast('Kein gespeicherter Laden in der Nähe');
-  } catch (e) { if (mitMeldung) zeigeToast('Standort nicht verfügbar'); }
+      zeigeToast(t`Laden: ${treffer.p.name}`);
+    } else if (mitMeldung) zeigeToast(t`Kein gespeicherter Laden in der Nähe`);
+  } catch (e) { if (mitMeldung) zeigeToast(t`Standort nicht verfügbar`); }
 }
 
 /* ============================================================
@@ -1910,8 +1995,8 @@ async function oeffneScanner() {
   const el = document.createElement('div');
   el.className = 'scanner';
   el.innerHTML = `<video playsinline muted autoplay></video><div class="rahmen"></div>
-    <div class="oben"><button type="button" data-zu>Abbrechen</button><button type="button" data-hand>Nummer eingeben</button></div>
-    <div class="unten" id="scanHinweis">Barcode in den Rahmen halten</div>`;
+    <div class="oben"><button type="button" data-zu>${t`Abbrechen`}</button><button type="button" data-hand>${t`Nummer eingeben`}</button></div>
+    <div class="unten" id="scanHinweis">${t`Barcode in den Rahmen halten`}</div>`;
   document.body.appendChild(el);
   const video = $('video', el);
   let stopp = () => {};
@@ -1919,7 +2004,7 @@ async function oeffneScanner() {
   const schliessen = () => { fertig = true; stopp(); el.remove(); };
   el.querySelector('[data-zu]').onclick = schliessen;
   el.querySelector('[data-hand]').onclick = () => {
-    const ean = prompt('EAN-Nummer (unter dem Barcode):');
+    const ean = prompt(t`EAN-Nummer (unter dem Barcode):`);
     if (ean && /^\d{8,14}$/.test(ean.trim())) { schliessen(); barcodeGefunden(ean.trim()); }
   };
   const gefunden = code => { if (fertig) return; schliessen(); barcodeGefunden(code); };
@@ -1948,8 +2033,8 @@ async function oeffneScanner() {
     }
   } catch (e) {
     $('#scanHinweis', el).textContent = location.protocol === 'https:' || location.hostname === 'localhost'
-      ? 'Kamera nicht verfügbar. Zugriff in den Einstellungen erlauben oder Nummer eingeben.'
-      : 'Die Kamera geht nur, wenn die App über https geöffnet wird. Nummer eingeben geht trotzdem.';
+      ? t`Kamera nicht verfügbar. Zugriff in den Einstellungen erlauben oder Nummer eingeben.`
+      : t`Die Kamera geht nur, wenn die App über https geöffnet wird. Nummer eingeben geht trotzdem.`;
   }
 }
 
@@ -1971,14 +2056,14 @@ async function holeJSON(url, ms = 7000, optionen = {}) {
 
 function produktname(p) {
   const marke = gross((p.brands || '').split(',')[0].trim());
-  let name = (p.product_name_de || p.product_name || p.generic_name_de || p.generic_name || '').trim();
+  let name = (p['product_name_' + SPRACHE] || p.product_name || p['generic_name_' + SPRACHE] || p.generic_name || '').trim();
   if (marke && name.toLowerCase().includes(marke.toLowerCase())) name = name.replace(new RegExp(marke.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '').trim();
   const menge = (p.quantity || '').trim();
   return [marke, name, menge].filter(Boolean).join(' ').replace(/\s+/g, ' ');
 }
 
 async function sucheProdukt(ean) {
-  const felder = 'product_name,product_name_de,generic_name,generic_name_de,brands,quantity,categories_tags';
+  const felder = `product_name,product_name_${SPRACHE},generic_name,generic_name_${SPRACHE},brands,quantity,categories_tags`;
   const quellen = [
     ['https://world.openfoodfacts.org', null],
     ['https://world.openbeautyfacts.org', 'drogerie'],
@@ -1989,7 +2074,7 @@ async function sucheProdukt(ean) {
     if (d && d.status === 1 && d.product) {
       const name = produktname(d.product);
       if (!name) continue;
-      const abt = abteilungAusTags(d.product.categories_tags, standard) || klassifiziere(d.product.product_name_de || d.product.product_name || name).abt;
+      const abt = abteilungAusTags(d.product.categories_tags, standard) || klassifiziere(d.product['product_name_' + SPRACHE] || d.product.product_name || name).abt;
       return { name, abt };
     }
   }
@@ -1997,17 +2082,17 @@ async function sucheProdukt(ean) {
 }
 
 async function barcodeGefunden(ean) {
-  const b = oeffneBlatt(`<div class="blatt-kopf"><h3>Barcode ${esc(ean)}</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
-    <p id="bcStatus"><span class="laedt"></span>Produkt wird gesucht</p><div id="bcForm"></div>`);
+  const b = oeffneBlatt(`<div class="blatt-kopf"><h3>${t`Barcode ${esc(ean)}`}</h3><button type="button" class="zurueck" data-schliessen>${t`Abbrechen`}</button></div>
+    <p id="bcStatus"><span class="laedt"></span>${t`Produkt wird gesucht`}</p><div id="bcForm"></div>`);
   let treffer = S.eans[ean] || null;
   if (!treffer) treffer = await sucheProdukt(ean);
   if (!b.isConnected) return;
-  $('#bcStatus', b).textContent = treffer ? (S.eans[ean] ? 'Schon einmal gescannt.' : 'Gefunden. Name bei Bedarf kürzen.')
-    : 'Nicht in der Produktdatenbank. Einmal benennen, dann merkt sich die App den Barcode.';
+  $('#bcStatus', b).textContent = treffer ? (S.eans[ean] ? t`Schon einmal gescannt.` : t`Gefunden. Name bei Bedarf kürzen.`)
+    : t`Nicht in der Produktdatenbank. Einmal benennen, dann merkt sich die App den Barcode.`;
   $('#bcForm', b).innerHTML = `
-    <label class="feld"><span>Name</span><input type="text" id="bcName" value="${esc(treffer ? treffer.name : '')}" placeholder="z. B. Alpro Haferdrink Barista 1 l"></label>
-    <label class="feld"><span>Abteilung</span><select id="bcAbt">${abteilungsOptionen(treffer ? treffer.abt : 'sonstiges')}</select></label>
-    <div class="knopfreihe"><button type="button" class="knopf" id="bcOk">Hinzufügen</button></div>`;
+    <label class="feld"><span>${t`Name`}</span><input type="text" id="bcName" value="${esc(treffer ? treffer.name : '')}" placeholder="${t`z. B. Alpro Haferdrink Barista 1 l`}"></label>
+    <label class="feld"><span>${t`Abteilung`}</span><select id="bcAbt">${abteilungsOptionen(treffer ? treffer.abt : 'sonstiges')}</select></label>
+    <div class="knopfreihe"><button type="button" class="knopf" id="bcOk">${t`Hinzufügen`}</button></div>`;
   const feld = $('#bcName', b);
   if (!treffer) feld.focus();
   feld.addEventListener('input', () => { if (!treffer) $('#bcAbt', b).value = klassifiziere(feld.value).abt; });
@@ -2036,17 +2121,37 @@ const EINHEITEN = ['g', 'gr', 'gramm', 'kg', 'mg', 'ml', 'cl', 'dl', 'l', 'liter
   'bund', 'zehe', 'zehen', 'scheibe', 'scheiben', 'becher', 'glas', 'gläser', 'tasse', 'tassen', 'handvoll', 'zweig', 'zweige', 'stange',
   'stangen', 'blatt', 'blätter', 'kopf', 'köpfe', 'knolle', 'knollen', 'schuss', 'spritzer', 'etwas', 'ca', 'circa', 'je', 'evtl', 'n.b.', 'nb',
   'große', 'großer', 'großes', 'groß', 'kleine', 'kleiner', 'kleines', 'klein', 'mittelgroße', 'mittelgroßer', 'mittelgroßes', 'reife', 'reifer',
-  'frische', 'frischer', 'frisches', 'frisch', 'getrocknete', 'getrockneter', 'getrocknetes', 'gehackte', 'gehackter', 'tl.', 'el.', 'cup', 'cups', 'tbsp', 'tsp', 'oz'];
-const EINHEIT_RE = new RegExp(`^(?:${EINHEITEN.map(e => e.replace('.', '\\.')).join('|')})\\.?(?=\\s|$)`, 'i');
+  'frische', 'frischer', 'frisches', 'frisch', 'getrocknete', 'getrockneter', 'getrocknetes', 'gehackte', 'gehackter', 'tl.', 'el.', 'cup', 'cups', 'tbsp', 'tsp', 'oz',
+  // Englisch
+  'grams', 'gram', 'kilos', 'litres', 'litre', 'liters', 'lb', 'lbs', 'pound', 'pounds', 'tablespoon', 'tablespoons', 'teaspoon', 'teaspoons',
+  'tbs', 'tbsps', 'tsps', 'clove', 'cloves', 'pinch', 'pinches', 'dash', 'can', 'cans', 'tin', 'tins', 'jar', 'jars', 'pack', 'packs', 'package',
+  'packet', 'bunch', 'bunches', 'slice', 'slices', 'handful', 'sprig', 'sprigs', 'stalk', 'stalks', 'head', 'heads', 'piece', 'pieces', 'pcs',
+  'large', 'small', 'medium', 'fresh', 'dried', 'chopped', 'ripe', 'about', 'approx', 'some',
+  // Französisch
+  'gramme', 'grammes', 'litres', 'cuillère', 'cuillères', 'cuillere', 'cuilleres', 'càs', 'càc', 'cas', 'cac', 'cs', 'cc',
+  'pincée', 'pincées', 'pincee', 'gousse', 'gousses', 'boîte', 'boîtes', 'boite', 'sachet', 'sachets', 'paquet', 'paquets', 'botte', 'bouquet',
+  'tranche', 'tranches', 'verre', 'verres', 'tasse', 'poignée', 'brin', 'brins', 'branche', 'branches', 'tête', 'pièce', 'pièces',
+  'gros', 'grosse', 'grosses', 'petit', 'petite', 'petits', 'petites', 'moyen', 'moyenne', 'moyens', 'frais', 'fraîche', 'fraîches', 'environ', 'quelques',
+  // Spanisch
+  'gramos', 'gramo', 'litros', 'litro', 'cucharada', 'cucharadas', 'cucharadita', 'cucharaditas', 'cda', 'cdas', 'cdta', 'cdtas', 'cdita', 'pizca',
+  'pizcas', 'diente', 'dientes', 'lata', 'latas', 'bote', 'botes', 'paquete', 'paquetes', 'sobre', 'sobres', 'manojo', 'rama', 'ramas',
+  'rodaja', 'rodajas', 'loncha', 'lonchas', 'taza', 'tazas', 'vaso', 'vasos', 'puñado', 'hoja', 'hojas', 'cabeza', 'pieza', 'piezas', 'unidad', 'unidades',
+  'grande', 'grandes', 'pequeño', 'pequeña', 'pequeños', 'pequeñas', 'mediano', 'mediana', 'medianos', 'medianas', 'fresco', 'fresca', 'frescos', 'frescas', 'aprox'];
+const EINHEIT_RE = new RegExp(`^(?:${EINHEITEN.map(e => e.replace('.', '\\.')).join('|')})\\.?(?=\\s|$)`, 'iu');
 
 // Menge am Zeilenanfang, soweit man sie so einkauft: g/kg/ml/l oder Stückzahl.
 // Küchenmaße (EL, TL, Zehe, Prise …) ergeben keine Menge.
 const REZEPT_GEWICHT = { g: ['g', 1], gr: ['g', 1], gramm: ['g', 1], kg: ['kg', 1], kilo: ['kg', 1],
-  ml: ['ml', 1], cl: ['ml', 10], dl: ['ml', 100], l: ['l', 1], liter: ['l', 1], ltr: ['l', 1] };
-const REZEPT_KUECHE = /^(el|tl|essl[öo]ffel|teel[öo]ffel|msp|messerspitzen?|prisen?|zehen?|scheiben?|tassen?|handvoll|zweige?|stiele?|bl[äa]tt(er)?|schuss|spritzer|etwas|cups?|tbsp|tsp|oz|mg)$/i;
+  ml: ['ml', 1], cl: ['ml', 10], dl: ['ml', 100], l: ['l', 1], liter: ['l', 1], ltr: ['l', 1],
+  gram: ['g', 1], grams: ['g', 1], gramme: ['g', 1], grammes: ['g', 1], gramo: ['g', 1], gramos: ['g', 1], kilos: ['kg', 1],
+  litre: ['l', 1], litres: ['l', 1], liters: ['l', 1], litro: ['l', 1], litros: ['l', 1], lb: ['g', 454], lbs: ['g', 454], pound: ['g', 454], pounds: ['g', 454] };
+const REZEPT_KUECHE = new RegExp('^(el|tl|essl[öo]ffel|teel[öo]ffel|msp|messerspitzen?|prisen?|zehen?|scheiben?|tassen?|handvoll|zweige?|stiele?|bl[äa]tt(er)?|schuss|spritzer|etwas|cups?|tbsp|tsp|oz|mg'
+  + '|tbsps?|tsps?|tbs|tablespoons?|teaspoons?|cloves?|pinch(es)?|dash|slices?|handful|sprigs?|stalks?'
+  + '|c|cs|cc|cas|cac|càs|càc|cuill[èe]res?|pinc[ée]es?|gousses?|tranches?|verres?|poign[ée]e|brins?|branches?'
+  + '|cucharadas?|cucharaditas?|cdas?|cdtas?|cditas?|pizcas?|dientes?|rodajas?|lonchas?|ramas?|vasos?|puñados?|hojas?)$', 'iu');
 const BRUECHE = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3, '⅛': 0.125 };
 function rezeptMenge(zeile) {
-  const m = zeile.match(/^(?:ca\.?\s*)?(\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛])(?:\s*[-–]\s*(\d+(?:[.,]\d+)?))?\s*([a-zäöüß]+)?/i);
+  const m = zeile.match(/^(?:ca\.?\s*)?(\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛])(?:\s*[-–]\s*(\d+(?:[.,]\d+)?))?\s*([a-zäöüßàâçéèêëîïôûùÿñáíóú]+)?/i);
   if (!m) return null;
   const n = BRUECHE[m[2] || m[1]] ?? parseFloat((m[2] || m[1]).replace(',', '.'));
   const wort = (m[3] || '').toLowerCase();
@@ -2061,9 +2166,9 @@ function rezeptMenge(zeile) {
 function rezeptTeile(text) {
   let t = String(text).replace(/\r/g, '');
   // Alles ab „Zubereitung:“ ist Anleitung – aber nur, wenn davor schon Zutaten stehen (nicht „Zubereitung: 20 Min“ oben im Rezept)
-  const anleitung = t.search(/(?:^|\s)(?:zubereitung|anleitung|so geht'?s)\b\s*:?/i);
+  const anleitung = t.search(/(?:^|\s)(?:zubereitung|anleitung|so geht'?s|instructions|directions|method|preparation|préparation|étapes|preparación|elaboración|instrucciones|pasos)(?=[\s:]|$)\s*:?/i);
   if (anleitung > 0 && /\d/.test(t.slice(0, anleitung))) t = t.slice(0, anleitung);
-  t = t.replace(/\([^)]*\)/g, ' ').replace(/\b(?:für|for)\s+\d+\s*(?:personen|portionen|stück|stk)\b/gi, ' ');
+  t = t.replace(/\([^)]*\)/g, ' ').replace(/(?:^|\s)(?:für|for|pour|para)\s+\d+\s*(?:personen|portionen|stück|stk|people|persons|servings|portions|personnes|parts|personas|raciones|porciones)(?=[\s.,;:]|$)/gi, ' ');
   const zeilen = t.split('\n').filter(z => z.trim());
   const einzeilig = zeilen.length === 1;
   return {
@@ -2090,23 +2195,28 @@ function parseRezept(text) {
   for (let z of teile) {
     z = z.replace(/^[\s•·\-–—*▢□☐◦○●✓✔]+/, '').replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
     if (!z || z.endsWith(':') || z.length > 70) continue;
-    if (/^(zutaten|zubereitung|anleitung|schritt|portion|für \d|personen|nährwerte|tipp|dazu|außerdem)/i.test(z)) continue;
+    if (/^(zutaten|zubereitung|anleitung|schritt|portion|für \d|personen|nährwerte|tipp|dazu|außerdem|ingredients|instructions|directions|method|step|serves|servings|for \d|nutrition|tips?\b|ingrédients|préparation|étape|pour \d|ingredientes|preparación|elaboración|paso|para \d|raciones)/i.test(z)) continue;
     // Zubereitungshinweis ohne Zutat, z. B. der Rest von „Knoblauch, fein gehackt“ im Fließtext
-    if (/^(fein|grob|frisch|klein|gehackt|gerieben|gewürfelt|geschnitten|geschält|gepresst|zerdrückt|halbiert|geviertelt|zimmerwarm|in (scheiben|würfel|streifen|ringe))\b/i.test(z)) continue;
+    if (/^(fein|grob|frisch|klein|gehackt|gerieben|gewürfelt|geschnitten|geschält|gepresst|zerdrückt|halbiert|geviertelt|zimmerwarm|in (scheiben|würfel|streifen|ringe)|finely|roughly|chopped|minced|diced|sliced|grated|peeled|crushed|halved|finement|haché|hachée|hachés|émincé|émincée|coupé|coupée|râpé|râpée|pelé|pelée|picado|picada|picados|picadas|rallado|rallada|pelado|pelada|cortado|cortada|troceado|en (dados|rodajas|tiras|cubes|rondelles|lamelles))(?![\p{L}])/iu.test(z)) continue;
     const mg = rezeptMenge(z);
     z = z.split(/(?<!\d),|,(?!\d)/)[0];
     z = z.replace(/\s+((fein|grob|frisch)\s+)?(gehackt|gerieben|gewürfelt|geschnitten|geschält|gepresst|zerdrückt|halbiert)\b.*$/i, '');
+    z = z.replace(/\s+((finely|roughly|freshly)\s+)?(chopped|minced|diced|sliced|grated|peeled|crushed|halved)(?![\p{L}]).*$/iu, '');
+    z = z.replace(/\s+(finement\s+)?(hach[ée]e?s?|émincée?s?|coupée?s?|râpée?s?|pelée?s?|écrasée?s?)(?![\p{L}]).*$/iu, '');
+    z = z.replace(/\s+(finamente\s+)?(picad[oa]s?|rallad[oa]s?|pelad[oa]s?|cortad[oa]s?|trocead[oa]s?)(?![\p{L}]).*$/iu, '');
     z = z.replace(/\b(nach (belieben|geschmack|bedarf)|zum (garnieren|bestreuen|servieren|braten|anbraten)|optional|zum Abschmecken|für die Form)\b.*$/i, '').trim();
+    z = z.replace(/(?:^|\s)(to taste|as needed|for garnish|for serving|optional|au goût|selon (le|votre) goût|pour (la )?garniture|facultatif|al gusto|opcional|para decorar|para servir)(?![\p{L}]).*$/iu, '').trim();
     for (let i = 0; i < 6; i++) {
       const vorher = z;
       z = z.replace(/^(ca\.?\s*)?[\d½¼¾⅓⅔⅛.,/\s-]+(?=\D)/, '').trim();
+      z = z.replace(/^(?:cuill[èe]res?|c\.?)\s*[àa]\s*(?:soupe|caf[ée]|s\.|c\.)(?=\s|$)/iu, '').trim();   // „c. à soupe“
       z = z.replace(EINHEIT_RE, '').trim();
-      z = z.replace(/^(à|a|von|vom|der|die|das)\s+/i, '').trim();
+      z = z.replace(/^(à|a|von|vom|der|die|das|of|de la|de|du|des|del|en)\s+/i, '').replace(/^d['’]\s*/i, '').trim();
       if (z === vorher) break;
     }
     if (!z || /^\d/.test(z) || z.length < 2) continue;
-    if (/^(min(uten|\.)?|std\.?|stunden?|kcal|kj|grad|°)(\s|$)/i.test(z)) continue;
-    const namen = z.split(/\s+(?:und|oder|&)\s+|\s*\/\s*/).map(t => t.trim()).filter(t => t.length >= 2)
+    if (/^(min(uten|utes|utos|\.)?|std\.?|stunden?|hours?|heures?|horas?|kcal|kj|grad|degrees|°)(\s|$)/i.test(z)) continue;
+    const namen = z.split(/\s+(?:und|oder|and|or|et|ou|y|o|&)\s+|\s*\/\s*/).map(t => t.trim()).filter(t => t.length >= 2)
       .flatMap(n => einzeilig ? trenneBekannte(n) : [n]);
     for (const name of namen) {
       const mit = namen.length === 1 && mg;
@@ -2119,7 +2229,7 @@ function parseRezept(text) {
 // Rezeptzeile → Artikel mit Hauptnamen aus dem Katalog („Knoblauchzehen“ → „Knoblauch“)
 function rezeptArtikel(namen) {
   const offenKeys = new Set(offene().map(i => kompakt(i.name)));
-  const vorrat = new Set(VORRAT.map(kompakt));
+  const vorrat = new Set([...VORRAT, ...Object.values(SPRACHPAKETE).flatMap(x => x.vorrat || [])].map(kompakt));
   const gesehen = new Set();
   const aus = [];
   for (const roh of namen) {
@@ -2131,7 +2241,7 @@ function rezeptArtikel(namen) {
     if (!key || gesehen.has(key)) continue;
     gesehen.add(key);
     const abt = roh.abteilung && ABT_IDS.includes(roh.abteilung) && !S.korrekturen[key] ? roh.abteilung : klassifiziere(name).abt;
-    const grund = offenKeys.has(key) ? 'auf der Liste' : vorrat.has(key) ? 'Vorrat' : '';
+    const grund = offenKeys.has(key) ? t`auf der Liste` : vorrat.has(key) ? t`Vorrat` : '';
     const menge = roh.menge > 0 ? roh.menge : null;
     aus.push({ name, abt, an: !grund, grund, menge, einheit: menge ? (EINHEITEN_MENGE.includes(roh.einheit) ? roh.einheit : 'stk') : null });
   }
@@ -2141,14 +2251,14 @@ function rezeptArtikel(namen) {
 function oeffneRezept() {
   const mitKey = !!S.einstellungen.apiKey;
   const b = oeffneBlatt(`
-    <div class="blatt-kopf"><h3>Rezept übernehmen</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
-    ${S.rezepte.length ? `<div class="feld"><span>Gespeicherte Rezepte</span><div class="chips">${S.rezepte.map(x =>
+    <div class="blatt-kopf"><h3>${t`Rezept übernehmen`}</h3><button type="button" class="zurueck" data-schliessen>${t`Abbrechen`}</button></div>
+    ${S.rezepte.length ? `<div class="feld"><span>${t`Gespeicherte Rezepte`}</span><div class="chips">${S.rezepte.map(x =>
       `<button type="button" class="chip" data-rezept-abruf="${x.id}">#${esc(x.name)}</button>`).join('')}</div></div>` : ''}
-    <p class="text-muted">Im Foto oder Screenshot die Zutaten markieren (Text gedrückt halten), kopieren und hier einfügen.</p>
-    <label class="feld"><span>Zutaten</span><textarea id="rText" placeholder="200 g Spaghetti&#10;2 Zehen Knoblauch&#10;1 Bund Basilikum"></textarea></label>
+    <p class="text-muted">${t`Im Foto oder Screenshot die Zutaten markieren (Text gedrückt halten), kopieren und hier einfügen.`}</p>
+    <label class="feld"><span>${t`Zutaten`}</span><textarea id="rText" placeholder="${t`200 g Spaghetti&#10;2 Zehen Knoblauch&#10;1 Bund Basilikum`}"></textarea></label>
     <div class="knopfreihe">
-      <button type="button" class="knopf" id="rWeiter">Zutaten übernehmen</button>
-      <button type="button" class="knopf zweit" id="rFoto">${mitKey ? 'Foto wählen und erkennen lassen' : 'Foto erkennen lassen (API-Schlüssel nötig)'}</button>
+      <button type="button" class="knopf" id="rWeiter">${t`Zutaten übernehmen`}</button>
+      <button type="button" class="knopf zweit" id="rFoto">${mitKey ? t`Foto wählen und erkennen lassen` : t`Foto erkennen lassen (API-Schlüssel nötig)`}</button>
     </div>
     <input type="file" id="rDatei" accept="image/*" hidden>
     <p class="text-muted" id="rStatus"></p>`);
@@ -2159,7 +2269,7 @@ function oeffneRezept() {
   });
   $('#rWeiter', b).onclick = () => {
     const namen = parseRezept($('#rText', b).value);
-    if (!namen.length) return zeigeToast('Keine Zutaten erkannt');
+    if (!namen.length) return zeigeToast(t`Keine Zutaten erkannt`);
     schliesseBlatt(b);
     setTimeout(() => oeffnePruefung(rezeptArtikel(namen)), 220);
   };
@@ -2171,16 +2281,16 @@ function oeffneRezept() {
     const datei = e.target.files[0];
     if (!datei) return;
     const status = $('#rStatus', b);
-    status.innerHTML = '<span class="laedt"></span>Foto wird ausgewertet';
+    status.innerHTML = '<span class="laedt"></span>' + t`Foto wird ausgewertet`;
     $$('button', b).forEach(x => x.disabled = true);
     try {
       const zutaten = await zutatenAusFoto(datei);
       if (!b.isConnected) return;
-      if (!zutaten.length) throw new Error('Auf dem Foto wurden keine Zutaten gefunden.');
+      if (!zutaten.length) throw new Error(t`Auf dem Foto wurden keine Zutaten gefunden.`);
       schliesseBlatt(b);
       setTimeout(() => oeffnePruefung(rezeptArtikel(zutaten)), 220);
     } catch (err) {
-      status.textContent = err.message || 'Fehler bei der Erkennung.';
+      status.textContent = err.message || t`Fehler bei der Erkennung.`;
       $$('button', b).forEach(x => x.disabled = false);
     }
   };
@@ -2200,26 +2310,26 @@ function pruefAendern(a, text) {
   return true;
 }
 
-function oeffnePruefung(artikel, { titel = 'Was brauchst du?', speichern = true } = {}) {
+function oeffnePruefung(artikel, { titel = t`Was brauchst du?`, speichern = true } = {}) {
   const b = oeffneBlatt(`
-    <div class="blatt-kopf"><h3>${esc(titel)}</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
-    <p class="text-muted">Abwählen, was noch im Vorrat ist. Name, Menge und Abteilung lassen sich antippen und ändern.</p>
+    <div class="blatt-kopf"><h3>${esc(titel)}</h3><button type="button" class="zurueck" data-schliessen>${t`Abbrechen`}</button></div>
+    <p class="text-muted">${t`Abwählen, was noch im Vorrat ist. Name, Menge und Abteilung lassen sich antippen und ändern.`}</p>
     <ul class="liste-einst pruef">${artikel.map((a, i) => `<li class="${a.an ? '' : 'aus'}">
-      <label class="pruef-haken"><input type="checkbox" data-i="${i}" aria-label="Übernehmen"${a.an ? ' checked' : ''}></label>
+      <label class="pruef-haken"><input type="checkbox" data-i="${i}" aria-label="${t`Übernehmen`}"${a.an ? ' checked' : ''}></label>
       <div class="pruef-text">
-        <input type="text" class="pruef-name" data-name="${i}" value="${esc(pruefText(a))}" aria-label="Name und Menge" autocapitalize="sentences" autocorrect="off" spellcheck="false" enterkeyhint="done">
-        <span class="pruef-abt"><span>${esc(ABT_NAME[a.abt])}</span><select data-abt="${i}" aria-label="Abteilung">${abteilungsOptionen(a.abt)}</select></span>
+        <input type="text" class="pruef-name" data-name="${i}" value="${esc(pruefText(a))}" aria-label="${t`Name und Menge`}" autocapitalize="sentences" autocorrect="off" spellcheck="false" enterkeyhint="done">
+        <span class="pruef-abt"><span>${esc(ABT_NAME[a.abt])}</span><select data-abt="${i}" aria-label="${t`Abteilung`}">${abteilungsOptionen(a.abt)}</select></span>
       </div>
       ${a.grund ? `<span class="marke">${esc(a.grund)}</span>` : ''}</li>`).join('')}</ul>
-    ${speichern ? `<label class="feld"><span>Als Rezept speichern (optional, alle Zutaten)</span>
-      <input type="text" id="pRezept" placeholder="Name, z. B. Chili sin Carne" autocapitalize="sentences" autocorrect="off" enterkeyhint="done"></label>` : ''}
+    ${speichern ? `<label class="feld"><span>${t`Als Rezept speichern (optional, alle Zutaten)`}</span>
+      <input type="text" id="pRezept" placeholder="${t`Name, z. B. Chili sin Carne`}" autocapitalize="sentences" autocorrect="off" enterkeyhint="done"></label>` : ''}
     <div class="knopfreihe"><button type="button" class="knopf" id="pOk"></button></div>`);
   const rezeptName = () => speichern ? $('#pRezept', b).value.trim().replace(/^#+\s*/, '') : '';
   const zaehle = () => {
     const n = $$('input[data-i]:checked', b).length;
     const k = $('#pOk', b);
-    const anzahl = n === 1 ? '1 Artikel hinzufügen' : `${n} Artikel hinzufügen`;
-    k.textContent = rezeptName() ? (n ? `${anzahl} und Rezept speichern` : 'Nur Rezept speichern') : anzahl;
+    const anzahl = n === 1 ? t`1 Artikel hinzufügen` : t`${n} Artikel hinzufügen`;
+    k.textContent = rezeptName() ? (n ? t`${anzahl} und Rezept speichern` : t`Nur Rezept speichern`) : anzahl;
     k.disabled = !n && !rezeptName();
   };
   zaehle();
@@ -2254,7 +2364,7 @@ function oeffnePruefung(artikel, { titel = 'Was brauchst du?', speichern = true 
     sichereListe(); sichereVerlauf();
     schliesseBlatt(b); render();
     if (letztes) blitze(letztes.id);
-    if (name) zeigeToast(`Rezept gespeichert, abrufen mit #${name}`);
+    if (name) zeigeToast(t`Rezept gespeichert, abrufen mit #${name}`);
   };
 }
 
@@ -2265,11 +2375,11 @@ function oeffnePruefung(artikel, { titel = 'Was brauchst du?', speichern = true 
 function rezeptSpeichern(name, artikel, ersetzt = null) {
   const key = kompakt(name);
   const vorhanden = S.rezepte.find(x => kompakt(x.name) === key && x !== ersetzt);
-  if (vorhanden && !confirm(`Es gibt schon ein Rezept „#${vorhanden.name}“. Ersetzen?`)) return false;
+  if (vorhanden && !confirm(t`Es gibt schon ein Rezept „#${vorhanden.name}“. Ersetzen?`)) return false;
   S.rezepte = S.rezepte.filter(x => x !== vorhanden);
   S.rezepte.push({ id: uid(), name, zutaten: artikel.map(a => ({
     name: a.name, menge: a.menge || null, einheit: a.menge ? (a.einheit || 'stk') : null, abteilung: a.abt || a.abteilung })) });
-  S.rezepte.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  S.rezepte.sort((a, b) => a.name.localeCompare(b.name, SPRACHE));
   sichereRezepte();
   return true;
 }
@@ -2303,16 +2413,16 @@ function oeffneRezeptBearbeiten(rz, nachher) {
   const b = oeffneBlatt('<div id="rez"></div>', { voll: true });
   const zeichne = () => {
     $('#rez', b).innerHTML = `
-      <div class="blatt-kopf"><button type="button" class="zurueck" data-schliessen>Zurück</button><h3></h3></div>
-      <label class="feld"><span>Name (abrufen mit #Name)</span><input type="text" id="rzName" value="${esc(rz.name)}" autocapitalize="sentences" autocorrect="off"></label>
-      <div class="abschnitt">Zutaten</div>
+      <div class="blatt-kopf"><button type="button" class="zurueck" data-schliessen>${t`Zurück`}</button><h3></h3></div>
+      <label class="feld"><span>${t`Name (abrufen mit #Name)`}</span><input type="text" id="rzName" value="${esc(rz.name)}" autocapitalize="sentences" autocorrect="off"></label>
+      <div class="abschnitt">${t`Zutaten`}</div>
       <ul class="liste-einst">${rz.zutaten.map((z, i) => `<li><span style="flex:1">${esc(artikelText(z))}
         <span class="text-muted" style="display:block;font-size:13px">${esc(ABT_NAME[z.abteilung] || '')}</span></span>
-        <button type="button" class="zurueck" data-zutat-weg="${i}" style="color:var(--danger)">Entfernen</button></li>`).join('')}</ul>
-      <form class="eingabe" id="rzNeu" style="margin-top:10px"><input id="rzNeuName" type="text" placeholder="Zutat, z. B. 500 g Hackfleisch" autocapitalize="sentences" autocorrect="off" enterkeyhint="done"></form>
+        <button type="button" class="zurueck" data-zutat-weg="${i}" style="color:var(--danger)">${t`Entfernen`}</button></li>`).join('')}</ul>
+      <form class="eingabe" id="rzNeu" style="margin-top:10px"><input id="rzNeuName" type="text" placeholder="${t`Zutat, z. B. 500 g Hackfleisch`}" autocapitalize="sentences" autocorrect="off" enterkeyhint="done"></form>
       <div class="knopfreihe">
-        <button type="button" class="knopf" id="rzListe"${rz.zutaten.length ? '' : ' disabled'}>Auf die Liste</button>
-        <button type="button" class="knopf gefahr" id="rzLoeschen">Rezept löschen</button>
+        <button type="button" class="knopf" id="rzListe"${rz.zutaten.length ? '' : ' disabled'}>${t`Auf die Liste`}</button>
+        <button type="button" class="knopf gefahr" id="rzLoeschen">${t`Rezept löschen`}</button>
       </div>`;
   };
   zeichne();
@@ -2320,8 +2430,8 @@ function oeffneRezeptBearbeiten(rz, nachher) {
     if (e.target.id !== 'rzName') return;
     const name = e.target.value.trim().replace(/^#+\s*/, '');
     const doppelt = S.rezepte.find(x => x !== rz && kompakt(x.name) === kompakt(name));
-    if (!name || doppelt) { zeigeToast(doppelt ? `„#${doppelt.name}“ gibt es schon` : 'Name fehlt'); e.target.value = rz.name; return; }
-    rz.name = name; S.rezepte.sort((a, c) => a.name.localeCompare(c.name, 'de')); sichereRezepte();
+    if (!name || doppelt) { zeigeToast(doppelt ? t`„#${doppelt.name}“ gibt es schon` : t`Name fehlt`); e.target.value = rz.name; return; }
+    rz.name = name; S.rezepte.sort((a, c) => a.name.localeCompare(c.name, SPRACHE)); sichereRezepte();
   });
   b.addEventListener('submit', e => {
     if (e.target.id !== 'rzNeu') return;
@@ -2337,7 +2447,7 @@ function oeffneRezeptBearbeiten(rz, nachher) {
     const weg = e.target.closest('[data-zutat-weg]');
     if (weg) { rz.zutaten.splice(+weg.dataset.zutatWeg, 1); sichereRezepte(); zeichne(); return; }
     if (e.target.closest('#rzListe')) { schliesseBlatt(b); setTimeout(() => rezepteAbrufen([rz]), 220); return; }
-    if (e.target.closest('#rzLoeschen') && confirm(`Rezept „#${rz.name}“ löschen?`)) {
+    if (e.target.closest('#rzLoeschen') && confirm(t`Rezept „#${rz.name}“ löschen?`)) {
       S.rezepte = S.rezepte.filter(x => x !== rz); sichereRezepte(); schliesseBlatt(b);
     }
   });
@@ -2358,7 +2468,7 @@ async function bildAlsJPEG(datei, maxKante = 1568) {
 
 async function zutatenAusFoto(datei) {
   const daten = await bildAlsJPEG(datei);
-  const abteilungen = ABTEILUNGEN.map(a => `${a.id} = ${a.name}`).join('\n');
+  const abteilungen = ABT_IDS.map(a => `${a} = ${ABT_NAME[a]}`).join('\n');
   const antwort = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -2404,7 +2514,7 @@ async function zutatenAusFoto(datei) {
         content: [
           { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: daten } },
           { type: 'text', text:
-`Das Bild zeigt ein Rezept (Foto oder Screenshot). Liste alle Zutaten als Einkaufsartikel auf Deutsch auf.
+`Das Bild zeigt ein Rezept (Foto oder Screenshot). Liste alle Zutaten als Einkaufsartikel auf. Schreibe die Artikelnamen auf ${{ de: 'Deutsch', en: 'Englisch', fr: 'Französisch', es: 'Spanisch' }[SPRACHE]}, auch wenn das Rezept in einer anderen Sprache ist.
 - Nur den Artikelnamen, so wie man ihn auf einen Einkaufszettel schreibt: "Zwiebeln" statt "2 Zwiebeln, fein gewürfelt", "Knoblauch" statt "3 Zehen Knoblauch".
 - Keine Zubereitungshinweise im Namen. Doppelte Zutaten nur einmal.
 - menge und einheit nur, wenn man die Zutat so einkauft: Gramm (g), Kilogramm (kg), Milliliter (ml), Liter (l) oder Stückzahl (stk, auch für Dose, Packung, Bund, Becher). Bei Küchenmaßen wie EL, TL, Prise, Zehe oder ohne Angabe: menge 0 und einheit "stk".
@@ -2419,12 +2529,12 @@ Enthält das Bild kein Rezept, gib eine leere Liste zurück.` },
   try { d = await antwort.json(); } catch (e) {}
   if (!antwort.ok) {
     const meldung = d && d.error && d.error.message;
-    if (antwort.status === 401) throw new Error('API-Schlüssel ungültig. Bitte in den Einstellungen prüfen.');
-    if (antwort.status === 429 || antwort.status === 529) throw new Error('Claude ist gerade ausgelastet. Bitte gleich noch einmal versuchen.');
-    throw new Error(`Fehler ${antwort.status}${meldung ? ': ' + meldung : ''}`);
+    if (antwort.status === 401) throw new Error(t`API-Schlüssel ungültig. Bitte in den Einstellungen prüfen.`);
+    if (antwort.status === 429 || antwort.status === 529) throw new Error(t`Claude ist gerade ausgelastet. Bitte gleich noch einmal versuchen.`);
+    throw new Error(t`Fehler ${antwort.status}` + (meldung ? ': ' + meldung : ''));
   }
-  if (d.stop_reason === 'refusal') throw new Error('Die Anfrage wurde abgelehnt. Bitte den Text einfügen.');
-  if (d.stop_reason === 'max_tokens') throw new Error('Die Antwort war zu lang. Bitte einen kleineren Ausschnitt fotografieren.');
+  if (d.stop_reason === 'refusal') throw new Error(t`Die Anfrage wurde abgelehnt. Bitte den Text einfügen.`);
+  if (d.stop_reason === 'max_tokens') throw new Error(t`Die Antwort war zu lang. Bitte einen kleineren Ausschnitt fotografieren.`);
   const text = (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
   const json = JSON.parse(text);
   return (json.zutaten || []).filter(z => z && z.name);
@@ -2479,12 +2589,12 @@ function artikelText(i) {
 
 async function teileListe() {
   const snap = snapshot();
-  if (!snap.a.length) return zeigeToast('Keine offenen Artikel zum Teilen');
+  if (!snap.a.length) return zeigeToast(t`Keine offenen Artikel zum Teilen`);
   const items = snap.a.map(ausZeile);
-  const text = `Einkaufsliste (${items.length} Artikel)\n\n`
+  const text = t`Einkaufsliste (${items.length} Artikel)` + '\n\n'
     + nachAbteilung(items).map(([abt, l]) => `${ABT_NAME[abt]}\n${l.map(i => '- ' + artikelText(i)).join('\n')}`).join('\n\n')
-    + `\n\nZum Abhaken öffnen:\n${appAdresse()}#l=${await kodiere(snap)}`;
-  teile(text, 'Liste teilen');
+    + '\n\n' + t`Zum Abhaken öffnen:` + `\n${appAdresse()}#l=${await kodiere(snap)}`;
+  teile(text, t`Liste teilen`);
 }
 
 async function teile(text, titel) {
@@ -2493,17 +2603,17 @@ async function teile(text, titel) {
     catch (e) { if (e.name === 'AbortError') return; }
   }
   // Safari verlangt fürs Teilen ein frisches Antippen; dann über ein Blatt mit eigenem Knopf
-  const b = oeffneBlatt(`<div class="blatt-kopf"><h3>${esc(titel)}</h3><button type="button" class="zurueck" data-schliessen>Fertig</button></div>
+  const b = oeffneBlatt(`<div class="blatt-kopf"><h3>${esc(titel)}</h3><button type="button" class="zurueck" data-schliessen>${t`Fertig`}</button></div>
     <textarea class="teilen-text" readonly>${esc(text)}</textarea>
     <div class="knopfreihe">
-      ${navigator.share ? '<button type="button" class="knopf" id="tTeilen">Teilen</button>' : ''}
-      <button type="button" class="knopf zweit" id="tKopieren">Kopieren</button>
+      ${navigator.share ? `<button type="button" class="knopf" id="tTeilen">${t`Teilen`}</button>` : ''}
+      <button type="button" class="knopf zweit" id="tKopieren">${t`Kopieren`}</button>
     </div>`);
   b.addEventListener('click', async e => {
     if (e.target.closest('#tTeilen')) { try { await navigator.share({ text }); schliesseBlatt(b); } catch (x) {} }
     if (e.target.closest('#tKopieren')) {
       try { await navigator.clipboard.writeText(text); } catch (x) { $('.teilen-text', b).select(); document.execCommand('copy'); }
-      schliesseBlatt(b); zeigeToast('Kopiert, jetzt in eine Nachricht einfügen');
+      schliesseBlatt(b); zeigeToast(t`Kopiert, jetzt in eine Nachricht einfügen`);
     }
   });
 }
@@ -2517,17 +2627,17 @@ function linkAusAdresse() {
 
 async function verarbeiteLink(link) {
   let daten;
-  try { daten = await dekodiere(link.daten); } catch (e) { return zeigeToast('Der Link ist unvollständig oder beschädigt'); }
-  if (!daten || daten.v !== 1) return zeigeToast('Der Link stammt aus einer neueren Version der App');
+  try { daten = await dekodiere(link.daten); } catch (e) { return zeigeToast(t`Der Link ist unvollständig oder beschädigt`); }
+  if (!daten || daten.v !== 1) return zeigeToast(t`Der Link stammt aus einer neueren Version der App`);
   if (link.art === 'l') oeffneGeteilt(daten);
   else oeffneRueckmeldung(daten);
 }
 
 function oeffneGeteilt(snap) {
-  if (!Array.isArray(snap.a)) return zeigeToast('Der Link ist unvollständig oder beschädigt');
+  if (!Array.isArray(snap.a)) return zeigeToast(t`Der Link ist unvollständig oder beschädigt`);
   if (S.geteilt && S.geteilt.id === snap.id) return render();  // derselbe Link noch einmal: Häkchen bleiben
   if (S.geteilt && S.geteilt.artikel.some(i => i.erledigt)
-    && !confirm('Es ist schon eine geteilte Liste mit abgehakten Artikeln offen. Durch die neue ersetzen?')) return;
+    && !confirm(t`Es ist schon eine geteilte Liste mit abgehakten Artikeln offen. Durch die neue ersetzen?`)) return;
   S.geteilt = { id: String(snap.id), t: snap.t, artikel: snap.a.map(ausZeile) };
   sichere('geteilt', S.geteilt);
   render();
@@ -2536,12 +2646,12 @@ function oeffneGeteilt(snap) {
 
 function renderGeteilt() {
   const g = S.geteilt, n = g.artikel.length, erledigt = g.artikel.filter(i => i.erledigt).length;
-  const datum = g.t ? ` · geteilt am ${new Date(g.t).toLocaleDateString('de-DE', { day: 'numeric', month: 'numeric', year: 'numeric' })}` : '';
-  $('#geteiltInfo').textContent = `${n} Artikel${datum}`;
+  const datum = g.t ? ' · ' + t`geteilt am ${new Date(g.t).toLocaleDateString(gebietsschema(), { day: 'numeric', month: 'numeric', year: 'numeric' })}` : '';
+  $('#geteiltInfo').textContent = t`${n} Artikel` + datum;
   $('#main').innerHTML = nachAbteilung(g.artikel).map(([abt, items]) => gruppeHTML(abt, items)).join('')
-    || '<div class="leer">Die geteilte Liste ist leer.</div>';
+    || `<div class="leer">${t`Die geteilte Liste ist leer.`}</div>`;
   $('#abschluss').hidden = !n;
-  $('#btnAbschluss').textContent = `Erledigt zurückschicken · ${erledigt} von ${n}`;
+  $('#btnAbschluss').textContent = t`Erledigt zurückschicken · ${erledigt} von ${n}`;
 }
 
 function geteiltAbhaken(item) {
@@ -2552,7 +2662,7 @@ function geteiltAbhaken(item) {
 }
 
 function geteiltSchliessen() {
-  if (!confirm('Geteilte Liste schließen? Die Häkchen gehen verloren. Schicke vorher die Rückmeldung, falls noch nicht geschehen.')) return;
+  if (!confirm(t`Geteilte Liste schließen? Die Häkchen gehen verloren. Schicke vorher die Rückmeldung, falls noch nicht geschehen.`)) return;
   S.geteilt = null;
   sichere('geteilt', null);
   render();
@@ -2562,10 +2672,10 @@ async function rueckmeldungSchicken() {
   const g = S.geteilt;
   const gekauft = g.artikel.filter(i => i.erledigt), fehlt = g.artikel.filter(i => !i.erledigt);
   const r = { v: 1, id: g.id, g: gekauft.map(i => i.id), n: fehlt.map(i => i.id) };
-  const text = `Einkauf erledigt: ${gekauft.length} von ${g.artikel.length} Artikeln\n`
-    + (fehlt.length ? `\nNicht bekommen:\n${fehlt.map(i => '- ' + artikelText(i)).join('\n')}\n` : '')
-    + `\nIn die Liste übernehmen:\n${appAdresse()}#r=${await kodiere(r)}`;
-  teile(text, 'Rückmeldung schicken');
+  const text = t`Einkauf erledigt: ${gekauft.length} von ${g.artikel.length} Artikeln` + '\n'
+    + (fehlt.length ? '\n' + t`Nicht bekommen:` + `\n${fehlt.map(i => '- ' + artikelText(i)).join('\n')}\n` : '')
+    + '\n' + t`In die Liste übernehmen:` + `\n${appAdresse()}#r=${await kodiere(r)}`;
+  teile(text, t`Rückmeldung schicken`);
 }
 
 function rueckmeldungAuswerten(r) {
@@ -2584,18 +2694,18 @@ function oeffneRueckmeldung(r) {
   const { gekauft, fehlt, offen, unbekannt } = rueckmeldungAuswerten(r);
   const homescreen = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
   const namen = l => l.map(i => esc(i.name)).join(', ');
-  const b = oeffneBlatt(`<div class="blatt-kopf"><h3>Rückmeldung</h3><button type="button" class="zurueck" data-schliessen>Abbrechen</button></div>
-    <p>${(r.g || []).length} gekauft, ${(r.n || []).length} nicht bekommen.</p>
-    ${gekauft.length ? `<div class="abschnitt">Gekauft</div><p>${namen(gekauft)}</p>` : ''}
-    ${fehlt.length ? `<div class="abschnitt">Nicht bekommen (bleibt offen)</div><p>${namen(fehlt)}</p>` : ''}
-    ${unbekannt ? `<p class="text-muted">${unbekannt} Artikel ${unbekannt === 1 ? 'steht' : 'stehen'} nicht mehr auf dieser Liste.</p>` : ''}
-    ${homescreen ? '' : '<p class="text-muted">Nutzt du die App vom Home-Bildschirm? Dann kopiere den Link aus der Nachricht und füge ihn dort ins Eingabefeld ein. Safari und die App haben getrennte Listen.</p>'}
-    <div class="knopfreihe"><button type="button" class="knopf" id="rmOk"${offen.length ? '' : ' disabled'}>${offen.length ? `${offen.length} als gekauft abhaken` : 'Nichts abzuhaken'}</button></div>`);
+  const b = oeffneBlatt(`<div class="blatt-kopf"><h3>${t`Rückmeldung`}</h3><button type="button" class="zurueck" data-schliessen>${t`Abbrechen`}</button></div>
+    <p>${t`${(r.g || []).length} gekauft, ${(r.n || []).length} nicht bekommen.`}</p>
+    ${gekauft.length ? `<div class="abschnitt">${t`Gekauft`}</div><p>${namen(gekauft)}</p>` : ''}
+    ${fehlt.length ? `<div class="abschnitt">${t`Nicht bekommen (bleibt offen)`}</div><p>${namen(fehlt)}</p>` : ''}
+    ${unbekannt ? `<p class="text-muted">${unbekannt === 1 ? t`1 Artikel steht nicht mehr auf dieser Liste.` : t`${unbekannt} Artikel stehen nicht mehr auf dieser Liste.`}</p>` : ''}
+    ${homescreen ? '' : `<p class="text-muted">${t`Nutzt du die App vom Home-Bildschirm? Dann kopiere den Link aus der Nachricht und füge ihn dort ins Eingabefeld ein. Safari und die App haben getrennte Listen.`}</p>`}
+    <div class="knopfreihe"><button type="button" class="knopf" id="rmOk"${offen.length ? '' : ' disabled'}>${offen.length ? t`${offen.length} als gekauft abhaken` : t`Nichts abzuhaken`}</button></div>`);
   b.addEventListener('click', e => {
     if (!e.target.closest('#rmOk')) return;
     rueckmeldungAnwenden(offen);
     schliesseBlatt(b);
-    zeigeToast(`${offen.length} abgehakt`, 'Rückgängig', () => {
+    zeigeToast(t`${offen.length} abgehakt`, t`Rückgängig`, () => {
       for (const i of offen) { i.erledigt = false; i.erledigtUm = null; }
       sichereListe(); render();
     });
@@ -2846,6 +2956,78 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
   pruefe('Chips immer: nie in der Laden-Ansicht', chipsZustand(false), { zeigen: false, griff: null });
   S.einstellungen = standardEinstellungen(); S.liste = []; render();
 
+  // Sprachen: Übersetzungen vollständig, Platzhalter passen
+  const html = await (await fetch('index.html', { cache: 'no-store' })).text();
+  const quelle = html.slice(0, html.indexOf('async function selbsttest'));   // ohne diesen Test, der die Suchmuster selbst enthält
+  const schluessel = new Set();
+  for (let i = quelle.search(/(?<![\w$.])t`/); i >= 0; ) {
+    let j = i + 2, key = '', n = 0;
+    while (j < quelle.length && quelle[j] !== '`') {
+      if (quelle.startsWith('${', j)) {
+        let tiefe = 1; j += 2;
+        while (tiefe && j < quelle.length) { if (quelle[j] === '{') tiefe++; else if (quelle[j] === '}') tiefe--; j++; }
+        key += `{${n++}}`;
+      } else if (quelle[j] === '\\') { key += quelle[j + 1] === 'n' ? '\n' : quelle[j + 1]; j += 2; }
+      else key += quelle[j++];
+    }
+    schluessel.add(key);
+    const weiter = quelle.slice(j + 1).search(/(?<![\w$.])t`/);
+    i = weiter < 0 ? -1 : j + 1 + weiter;
+  }
+  for (const m of quelle.matchAll(/(?<![\w$.])t\('([^'\\]*)'\)/g)) schluessel.add(m[1]);
+  for (const x of [...ABTEILUNGEN, ...BEREICHE]) schluessel.add(x.name);
+  for (const f of FARBSCHEMATA) { schluessel.add(f.name); schluessel.add(f.text); for (const z of f.zonen || []) schluessel.add(z.name); }
+  for (const x of ['Liste', 'Laden', 'Geteilte Liste', 'Schließen', 'Liste teilen', 'Einstellungen', 'Artikel hinzufügen', 'Barcode scannen',
+    'Rezept übernehmen', 'Einkauf abschließen', 'Neuer Laden', 'Supermarkt', 'Drogerie']) schluessel.add(x);
+  schluessel.delete('…');  // aus einem Kommentar
+  const platzhalter = x => typeof x === 'object' ? platzhalter(x.other) : (x.match(/\{\d+\}/g) || []).sort().join();
+  for (const spr of ['en', 'fr', 'es']) {
+    const texte = (SPRACHPAKETE[spr] || {}).texte || {};
+    pruefe(`${spr}: alle Texte übersetzt`, [...schluessel].filter(k => !texte[k]), []);
+    pruefe(`${spr}: Platzhalter passen`, Object.entries(texte).filter(([k, v]) => platzhalter(k) !== platzhalter(v)).map(([k]) => k), []);
+    pruefe(`${spr}: keine überflüssigen Texte`, Object.keys(texte).filter(k => !schluessel.has(k)), []);
+    pruefe(`${spr}: Startverlauf erkannt`, (SPRACHPAKETE[spr].start || []).filter(n => { SPRACHE = spr; baueIndex(spr); const r = erkenne(n); return !r; }), []);
+  }
+
+  // Sprachen: Artikel in der jeweiligen Sprache richtig einsortieren
+  const jeSprache = {
+    en: { 'milk': 'molkerei', '2 pcs eggs': 'molkerei', 'pepper': 'oel', 'peppers': 'gemuese', 'tomatos': 'gemuese', 'toilet paper': 'drogerie',
+      'frozen peas': 'tk', 'oat milk': 'pflanzendrink', 'minced beef': 'fleisch', 'crisps': 'suess', 'strawberries': 'obst',
+      'tinned tomatoes': 'konserven', 'bin bags': 'haushalt', 'self raising flour': 'backen', 'mozarella': 'kaese' },
+    fr: { 'lait': 'molkerei', 'œufs': 'molkerei', 'pommes de terre': 'gemuese', 'pommes': 'obst', 'poivre': 'oel', 'papier toilette': 'drogerie',
+      'petits pois surgelés': 'tk', 'lait d’avoine': 'pflanzendrink', 'viande hachée': 'fleisch', 'chips': 'suess', 'bœuf': 'fleisch',
+      'tomates concassées': 'konserven', 'sacs poubelle': 'haushalt', '500 grammes farine': 'backen', 'poireaux': 'gemuese' },
+    es: { 'leche': 'molkerei', 'huevos': 'molkerei', 'patatas': 'gemuese', 'pimienta': 'oel', 'pimientos': 'gemuese', 'papel higiénico': 'drogerie',
+      'guisantes congelados': 'tk', 'leche de avena': 'pflanzendrink', 'carne picada': 'fleisch', 'nueces': 'backen', 'limones': 'obst',
+      'tomate triturado': 'konserven', 'bolsas de basura': 'haushalt', '2 uds pan': 'brot', 'pasta de dientes': 'drogerie' },
+  };
+  for (const [spr, liste] of Object.entries(jeSprache)) {
+    SPRACHE = spr; baueIndex(spr);
+    for (const [roh, soll] of Object.entries(liste)) pruefe(`${spr}: ${roh}`, klassifiziere(parseMenge(roh).name).abt, soll);
+  }
+  SPRACHE = 'en'; baueIndex('en');
+  pruefe('en: Korrektur', [korrigiere('tomatos'), korrigiere('brocolli')], ['Tomatoes', 'Broccoli']);
+  pruefe('en: Vorschlag ab einem Buchstaben', vorschlaege('b').length > 0 && vorschlaege('b').every(v => !/ü|ö|ä/.test(v.name)), true);
+  pruefe('en: deutsche Artikel bleiben erkennbar', klassifiziere('Spülmittel').abt, 'haushalt');
+  pruefe('en: Rezept', parseRezept('2 cups flour\n200 g spaghetti\n3 cloves garlic, minced\n1 tbsp olive oil\n1 lb ground beef\nSalt and pepper to taste').map(z => z.name),
+    ['flour', 'spaghetti', 'garlic', 'olive oil', 'ground beef', 'Salt', 'pepper']);
+  pruefe('en: Rezeptmengen', parseRezept('200 g spaghetti\n1 lb ground beef').map(z => [z.menge, z.einheit]), [[200, 'g'], [454, 'g']]);
+  pruefe('en: Mengenanzeige mit Punkt', mengeText({ menge: 1.5, einheit: 'kg' }), '1.5 kg');
+  SPRACHE = 'de';
+  pruefe('de: Einzahl', [t`${1} Zutaten`, t`${2} Zutaten`], ['1 Zutat', '2 Zutaten']);
+  SPRACHE = 'en';
+  pruefe('en: Einzahl und Mehrzahl', [t`Einkaufsliste (${1} Artikel)`, t`Einkaufsliste (${3} Artikel)`], ['Shopping list (1 item)', 'Shopping list (3 items)']);
+  pruefe('en: Mehrfacheingabe mit „and“', zerlegeEingabe('milk and bread').map(x => x.name), ['milk', 'bread']);
+  SPRACHE = 'fr'; baueIndex('fr');
+  pruefe('fr: Rezept', parseRezept('200 g de farine\n2 gousses d’ail hachées\n1 c. à soupe d’huile d’olive\n3 œufs\nsel et poivre').map(z => z.name),
+    ['farine', 'ail', 'huile d’olive', 'œufs', 'sel', 'poivre']);
+  pruefe('fr: Rezept Vorrat', rezeptArtikel(parseRezept('200 g de farine\n3 œufs')).map(a => [a.name, a.an]), [['Farine', false], ['Œufs', true]]);
+  SPRACHE = 'es'; baueIndex('es');
+  pruefe('es: Rezept', parseRezept('200 g de harina\n2 dientes de ajo picados\n1 cucharada de aceite de oliva\n3 huevos\nsal al gusto').map(z => z.name),
+    ['harina', 'ajo', 'aceite de oliva', 'huevos', 'sal']);
+  SPRACHE = 'de'; baueIndex('de');
+  pruefe('de: nach Sprachwechsel wieder deutsch', [klassifiziere('Spülmittel').abt, INDEX.has('milk')], ['haushalt', false]);
+
   const fehler = ergebnisse.filter(e => !e.ok);
   document.body.innerHTML = `<div class="testbericht"><h2>Selbsttest: ${ergebnisse.length - fehler.length}/${ergebnisse.length} bestanden</h2>
     ${ergebnisse.map(e => `<div class="${e.ok ? 'ok' : 'fehler'}">${e.ok ? 'OK  ' : 'FEHLER'} ${esc(e.titel)}${e.ok ? '' : `<br>&nbsp;&nbsp;ist:  ${esc(JSON.stringify(e.ist))}<br>&nbsp;&nbsp;soll: ${esc(JSON.stringify(e.soll))}`}</div>`).join('')}</div>`;
@@ -2862,6 +3044,7 @@ if (new URLSearchParams(location.search).has('test')) {
   TESTMODUS = true;
   selbsttest().catch(e => { document.body.innerHTML = `<pre class="testbericht">Selbsttest abgebrochen: ${esc(e.stack || e)}</pre>`; document.title = 'Test abgebrochen'; });
 } else {
+  uebersetzeSeite();
   ladeAlles();
   wendeDarstellungAn();
   render();
