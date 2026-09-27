@@ -14,8 +14,12 @@ Der kostenlose Plan („Free“) genügt. Eine Domain wird nicht gebraucht.
 ## 2. Datenbank anlegen
 1. Links **Storage & Databases → D1 SQL Database** → **Create** (bzw. „Create database“).
 2. Name: `einkauf` → **Create**.
-3. In der Datenbank den Reiter **Console** öffnen, den Inhalt von [`schema.sql`](schema.sql) einfügen und **Execute** drücken.
-   Danach steht unter „Tables“ die Tabelle `raum`.
+3. In der Datenbank den Reiter **Console** öffnen, diese eine Zeile einfügen und **Execute** drücken:
+   ```sql
+   CREATE TABLE IF NOT EXISTS raum (id TEXT PRIMARY KEY, version INTEGER NOT NULL, daten TEXT NOT NULL, geaendert INTEGER NOT NULL);
+   ```
+   Danach steht unter „Tables“ die Tabelle `raum`. (Keine Zeilen mit `--`-Kommentaren einfügen: Die Konsole zieht den
+   Text zu einer Zeile zusammen, dann verschluckt der Kommentar den Rest, Fehler „incomplete input“.)
 
 ## 3. Worker anlegen
 1. Links **Compute (Workers) → Workers & Pages** → **Create** → **Worker** („Start with Hello World“).
