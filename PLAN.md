@@ -206,9 +206,8 @@ Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone d
   übrigen Daten bekommen Zeitstempel 1, damit bei gleichen Einträgen (Standardläden, Startverlauf) der gemeinsame Stand gewinnt.
 - **Server** in `server/`: `worker.js` (Cloudflare Worker, D1-Bindung `DB`, CORS nur für GitHub Pages und localhost:8765,
   1 MB Grenze, optional Cron zum Aufräumen), `schema.sql`, `ANLEITUNG.md` (Einrichtung im Browser).
-- **Adresse**: `SYNC_URL_STANDARD` in `index.html` ist noch leer, weil der Nutzer den Worker noch einrichten muss. Bis
-  dahin zeigt die App „Der Sync-Server ist noch nicht eingerichtet“. Zum Testen überschreibbar mit
-  `localStorage['ek.syncUrl']`.
+- **Adresse**: `SYNC_URL_STANDARD` = `https://einkaufsliste-sync.56nr5tc89d.workers.dev` (Cloudflare-Konto des Nutzers,
+  Worker `einkaufsliste-sync`, D1-Datenbank `einkauf`). Zum Testen überschreibbar mit `localStorage['ek.syncUrl']`.
 - **Geprüft**:
   - Selbsttest 243/243 (20 neue Sync-Fälle).
   - Zwei-Geräte-Simulation in Headless Chrome, 18/18: zwei iframes auf `localhost` und `127.0.0.1` mit getrennten
@@ -217,9 +216,12 @@ Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone d
     Löschen, Einkauf abschließen, Rezepte, Läden, lokale Einstellungen, kein Hochladen ohne Änderung, Server-Daten
     unlesbar und die Trennung nach neuem Schlüssel.
   - Der erzeugte QR-Code wird von zxing gelesen. Screenshots bei 390 px.
-- **Offen**: Cloudflare einrichten (Nutzer, `server/ANLEITUNG.md`), danach `SYNC_URL_STANDARD` eintragen und gegen den
-  echten Worker testen. Nur auf dem iPhone prüfbar: QR-Scan mit der Kamera, zwei Geräte im Laden, Flugmodus.
-- `sw.js` VERSION `einkauf-14`.
+  - Echter Worker (27.09.2026): `curl` für 404, Anlegen, zwei 409-Fälle, `unveraendert`, CORS für GitHub Pages und
+    Löschen; dazu die Zwei-Geräte-Simulation gegen den echten Server, 18/18 (Offline-Fall nur gegen den lokalen Nachbau).
+- Stolperstein beim Einrichten: Die D1-Konsole zieht eingefügten Text zu einer Zeile zusammen; `--`-Kommentare
+  verschlucken dann den Rest. `schema.sql` ist deshalb einzeilig.
+- **Offen, nur auf dem iPhone prüfbar**: QR-Scan mit der Kamera, zwei Geräte im Laden, Flugmodus.
+- `sw.js` VERSION `einkauf-15`.
 
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |

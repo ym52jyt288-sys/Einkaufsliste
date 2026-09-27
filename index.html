@@ -2847,7 +2847,7 @@ function oeffneRueckmeldung(r) {
    Dokument: { sammlung: { schlüssel: { f: { feld: [wert, t] | [t] (Feld entfernt) }, x: t (gelöscht) } } }
    ============================================================ */
 
-const SYNC_URL_STANDARD = '';   // Worker-Adresse, siehe server/ANLEITUNG.md; zum Testen überschreibbar mit localStorage „ek.syncUrl“
+const SYNC_URL_STANDARD = 'https://einkaufsliste-sync.56nr5tc89d.workers.dev';   // Worker-Adresse, siehe server/ANLEITUNG.md; zum Testen überschreibbar mit localStorage „ek.syncUrl“
 const SYNC_URL = (() => { try { return localStorage.getItem('ek.syncUrl') || SYNC_URL_STANDARD; } catch (e) { return SYNC_URL_STANDARD; } })().replace(/\/+$/, '');
 const SYNC_SAMMLUNGEN = ['liste', 'verlauf', 'korrekturen', 'eans', 'profile', 'rezepte'];
 const SYNC_LISTEN = ['liste', 'profile', 'rezepte'];      // Arrays mit id, der Rest sind Objekte mit Schlüssel
