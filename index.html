@@ -251,6 +251,22 @@
   .liste-einst li.zieht { background: var(--bg2); box-shadow: var(--schatten); position: relative; z-index: 3; }
   .liste-einst li.aus .abtname { color: var(--muted); text-decoration: line-through; }
   .liste-einst input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+  /* Einstellungen: Zeilen mit Wert und Pfeil, Unterseiten */
+  .liste-einst .zeile { display: flex; align-items: center; gap: 8px; }
+  .liste-einst .zeile > span:first-child { flex: 1; }
+  .zeile .wert { color: var(--muted); font-size: 15px; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pfeil { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
+  .zeile .haken svg { width: 22px; height: 22px; fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; display: block; }
+  .blatt-kopf.unter { justify-content: space-between; }
+  .blatt-kopf.unter > :first-child { display: inline-flex; align-items: center; gap: 2px; margin-left: -6px; }
+  .seiten-titel { margin: 2px 0 8px; font-size: 28px; font-weight: 700; letter-spacing: -.01em; }
+  .blatt-kopf.unter .pfeil { color: var(--accent); width: 22px; height: 22px; }
+  .einst-seite > .abschnitt:first-child, .seiten-titel + .abschnitt { margin-top: 12px; }
+  .einst-seite.von-rechts { animation: von-rechts .2s ease; }
+  .einst-seite.von-links { animation: von-links .2s ease; }
+  @keyframes von-rechts { from { transform: translateX(28px); opacity: 0; } }
+  @keyframes von-links { from { transform: translateX(-28px); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .einst-seite { animation: none !important; } }
   .text-muted { color: var(--muted); font-size: 14px; }
   .pruef li { display: flex; align-items: center; gap: 6px; min-height: 56px; border-bottom: 1px solid var(--line); }
   .pruef .marke { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; margin-left: auto; white-space: nowrap; }
@@ -1479,7 +1495,7 @@ function oeffneAbteilungWahl(item) {
    Einstellungen
    ============================================================ */
 
-$('#btnEinstellungen').addEventListener('click', oeffneEinstellungen);
+$('#btnEinstellungen').addEventListener('click', () => oeffneEinstellungen());
 
 const istDunkel = () => S.einstellungen.thema === 'dark' || (S.einstellungen.thema !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
 
@@ -1496,77 +1512,120 @@ function chipVerwaltungHTML() {
     ${ausgeblendet.length ? `<p class="text-muted" style="margin:14px 0 2px">${t`Ausgeblendet`}</p><ul class="liste-einst">${ausgeblendet.map(n => zeile(n, knopf('zeig', n, t`Wieder zeigen`))).join('')}</ul>` : ''}`;
 }
 
-function oeffneEinstellungen() {
+// Einstellungen als Startseite mit Unterseiten (wie in den iPhone-Einstellungen): start = Seite, die sofort offen ist
+const ICON_PFEIL = '<svg class="pfeil" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
+const ICON_ZURUECK = '<svg class="pfeil" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+
+function oeffneEinstellungen(start = 'haupt') {
   const b = oeffneBlatt('<div id="einst"></div>', { voll: true });
-  const zeichne = () => {
-    const stamm = Object.values(S.verlauf).filter(v => v.stamm).sort((x, y) => x.name.localeCompare(y.name, SPRACHE));
-    const sprachWahl = [['auto', t`Automatisch (${SPRACHEN[geraeteSprache()]})`], ...Object.entries(SPRACHEN)];
-    $('#einst', b).innerHTML = `
-      <div class="blatt-kopf"><h3>${t`Einstellungen`}</h3><button type="button" class="zurueck" data-schliessen>${t`Fertig`}</button></div>
-      <div class="abschnitt">${t`Läden`}</div>
-      <ul class="liste-einst">${S.profile.map(p => `<li><button type="button" class="fuellen" data-profil="${p.id}">${esc(p.name)}
-        <span class="klein">${p.ort ? ' · ' + t`Standort gespeichert` : ''}${p.ausgeblendet.length ? ' · ' + t`${ABT_IDS.length - p.ausgeblendet.length} Abteilungen` : ''}</span></button></li>`).join('')}
+  let seite = start, zurueck = false;
+  const zeile = (ziel, name, wert = '') => `<li><button type="button" class="fuellen zeile" data-seite="${ziel}"><span>${name}</span>
+    <span class="wert">${esc(String(wert))}</span>${ICON_PFEIL}</button></li>`;
+  const themaName = id => ({ system: t`Automatisch`, light: t`Hell`, dark: t`Dunkel` })[id] || t`Automatisch`;
+  const seiten = {
+    haupt: () => {
+      const e = S.einstellungen, c = e.chips;
+      const stammZahl = Object.values(S.verlauf).filter(v => v.stamm).length;
+      const sprache = e.sprache && SPRACHEN[e.sprache] ? SPRACHEN[e.sprache] : t`Automatisch`;
+      return `
+      <div class="abschnitt">${t`Einkaufen`}</div>
+      <ul class="liste-einst">
+        ${zeile('laeden', t`Läden`, S.profile.length)}
+        ${zeile('stamm', t`Stammartikel`, stammZahl || t`Keine`)}
+        ${zeile('rezepte', t`Rezepte`, S.rezepte.length || t`Keine`)}
+      </ul>
+      <div class="abschnitt">${t`Anzeige`}</div>
+      <ul class="liste-einst">
+        ${zeile('darstellung', t`Darstellung`, themaName(e.thema))}
+        ${zeile('schnell', t`Schnellauswahl`, !c.an ? t`Aus` : c.modus === 'immer' ? t`Immer` : t`Beim Antippen`)}
+        ${zeile('sprache', t`Sprache`, sprache)}
+      </ul>
+      <div class="abschnitt">${t`Erweitert`}</div>
+      <ul class="liste-einst">
+        ${zeile('foto', t`Rezept-Fotos`, e.apiKey ? t`Eingerichtet` : t`Aus`)}
+        ${zeile('daten', t`Daten`)}
+      </ul>`;
+    },
+    laeden: () => `
+      <ul class="liste-einst">${S.profile.map(p => `<li><button type="button" class="fuellen zeile" data-profil="${p.id}"><span>${esc(p.name)}
+        <span class="klein">${p.ort ? ' · ' + t`Standort gespeichert` : ''}${p.ausgeblendet.length ? ' · ' + t`${ABT_IDS.length - p.ausgeblendet.length} Abteilungen` : ''}</span></span>${ICON_PFEIL}</button></li>`).join('')}
         <li><button type="button" class="fuellen" id="eNeuesProfil" style="color:var(--accent)">${t`Laden hinzufügen`}</button></li></ul>
-      <label class="schalter"><div>${t`Laden per Standort wählen`}<small>${t`Beim Öffnen im Laden passendes Profil einstellen`}</small></div><input type="checkbox" id="eStandort"${S.einstellungen.standort ? ' checked' : ''}></label>
-
-      <div class="abschnitt">${t`Sprache`}</div>
-      <label class="feld"><select id="eSprache" aria-label="${t`Sprache`}">${sprachWahl.map(([id, n]) =>
-        `<option value="${id}"${(S.einstellungen.sprache || 'auto') === id ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
-      <p class="text-muted">${t`Gilt für Texte, Abteilungen und die Erkennung der Artikel. Schon eingetragene Artikel behalten ihren Namen.`}</p>
-
-      <div class="abschnitt">${t`Darstellung`}</div>
-      <div class="segment klein" id="eThema">${[['system', t`Automatisch`], ['light', t`Hell`], ['dark', t`Dunkel`]].map(([id, n]) =>
-        `<button type="button" data-thema="${id}" class="${S.einstellungen.thema === id ? 'an' : ''}">${n}</button>`).join('')}</div>
-      <label class="schalter" style="margin-top:8px"><div>${t`Abteilungen farbig markieren`}<small>${t`Farbe je Bereich im Laden, die Beschriftung bleibt`}</small></div><input type="checkbox" id="eFarben"${S.einstellungen.farben.an ? ' checked' : ''}></label>
-      <label class="schalter"><div>${t`Abteilung in der Listenansicht zeigen`}<small>${t`Name der Abteilung rechts neben dem Artikel`}</small></div><input type="checkbox" id="eAbtListe"${S.einstellungen.abteilungInListe ? ' checked' : ''}></label>
-      <div id="eFarbWahl"${S.einstellungen.farben.an ? '' : ' hidden'}>
+      <label class="schalter"><div>${t`Laden per Standort wählen`}<small>${t`Beim Öffnen im Laden passendes Profil einstellen`}</small></div><input type="checkbox" id="eStandort"${S.einstellungen.standort ? ' checked' : ''}></label>`,
+    stamm: () => {
+      const stamm = Object.values(S.verlauf).filter(v => v.stamm).sort((x, y) => x.name.localeCompare(y.name, SPRACHE));
+      return stamm.length ? `<ul class="liste-einst">${stamm.map(v => `<li><span class="fuellen" style="flex:1">${esc(v.name)}</span>
+        <button type="button" class="zurueck" data-stamm-weg="${esc(kompakt(v.name))}" style="color:var(--danger)">${t`Entfernen`}</button></li>`).join('')}</ul>`
+        : `<p class="text-muted">${t`Noch keine. Artikel antippen und „Wird immer benötigt“ einschalten.`}</p>`;
+    },
+    rezepte: () => S.rezepte.length ? `<ul class="liste-einst">${S.rezepte.map(x => `<li><button type="button" class="fuellen zeile" data-rezept="${x.id}"><span>#${esc(x.name)}
+        <span class="klein">· ${t`${x.zutaten.length} Zutaten`}</span></span>${ICON_PFEIL}</button></li>`).join('')}</ul>`
+        : `<p class="text-muted">${t`Noch keine. Beim Übernehmen eines Rezepts einen Namen vergeben, dann im Eingabefeld mit #Name abrufen.`}</p>`,
+    darstellung: () => { const e = S.einstellungen; return `
+      <div class="abschnitt">${t`Erscheinungsbild`}</div>
+      <div class="segment klein" id="eThema">${['system', 'light', 'dark'].map(id =>
+        `<button type="button" data-thema="${id}" class="${e.thema === id ? 'an' : ''}">${themaName(id)}</button>`).join('')}</div>
+      <div class="abschnitt">${t`Abteilungen`}</div>
+      <label class="schalter"><div>${t`Abteilung in der Listenansicht zeigen`}<small>${t`Name der Abteilung rechts neben dem Artikel`}</small></div><input type="checkbox" id="eAbtListe"${e.abteilungInListe ? ' checked' : ''}></label>
+      <label class="schalter"><div>${t`Abteilungen farbig markieren`}<small>${t`Farbe je Bereich im Laden, die Beschriftung bleibt`}</small></div><input type="checkbox" id="eFarben"${e.farben.an ? ' checked' : ''}></label>
+      <div id="eFarbWahl"${e.farben.an ? '' : ' hidden'}>
+        <div class="segment klein" id="eStil">${[['streifen', t`Streifen`], ['flaeche', t`Farbige Zeilen`]].map(([id, n]) =>
+          `<button type="button" data-stil="${id}" class="${e.farben.stil === id ? 'an' : ''}">${n}</button>`).join('')}</div>
         <div class="wahl" style="margin-top:12px">${FARBSCHEMATA.map(f => `<button type="button" data-schema="${f.id}" class="${aktuellesSchema().id === f.id ? 'an' : ''}">
           <span class="titel">${esc(t(f.name))}</span><span class="text-muted">${esc(t(f.text))}</span>
           <span class="muster">${legende(f).map(l => `<span><i style="--c:${FARBTOENE[l.ton][istDunkel() ? 1 : 0]}"></i>${esc(l.name)}</span>`).join('')}</span>
         </button>`).join('')}</div>
-        <div class="segment klein" id="eStil">${[['streifen', t`Streifen`], ['flaeche', t`Farbige Zeilen`]].map(([id, n]) =>
-          `<button type="button" data-stil="${id}" class="${S.einstellungen.farben.stil === id ? 'an' : ''}">${n}</button>`).join('')}</div>
-      </div>
-
-      <div class="abschnitt">${t`Schnellauswahl`}</div>
-      <label class="schalter"><div>${t`Schnellauswahl zeigen`}<small>${t`Nur in der Listenansicht, wenn das Eingabefeld leer ist`}</small></div><input type="checkbox" id="eChips"${S.einstellungen.chips.an ? ' checked' : ''}></label>
-      <div id="eChipWahl"${S.einstellungen.chips.an ? '' : ' hidden'}>
+      </div>`; },
+    schnell: () => { const c = S.einstellungen.chips; return `
+      <label class="schalter"><div>${t`Schnellauswahl zeigen`}<small>${t`Nur in der Listenansicht, wenn das Eingabefeld leer ist`}</small></div><input type="checkbox" id="eChips"${c.an ? ' checked' : ''}></label>
+      <div id="eChipWahl"${c.an ? '' : ' hidden'}>
         <div class="feld"><span>${t`Anzeigen`}</span><div class="segment klein" id="eChipModus">${[['antippen', t`Beim Antippen`], ['immer', t`Immer`]].map(([id, n]) =>
-          `<button type="button" data-chip-modus="${id}" class="${S.einstellungen.chips.modus === id ? 'an' : ''}">${n}</button>`).join('')}</div>
-          <p class="text-muted" style="margin:6px 0 0">${S.einstellungen.chips.modus === 'immer'
+          `<button type="button" data-chip-modus="${id}" class="${c.modus === id ? 'an' : ''}">${n}</button>`).join('')}</div>
+          <p class="text-muted" style="margin:6px 0 0">${c.modus === 'immer'
             ? t`Immer unter dem Eingabefeld. Nach oben wischen blendet sie aus, antippen oder nach unten wischen holt sie zurück.`
             : t`Erscheint, sobald du ins Eingabefeld tippst, und bei leerer Liste.`}</p></div>
         <div class="feld"><span>${t`Anzahl`}</span><div class="segment klein" id="eAnzahl">${[6, 9, 12, 18].map(n =>
-          `<button type="button" data-anzahl="${n}" class="${S.einstellungen.chips.anzahl === n ? 'an' : ''}">${n}</button>`).join('')}</div></div>
-        <form class="eingabe" id="ePinForm" style="margin-top:6px"><input id="ePinName" type="text" placeholder="${t`Artikel anheften`}" autocapitalize="sentences" autocorrect="off" enterkeyhint="done" autocomplete="off"></form>
+          `<button type="button" data-anzahl="${n}" class="${c.anzahl === n ? 'an' : ''}">${n}</button>`).join('')}</div></div>
+        <div class="abschnitt">${t`Artikel`}</div>
+        <form class="eingabe" id="ePinForm"><input id="ePinName" type="text" placeholder="${t`Artikel anheften`}" autocapitalize="sentences" autocorrect="off" enterkeyhint="done" autocomplete="off"></form>
         <ul class="vorschlaege" id="ePinVorschlaege" hidden></ul>
         ${chipVerwaltungHTML()}
-      </div>
-
-      <div class="abschnitt">${t`Stammartikel`}</div>
-      ${stamm.length ? `<ul class="liste-einst">${stamm.map(v => `<li><span class="fuellen" style="flex:1">${esc(v.name)}</span>
-        <button type="button" class="zurueck" data-stamm-weg="${esc(kompakt(v.name))}" style="color:var(--danger)">${t`Entfernen`}</button></li>`).join('')}</ul>`
-        : `<p class="text-muted">${t`Noch keine. Artikel antippen und „Wird immer benötigt“ einschalten.`}</p>`}
-
-      <div class="abschnitt">${t`Rezepte`}</div>
-      ${S.rezepte.length ? `<ul class="liste-einst">${S.rezepte.map(x => `<li><button type="button" class="fuellen" data-rezept="${x.id}">#${esc(x.name)}
-        <span class="klein">· ${t`${x.zutaten.length} Zutaten`}</span></button></li>`).join('')}</ul>`
-        : `<p class="text-muted">${t`Noch keine. Beim Übernehmen eines Rezepts einen Namen vergeben, dann im Eingabefeld mit #Name abrufen.`}</p>`}
-
-      <div class="abschnitt">${t`Rezept-Fotos`}</div>
+      </div>`; },
+    sprache: () => {
+      const wahl = [['auto', t`Automatisch (${SPRACHEN[geraeteSprache()]})`], ...Object.entries(SPRACHEN)];
+      const aktiv = S.einstellungen.sprache || 'auto';
+      return `<ul class="liste-einst">${wahl.map(([id, n]) => `<li><button type="button" class="fuellen zeile" data-sprache="${id}" aria-pressed="${aktiv === id}">
+        <span>${esc(n)}</span><span class="haken">${aktiv === id ? ICON_HAKEN : ''}</span></button></li>`).join('')}</ul>
+      <p class="text-muted">${t`Gilt für Texte, Abteilungen und die Erkennung der Artikel. Schon eingetragene Artikel behalten ihren Namen.`}</p>`;
+    },
+    foto: () => `
       <label class="feld"><span>${t`Claude-API-Schlüssel (bleibt nur auf diesem Gerät)`}</span>
         <input type="password" id="eApiKey" value="${esc(S.einstellungen.apiKey)}" placeholder="sk-ant-…" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-      <p class="text-muted">${t`Ohne Schlüssel funktioniert „Zutaten übernehmen“ per Text weiterhin. Mit Schlüssel kostet ein Rezeptfoto etwa 2–3 Cent.`}</p>
-
-      <div class="abschnitt">${t`Daten`}</div>
+      <p class="text-muted">${t`Ohne Schlüssel funktioniert „Zutaten übernehmen“ per Text weiterhin. Mit Schlüssel kostet ein Rezeptfoto etwa 2–3 Cent.`}</p>`,
+    daten: () => `
       <div class="knopfreihe">
         <button type="button" class="knopf zweit" id="eExport">${t`Sicherung exportieren`}</button>
         <button type="button" class="knopf zweit" id="eImport">${t`Sicherung importieren`}</button>
         <button type="button" class="knopf gefahr" id="eVerlaufLeeren">${t`Verlauf und gelernte Zuordnungen löschen`}</button>
       </div>
       <input type="file" id="eImportDatei" accept="application/json,.json" hidden>
-      <p class="text-muted" style="margin-top:20px">${t`${Object.keys(S.verlauf).length} Artikel im Verlauf · ${Object.keys(S.korrekturen).length} gelernte Zuordnungen · ${INDEX_KEYS.length} Katalogbegriffe`}</p>
-    `;
+      <p class="text-muted" style="margin-top:20px">${t`${Object.keys(S.verlauf).length} Artikel im Verlauf · ${Object.keys(S.korrekturen).length} gelernte Zuordnungen · ${INDEX_KEYS.length} Katalogbegriffe`}</p>`,
+  };
+  const titel = { haupt: t`Einstellungen`, laeden: t`Läden`, stamm: t`Stammartikel`, rezepte: t`Rezepte`, darstellung: t`Darstellung`,
+    schnell: t`Schnellauswahl`, sprache: t`Sprache`, foto: t`Rezept-Fotos`, daten: t`Daten` };
+  const zeichne = () => {
+    const kopf = seite === 'haupt'
+      ? `<div class="blatt-kopf unter"><span></span><button type="button" class="zurueck" data-schliessen>${t`Fertig`}</button></div>`
+      : `<div class="blatt-kopf unter"><button type="button" class="zurueck" data-seite="haupt">${ICON_ZURUECK}${t`Einstellungen`}</button>
+          <button type="button" class="zurueck" data-schliessen>${t`Fertig`}</button></div>`;
+    const ueberschrift = `<h2 class="seiten-titel">${titel[seite]}</h2>`;
+    $('#einst', b).innerHTML = kopf + `<div class="einst-seite">${ueberschrift}${seiten[seite]()}</div>`;
+  };
+  const gehe = ziel => {
+    zurueck = ziel === 'haupt';
+    seite = ziel; zeichne();
+    const s = $('.einst-seite', b);
+    s.classList.add(zurueck ? 'von-links' : 'von-rechts');
+    $('.blatt', b).scrollTop = 0;
   };
   zeichne();
   // Anheften: Autovervollständigung wie beim Eingabefeld der Liste
@@ -1600,6 +1659,16 @@ function oeffneEinstellungen() {
     const e1 = S.einstellungen;
     const pv = e.target.closest('[data-pin-vorschlag]');
     if (pv) return pinne(pv.dataset.pinVorschlag);
+    const ziel = e.target.closest('[data-seite]');
+    if (ziel) return gehe(ziel.dataset.seite);
+    const spr = e.target.closest('[data-sprache]');
+    if (spr) {
+      // Katalog und Texte hängen an der Sprache: neu laden ist am einfachsten und sichersten
+      if ((e1.sprache || 'auto') === spr.dataset.sprache) return;
+      e1.sprache = spr.dataset.sprache; sichereEinstellungen(); zeichne();
+      if (!TESTMODUS) location.reload();
+      return;
+    }
     const thema = e.target.closest('[data-thema]');
     if (thema) { e1.thema = thema.dataset.thema; sichereEinstellungen(); wendeDarstellungAn(); zeichne(); return; }
     const schema = e.target.closest('[data-schema]');
@@ -1652,11 +1721,6 @@ function oeffneEinstellungen() {
     if (e.target.id === 'eAbtListe') { S.einstellungen.abteilungInListe = e.target.checked; sichereEinstellungen(); }
     if (e.target.id === 'eChips') { S.einstellungen.chips.an = e.target.checked; sichereEinstellungen(); zeichne(); }
     if (e.target.id === 'eStandort') { S.einstellungen.standort = e.target.checked; sichereEinstellungen(); if (e.target.checked) waehleLadenPerStandort(true); }
-    if (e.target.id === 'eSprache') {
-      // Katalog und Texte hängen an der Sprache: neu laden ist am einfachsten und sichersten
-      S.einstellungen.sprache = e.target.value; sichereEinstellungen();
-      if (!TESTMODUS) location.reload();
-    }
     if (e.target.id === 'eApiKey') { S.einstellungen.apiKey = e.target.value.trim(); sichereEinstellungen(); }
     if (e.target.id === 'eImportDatei' && e.target.files[0]) importieren(e.target.files[0], zeichne);
   });
@@ -2274,7 +2338,7 @@ function oeffneRezept() {
     setTimeout(() => oeffnePruefung(rezeptArtikel(namen)), 220);
   };
   $('#rFoto', b).onclick = () => {
-    if (!S.einstellungen.apiKey) { schliesseBlatt(b); setTimeout(oeffneEinstellungen, 220); return; }
+    if (!S.einstellungen.apiKey) { schliesseBlatt(b); setTimeout(() => oeffneEinstellungen('foto'), 220); return; }
     $('#rDatei', b).click();
   };
   $('#rDatei', b).onchange = async e => {

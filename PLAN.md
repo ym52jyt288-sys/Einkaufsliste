@@ -1,6 +1,6 @@
 # Einkaufsliste – Plan und Stand
 
-## Stand — 24.09.2026
+## Stand — 27.09.2026
 
 **Online unter https://ym52jyt288-sys.github.io/Einkaufsliste/** (GitHub Pages, Repo `ym52jyt288-sys/Einkaufsliste`, Branch `main`).
 Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone durch den Nutzer steht noch aus.
@@ -161,6 +161,21 @@ Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone d
   deutsche Reste. Sprachwechsel über die Einstellungen geprüft. Screenshots in Handybreite geprüft.
 - Offen: Die Übersetzungen und Kataloge hat Claude geschrieben; eine Durchsicht durch Muttersprachler steht aus.
 - `sw.js` VERSION `einkauf-12`, Sprachpakete im Cache und wie `katalog.js` „erst Netz“.
+
+### Runde 10 (27.09.2026): Einstellungen mit Unterseiten
+- Die Einstellungen waren eine lange Seite mit acht Abschnitten; allein Farbschemata und Schnellauswahl füllten mehr als
+  einen Bildschirm. Jetzt gibt es eine **Startseite im Stil der iPhone-Einstellungen**: Zeilen mit aktuellem Wert und Pfeil,
+  gruppiert in **Einkaufen** (Läden, Stammartikel, Rezepte), **Anzeige** (Darstellung, Schnellauswahl, Sprache) und
+  **Erweitert** (Rezept-Fotos, Daten).
+- Unterseiten mit „‹ Einstellungen“ und „Fertig“ und großer Überschrift. Beim Wechsel gleitet der Inhalt kurz seitlich ein
+  (aus bei „Bewegung reduzieren“). Alles bleibt in einem Blatt (`seite` in `oeffneEinstellungen`). Läden und Rezepte öffnen
+  wie bisher ein eigenes Blatt darüber.
+- **Sprache** ist jetzt eine Liste mit Haken statt eines Auswahlfelds. **Darstellung**: erst das Erscheinungsbild, dann die
+  Abteilungs-Schalter; Streifen/Zeilen steht vor den Farbschemata. Die Statistik (Verlauf, Zuordnungen, Katalogbegriffe)
+  steht unter Daten.
+- `oeffneEinstellungen(start)` kann direkt eine Unterseite öffnen: Das Rezeptfoto ohne Schlüssel führt nach „Rezept-Fotos“.
+- Neue Texte in allen drei Sprachpaketen. Selbsttest 220/220, skriptgesteuerter Durchlauf aller Unterseiten auf Französisch
+  ohne Fehler und ohne deutsche Reste. Screenshots bei 390 px hell, dunkel und auf Englisch. `sw.js` VERSION `einkauf-13`.
 
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
