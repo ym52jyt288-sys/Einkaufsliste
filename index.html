@@ -267,6 +267,8 @@
   @keyframes von-rechts { from { transform: translateX(28px); opacity: 0; } }
   @keyframes von-links { from { transform: translateX(-28px); opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { .einst-seite { animation: none !important; } }
+  .qr-rahmen { width: 220px; aspect-ratio: 1; margin: 8px auto 4px; background: #fff; border-radius: 12px; padding: 10px; }
+  .qr { display: block; width: 100%; height: 100%; }
   .text-muted { color: var(--muted); font-size: 14px; }
   .pruef li { display: flex; align-items: center; gap: 6px; min-height: 56px; border-bottom: 1px solid var(--line); }
   .pruef .marke { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; margin-left: auto; white-space: nowrap; }
@@ -446,11 +448,12 @@ function lade(schluessel, standard) {
     return roh == null ? standard : JSON.parse(roh);
   } catch (e) { return standard; }
 }
-let TESTMODUS = false;
+let TESTMODUS = false, SYNC_BEREIT = false;
 function sichere(schluessel, wert) {
   if (TESTMODUS) return;
   try { localStorage.setItem(SPEICHER_PREFIX + schluessel, JSON.stringify(wert)); }
   catch (e) { zeigeToast(t`Speichern fehlgeschlagen`); }
+  if (SYNC_BEREIT) syncGeaendert(schluessel);   // Synchronisierung: Änderung erfassen (siehe unten)
 }
 
 const ABT_IDS = ABTEILUNGEN.map(a => a.id);
@@ -1542,6 +1545,7 @@ function oeffneEinstellungen(start = 'haupt') {
       </ul>
       <div class="abschnitt">${t`Erweitert`}</div>
       <ul class="liste-einst">
+        ${zeile('sync', t`Synchronisieren`, syncAn() ? t`An` : t`Aus`)}
         ${zeile('foto', t`Rezept-Fotos`, e.apiKey ? t`Eingerichtet` : t`Aus`)}
         ${zeile('daten', t`Daten`)}
       </ul>`;
@@ -1597,6 +1601,26 @@ function oeffneEinstellungen(start = 'haupt') {
         <span>${esc(n)}</span><span class="haken">${aktiv === id ? ICON_HAKEN : ''}</span></button></li>`).join('')}</ul>
       <p class="text-muted">${t`Gilt für Texte, Abteilungen und die Erkennung der Artikel. Schon eingetragene Artikel behalten ihren Namen.`}</p>`;
     },
+    sync: () => !syncAn() ? `
+      <p class="text-muted">${t`Mehrere iPhones teilen sich dieselbe Liste, dieselben Läden und Rezepte. Ein Konto braucht es nicht: Wer die Einladung hat, gehört dazu. Die Daten werden auf dem Gerät verschlüsselt, der Server sieht nur unlesbare Daten.`}</p>
+      <div class="knopfreihe"><button type="button" class="knopf" id="eSyncStart"${SYNC_URL ? '' : ' disabled'}>${t`Synchronisierung einrichten`}</button></div>
+      ${SYNC_URL ? '' : `<p class="text-muted">${t`Der Sync-Server ist noch nicht eingerichtet.`}</p>`}
+      <p class="text-muted" style="margin-top:18px">${t`Schon eingeladen? Den Link ins Eingabefeld der Liste einfügen oder den QR-Code mit dem Scanner der App scannen.`}</p>`
+      : `
+      <p class="text-muted" id="eSyncStatus">${esc(syncStatusText())}</p>
+      <div class="abschnitt">${t`Weiteres Gerät einladen`}</div>
+      <div class="qr-rahmen" id="eQr"></div>
+      <p class="text-muted">${t`Auf dem anderen iPhone in der App den Scanner öffnen und diesen Code scannen. Oder den Link schicken.`}</p>
+      <div class="knopfreihe">
+        <button type="button" class="knopf zweit" id="eSyncTeilen">${t`Einladung teilen`}</button>
+        <button type="button" class="knopf zweit" id="eSyncJetzt">${t`Jetzt synchronisieren`}</button>
+      </div>
+      <div class="abschnitt">${t`Verbindung`}</div>
+      <div class="knopfreihe">
+        <button type="button" class="knopf zweit" id="eSyncEnde">${t`Auf diesem Gerät beenden`}</button>
+        <button type="button" class="knopf gefahr" id="eSyncNeu">${t`Neuen Schlüssel erzeugen`}</button>
+      </div>
+      <p class="text-muted">${t`Ein neuer Schlüssel trennt alle anderen Geräte. Sie müssen neu eingeladen werden.`}</p>`,
     foto: () => `
       <label class="feld"><span>${t`Claude-API-Schlüssel (bleibt nur auf diesem Gerät)`}</span>
         <input type="password" id="eApiKey" value="${esc(S.einstellungen.apiKey)}" placeholder="sk-ant-…" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
@@ -1611,7 +1635,7 @@ function oeffneEinstellungen(start = 'haupt') {
       <p class="text-muted" style="margin-top:20px">${t`${Object.keys(S.verlauf).length} Artikel im Verlauf · ${Object.keys(S.korrekturen).length} gelernte Zuordnungen · ${INDEX_KEYS.length} Katalogbegriffe`}</p>`,
   };
   const titel = { haupt: t`Einstellungen`, laeden: t`Läden`, stamm: t`Stammartikel`, rezepte: t`Rezepte`, darstellung: t`Darstellung`,
-    schnell: t`Schnellauswahl`, sprache: t`Sprache`, foto: t`Rezept-Fotos`, daten: t`Daten` };
+    schnell: t`Schnellauswahl`, sprache: t`Sprache`, sync: t`Synchronisieren`, foto: t`Rezept-Fotos`, daten: t`Daten` };
   const zeichne = () => {
     const kopf = seite === 'haupt'
       ? `<div class="blatt-kopf unter"><span></span><button type="button" class="zurueck" data-schliessen>${t`Fertig`}</button></div>`
@@ -1619,7 +1643,16 @@ function oeffneEinstellungen(start = 'haupt') {
           <button type="button" class="zurueck" data-schliessen>${t`Fertig`}</button></div>`;
     const ueberschrift = `<h2 class="seiten-titel">${titel[seite]}</h2>`;
     $('#einst', b).innerHTML = kopf + `<div class="einst-seite">${ueberschrift}${seiten[seite]()}</div>`;
+    if ($('#eQr', b)) zeigeQr();
   };
+  const zeigeQr = async () => {
+    try { if (!window.qrcode) await ladeSkript('vendor/qrcode.min.js'); } catch (e) { return; }
+    const el = $('#eQr', b);
+    if (el && syncAn()) el.innerHTML = qrSvg(einladungsLink());
+  };
+  // Status der Synchronisierung aktuell halten, ohne die Seite neu aufzubauen
+  const beiSync = () => { const st = $('#eSyncStatus', b); if (st) st.textContent = syncStatusText(); };
+  document.addEventListener('sync', beiSync);
   const gehe = ziel => {
     zurueck = ziel === 'haupt';
     seite = ziel; zeichne();
@@ -1705,6 +1738,28 @@ function oeffneEinstellungen(start = 'haupt') {
       sichereVerlauf(); sichereListe(); zeichne();
       return;
     }
+    const warte = (knopf, text) => { knopf.disabled = true; knopf.innerHTML = '<span class="laedt"></span>' + text; };
+    const syncStart = e.target.closest('#eSyncStart');
+    if (syncStart) {
+      warte(syncStart, t`Wird eingerichtet`);
+      return starteSync(neuerSyncSchluessel(), 'neu').then(() => {
+        if (!SYNC.stand || !SYNC.stand.zuletzt) { beendeSync(); zeigeToast(t`Verbindung fehlgeschlagen. Später erneut versuchen.`); }
+        zeichne();
+      });
+    }
+    if (e.target.closest('#eSyncTeilen')) return teile(t`Einladung zu unserer gemeinsamen Einkaufsliste:` + '\n' + einladungsLink(), t`Einladung teilen`);
+    const syncJetzt = e.target.closest('#eSyncJetzt');
+    if (syncJetzt) { warte(syncJetzt, t`Wird synchronisiert`); return synchronisiere().finally(zeichne); }
+    if (e.target.closest('#eSyncEnde')) {
+      if (!confirm(t`Synchronisierung auf diesem Gerät beenden? Die Daten bleiben hier, werden aber nicht mehr abgeglichen.`)) return;
+      beendeSync(); return zeichne();
+    }
+    const syncNeu = e.target.closest('#eSyncNeu');
+    if (syncNeu) {
+      if (!confirm(t`Neuen Schlüssel erzeugen? Alle anderen Geräte werden getrennt und müssen neu eingeladen werden.`)) return;
+      warte(syncNeu, t`Wird eingerichtet`);
+      return erneuereSync().finally(zeichne);
+    }
     if (e.target.closest('#eExport')) return exportieren();
     if (e.target.closest('#eImport')) return $('#eImportDatei', b).click();
     if (e.target.closest('#eVerlaufLeeren')) {
@@ -1724,7 +1779,7 @@ function oeffneEinstellungen(start = 'haupt') {
     if (e.target.id === 'eApiKey') { S.einstellungen.apiKey = e.target.value.trim(); sichereEinstellungen(); }
     if (e.target.id === 'eImportDatei' && e.target.files[0]) importieren(e.target.files[0], zeichne);
   });
-  b._beimSchliessen = render;
+  b._beimSchliessen = () => { document.removeEventListener('sync', beiSync); render(); };
 }
 
 function oeffneProfil(p, nachher) {
@@ -1832,7 +1887,8 @@ async function importieren(datei, nachher) {
   try {
     const d = JSON.parse(await datei.text());
     if (!d || !Array.isArray(d.liste) || !Array.isArray(d.profile)) throw new Error('Format');
-    if (!confirm(t`Sicherung einspielen? Die aktuellen Daten werden ersetzt (der API-Schlüssel bleibt).`)) return;
+    if (!confirm(syncAn() ? t`Sicherung einspielen? Die aktuellen Daten werden ersetzt, auch auf allen verbundenen Geräten.`
+      : t`Sicherung einspielen? Die aktuellen Daten werden ersetzt (der API-Schlüssel bleibt).`)) return;
     S.liste = d.liste; S.verlauf = d.verlauf || {}; S.korrekturen = d.korrekturen || {}; S.eans = d.eans || {};
     S.profile = d.profile; S.aktivesProfil = d.aktivesProfil || d.profile[0].id;
     S.rezepte = Array.isArray(d.rezepte) ? d.rezepte : S.rezepte;
@@ -2071,7 +2127,13 @@ async function oeffneScanner() {
     const ean = prompt(t`EAN-Nummer (unter dem Barcode):`);
     if (ean && /^\d{8,14}$/.test(ean.trim())) { schliessen(); barcodeGefunden(ean.trim()); }
   };
-  const gefunden = code => { if (fertig) return; schliessen(); barcodeGefunden(code); };
+  const gefunden = code => {
+    if (fertig) return;
+    const link = linkAus(code);
+    if (!link && !/^\d{6,14}$/.test(code)) return;          // anderer QR-Code: weiter suchen
+    schliessen();
+    link ? verarbeiteLink(link) : barcodeGefunden(code);
+  };
 
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('keine Kamera');
@@ -2080,7 +2142,7 @@ async function oeffneScanner() {
       stopp = () => stream.getTracks().forEach(t => t.stop());
       video.srcObject = stream;
       await video.play();
-      const detektor = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+      const detektor = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code'] });
       const schleife = async () => {
         if (fertig) return;
         try { const r = await detektor.detect(video); if (r[0]) return gefunden(r[0].rawValue); } catch (e) {}
@@ -2090,7 +2152,7 @@ async function oeffneScanner() {
     } else {
       if (!window.ZXing) await ladeSkript('vendor/zxing.min.js');
       const hints = new Map();
-      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E]);
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E, ZXing.BarcodeFormat.QR_CODE]);
       const leser = new ZXing.BrowserMultiFormatReader(hints, 300);
       stopp = () => leser.reset();
       await leser.decodeFromConstraints({ video: { facingMode: 'environment' }, audio: false }, video, r => { if (r) gefunden(r.getText()); });
@@ -2631,7 +2693,7 @@ async function dekodiere(str) {
 }
 
 function linkAus(text) {
-  const m = String(text || '').match(/#([lr])=([A-Za-z0-9_-]{4,})/);
+  const m = String(text || '').match(/#([lrs])=([A-Za-z0-9_-]{4,})/);
   return m ? { art: m[1], daten: m[2] } : null;
 }
 
@@ -2690,6 +2752,7 @@ function linkAusAdresse() {
 }
 
 async function verarbeiteLink(link) {
+  if (link.art === 's') return oeffneBeitreten(link.daten);
   let daten;
   try { daten = await dekodiere(link.daten); } catch (e) { return zeigeToast(t`Der Link ist unvollständig oder beschädigt`); }
   if (!daten || daten.v !== 1) return zeigeToast(t`Der Link stammt aus einer neueren Version der App`);
@@ -2774,6 +2837,366 @@ function oeffneRueckmeldung(r) {
       sichereListe(); render();
     });
   });
+}
+
+/* ============================================================
+   Synchronisierung für den Haushalt (#s=…)
+   Kein Konto: Wer den geheimen Schlüssel hat, gehört dazu. Aus dem Schlüssel entstehen die Raum-ID (für den Server)
+   und der AES-Schlüssel; der Server speichert nur einen verschlüsselten Block mit Versionsnummer.
+   Zusammengeführt wird hier: Jedes Feld eines Eintrags trägt einen Zeitstempel, der jüngere gewinnt.
+   Dokument: { sammlung: { schlüssel: { f: { feld: [wert, t] | [t] (Feld entfernt) }, x: t (gelöscht) } } }
+   ============================================================ */
+
+const SYNC_URL_STANDARD = '';   // Worker-Adresse, siehe server/ANLEITUNG.md; zum Testen überschreibbar mit localStorage „ek.syncUrl“
+const SYNC_URL = (() => { try { return localStorage.getItem('ek.syncUrl') || SYNC_URL_STANDARD; } catch (e) { return SYNC_URL_STANDARD; } })().replace(/\/+$/, '');
+const SYNC_SAMMLUNGEN = ['liste', 'verlauf', 'korrekturen', 'eans', 'profile', 'rezepte'];
+const SYNC_LISTEN = ['liste', 'profile', 'rezepte'];      // Arrays mit id, der Rest sind Objekte mit Schlüssel
+const SYNC_GRABSTEIN_TAGE = 60;
+const SYNC = { stand: null, doc: null, laeuft: false, nochmal: false, zeitgeber: null, fehler: '', online: true };
+
+function ladeSync() {
+  SYNC_BEREIT = true;
+  SYNC.stand = lade('sync', null);                         // { schluessel, version, serverHash, uhr, zuletzt }
+  SYNC.doc = SYNC.stand ? lade('sync.doc', {}) : null;
+}
+const syncAn = () => !!(SYNC.stand && SYNC.stand.schluessel);
+function sichereSync() {
+  sichere('sync', SYNC.stand);
+  sichere('sync.doc', SYNC.doc);
+}
+
+// JSON mit sortierten Schlüsseln, damit gleiche Stände auf allen Geräten gleich aussehen
+function kanonisch(x) {
+  if (Array.isArray(x)) return '[' + x.map(kanonisch).join(',') + ']';
+  if (x && typeof x === 'object') return '{' + Object.keys(x).filter(k => x[k] !== undefined).sort().map(k => JSON.stringify(k) + ':' + kanonisch(x[k])).join(',') + '}';
+  return JSON.stringify(x === undefined ? null : x);
+}
+function textHash(s) {   // FNV-1a, reicht zum Erkennen von Änderungen
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(36) + ':' + s.length;
+}
+
+// Hybride Uhr: nie kleiner als ein schon gesehener Zeitstempel, damit eine nachgehende Geräteuhr nicht verliert
+function syncUhr(stand) {
+  const t = Math.max(Date.now(), (stand.uhr || 0) + 1);
+  stand.uhr = t;
+  return t;
+}
+
+// Sammlung als { schlüssel: wert } (Arrays über die id)
+const alsMap = (name, wert) => SYNC_LISTEN.includes(name) ? Object.fromEntries((wert || []).map(e => [e.id, e])) : (wert || {});
+const istObjekt = v => v && typeof v === 'object' && !Array.isArray(v);
+const felderVon = v => istObjekt(v) ? v : { _: v };
+// Ein Eintrag lebt, wenn er Werte hat und ein Feld jünger ist als sein Löschzeitpunkt.
+// So bleibt ein Artikel vollständig erhalten, wenn jemand ihn löscht und ein anderer ihn gleichzeitig ändert.
+const juengstes = e => Math.max(0, ...Object.values(e.f || {}).map(w => w.at(-1)));
+const lebt = e => !!e && Object.values(e.f || {}).some(w => w.length === 2) && juengstes(e) > (e.x || 0);
+
+// Überträgt den aktuellen Stand einer Sammlung ins Dokument; geänderte Felder bekommen den Zeitstempel t
+function erfasse(doc, name, wert, t) {
+  const alt = doc[name] || (doc[name] = {});
+  const jetzt = alsMap(name, wert);
+  let geaendert = false;
+  for (const [key, v] of Object.entries(jetzt)) {
+    const e = alt[key] || (alt[key] = { f: {} });
+    const felder = felderVon(v);
+    for (const [feld, fw] of Object.entries(felder)) {
+      if (fw === undefined) continue;
+      const bisher = e.f[feld];
+      if (!bisher || bisher.length === 1 || kanonisch(bisher[0]) !== kanonisch(fw)) { e.f[feld] = [JSON.parse(JSON.stringify(fw)), t]; geaendert = true; }
+    }
+    for (const [feld, bisher] of Object.entries(e.f)) {
+      if (bisher.length === 2 && !(feld in felder && felder[feld] !== undefined)) { e.f[feld] = [t]; geaendert = true; }
+    }
+  }
+  for (const [key, e] of Object.entries(alt)) {
+    if (!(key in jetzt) && lebt(e)) { alt[key] = { f: {}, x: t }; geaendert = true; }
+  }
+  return geaendert;
+}
+
+// Führt zwei Dokumente zusammen (reine Funktion). Pro Feld gewinnt der jüngere Zeitstempel,
+// bei Gleichstand der größere Wert, damit alle Geräte zum selben Ergebnis kommen.
+function zusammenfuehren(a, b, jetzt = Date.now()) {
+  const erg = {}, grenze = jetzt - SYNC_GRABSTEIN_TAGE * 864e5;
+  for (const name of new Set([...Object.keys(a || {}), ...Object.keys(b || {})])) {
+    const sa = (a || {})[name] || {}, sb = (b || {})[name] || {}, ziel = erg[name] = {};
+    for (const key of new Set([...Object.keys(sa), ...Object.keys(sb)])) {
+      const ea = sa[key] || { f: {} }, eb = sb[key] || { f: {} };
+      const x = Math.max(ea.x || 0, eb.x || 0);
+      const f = {};
+      for (const feld of new Set([...Object.keys(ea.f || {}), ...Object.keys(eb.f || {})])) {
+        const va = (ea.f || {})[feld], vb = (eb.f || {})[feld];
+        let w = !va ? vb : !vb ? va : va.at(-1) !== vb.at(-1) ? (va.at(-1) > vb.at(-1) ? va : vb)
+          : kanonisch(va) >= kanonisch(vb) ? va : vb;
+        f[feld] = w;
+      }
+      const neu = x ? { f, x } : { f };
+      if (x && !lebt(neu)) {
+        if (x >= grenze) ziel[key] = { f: {}, x };   // Grabstein; alte fallen weg
+        continue;
+      }
+      if (Object.keys(f).length) ziel[key] = neu;
+    }
+  }
+  return erg;
+}
+
+// Wert eines Eintrags aus dem Dokument; null = gelöscht
+function eintragWert(e) {
+  if (!lebt(e)) return null;
+  if ('_' in e.f) return e.f._.length === 2 ? e.f._[0] : null;
+  return Object.fromEntries(Object.entries(e.f).filter(([, w]) => w.length === 2).map(([k, w]) => [k, JSON.parse(JSON.stringify(w[0]))]));
+}
+const ersterZeitstempel = e => Math.min(...Object.values(e.f || {}).map(w => w.at(-1)));
+
+// Schreibt das Dokument in eine Sammlung zurück. Vorhandene Objekte werden an Ort und Stelle geändert,
+// damit offene Blätter (z. B. das Detailblatt eines Artikels) weiter auf dasselbe Objekt zeigen.
+function ausDokument(doc, name, bisher) {
+  const s = doc[name] || {};
+  const angleichen = (obj, wert) => {
+    if (!istObjekt(obj) || !istObjekt(wert)) return wert;
+    for (const k of Object.keys(obj)) if (!(k in wert)) delete obj[k];
+    return Object.assign(obj, wert);
+  };
+  if (SYNC_LISTEN.includes(name)) {
+    const alt = new Map((bisher || []).map(e => [e.id, e]));
+    const erg = [];
+    for (const e of bisher || []) {
+      const w = eintragWert(s[e.id]);
+      if (w) erg.push(angleichen(e, { ...w, id: e.id }));
+    }
+    const neu = Object.entries(s).filter(([k, e]) => !alt.has(k) && eintragWert(e)).sort((x, y) => ersterZeitstempel(x[1]) - ersterZeitstempel(y[1]));
+    for (const [k, e] of neu) erg.push({ ...eintragWert(e), id: k });
+    return erg;
+  }
+  const erg = {};
+  for (const [k, e] of Object.entries(s)) {
+    const w = eintragWert(e);
+    if (w != null) erg[k] = angleichen((bisher || {})[k], w);
+  }
+  return erg;
+}
+
+/* Verschlüsselung */
+async function syncSchluessel(schluessel) {
+  const roh = new TextEncoder().encode(schluessel);
+  const raum = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('raum|' + schluessel))));
+  const basis = await crypto.subtle.importKey('raw', roh, 'HKDF', false, ['deriveKey']);
+  const aes = await crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: new TextEncoder().encode('einkaufsliste'), info: new TextEncoder().encode('daten') },
+    basis, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  return { raum, aes };
+}
+async function verschluessele(obj, aes) {
+  const roh = new TextEncoder().encode(JSON.stringify(obj));
+  const komp = typeof CompressionStream !== 'undefined';
+  const inhalt = komp ? await durchStrom(roh, new CompressionStream('deflate-raw')) : roh;
+  const klar = new Uint8Array(inhalt.length + 1);
+  klar[0] = komp ? 1 : 0; klar.set(inhalt, 1);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const geheim = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aes, klar));
+  const alles = new Uint8Array(12 + geheim.length);
+  alles.set(iv); alles.set(geheim, 12);
+  return b64url(alles);
+}
+async function entschluessele(text, aes) {
+  const alles = ausB64url(text);
+  const klar = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: alles.subarray(0, 12) }, aes, alles.subarray(12)));
+  const inhalt = klar.subarray(1);
+  const roh = klar[0] === 1 ? await durchStrom(inhalt, new DecompressionStream('deflate-raw')) : inhalt;
+  return JSON.parse(new TextDecoder().decode(roh));
+}
+const neuerSyncSchluessel = () => b64url(crypto.getRandomValues(new Uint8Array(16)));
+
+/* Server */
+async function syncAnfrage(methode, raum, body, parameter = '') {
+  const ctrl = new AbortController();
+  const zeit = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const r = await fetch(`${SYNC_URL}/r/${raum}${parameter}`, {
+      method: methode, signal: ctrl.signal, cache: 'no-store',
+      headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined,
+    });
+    const d = r.status === 204 ? {} : await r.json().catch(() => ({}));
+    return { status: r.status, ...d };
+  } finally { clearTimeout(zeit); }
+}
+
+/* Lokale Änderungen: wird von sichere() für jede synchronisierte Sammlung aufgerufen */
+function syncGeaendert(name) {
+  if (!SYNC_SAMMLUNGEN.includes(name) || !syncAn() || SYNC.anwenden) return;
+  if (erfasse(SYNC.doc, name, S[name], syncUhr(SYNC.stand))) {
+    sichereSync();
+    planeSync(1500);
+  }
+}
+function planeSync(ms) {
+  clearTimeout(SYNC.zeitgeber);
+  SYNC.zeitgeber = setTimeout(() => synchronisiere().catch(() => {}), ms);
+}
+
+// Übernimmt ein zusammengeführtes Dokument in die App
+function syncAnwenden(doc) {
+  const vorher = kanonisch(SYNC.doc);
+  SYNC.doc = doc;
+  if (kanonisch(doc) === vorher) return false;
+  SYNC.anwenden = true;
+  try {
+    for (const name of SYNC_SAMMLUNGEN) {
+      S[name] = ausDokument(doc, name, S[name]);
+      sichere(name, S[name]);
+    }
+    if (!S.profile.length) S.profile = standardProfile();
+    if (!S.profile.some(p => p.id === S.aktivesProfil)) { S.aktivesProfil = S.profile[0].id; sichere('aktivesProfil', S.aktivesProfil); }
+  } finally { SYNC.anwenden = false; }
+  return true;
+}
+
+// Holen, zusammenführen, bei Bedarf hochladen. Bei 409 (jemand war schneller) noch einmal.
+async function synchronisiere() {
+  if (!syncAn() || !SYNC_URL) return;
+  if (SYNC.laeuft) { SYNC.nochmal = true; return; }
+  SYNC.laeuft = true;
+  const st = SYNC.stand;
+  let geaendert = false;
+  try {
+    const { raum, aes } = await syncSchluessel(st.schluessel);
+    for (let versuch = 0; versuch < 4; versuch++) {
+      const r = await syncAnfrage('GET', raum, null, st.version ? `?v=${st.version}` : '');
+      let serverDoc = null;
+      if (r.status === 404) {
+        if (st.version) { beendeSync(); zeigeToast(t`Die gemeinsame Liste wurde beendet oder neu eingerichtet`); return; }
+      } else if (r.status !== 200) throw new Error('status ' + r.status);
+      else if (!r.unveraendert) {
+        serverDoc = await entschluessele(r.daten, aes);
+        const neu = zusammenfuehren(SYNC.doc, serverDoc);
+        for (const s of Object.values(serverDoc)) for (const e of Object.values(s)) for (const w of Object.values(e.f || {}).concat(e.x ? [[e.x]] : [])) st.uhr = Math.max(st.uhr || 0, w.at(-1));
+        if (syncAnwenden(neu)) geaendert = true;
+        st.version = r.version; st.serverHash = textHash(kanonisch(serverDoc));
+      }
+      const hash = textHash(kanonisch(SYNC.doc));
+      if (r.status === 200 && hash === st.serverHash) break;            // Server kennt schon alles
+      const p = await syncAnfrage('PUT', raum, { basis: r.status === 404 ? 0 : st.version, daten: await verschluessele(SYNC.doc, aes) });
+      if (p.status === 200) { st.version = p.version; st.serverHash = hash; break; }
+      if (p.status !== 409) throw new Error('status ' + p.status);
+    }
+    st.zuletzt = Date.now(); SYNC.fehler = ''; SYNC.online = true;
+    sichereSync();
+  } catch (e) {
+    const netz = navigator.onLine === false || e.name === 'AbortError' || e instanceof TypeError;
+    SYNC.online = !netz;
+    SYNC.fehler = netz ? '' : e.name === 'OperationError' ? t`Schlüssel passt nicht zu den Daten` : t`Synchronisierung fehlgeschlagen`;
+  } finally {
+    SYNC.laeuft = false;
+    if (geaendert) render();
+    document.dispatchEvent(new Event('sync'));
+    if (SYNC.nochmal) { SYNC.nochmal = false; planeSync(300); }
+  }
+}
+
+// modus: 'neu' (erstes Gerät), 'zusammen' (beitreten, eigene Daten behalten), 'ersetzen' (beitreten, nur gemeinsame Daten)
+async function starteSync(schluessel, modus) {
+  if (modus === 'zusammen') await entferneLokaleDoppelte(schluessel);
+  SYNC.stand = { schluessel, version: 0, serverHash: '', uhr: 0, zuletzt: 0 };
+  SYNC.doc = {};
+  if (modus !== 'ersetzen') {
+    // Beim Beitreten gewinnt bei gleichen Einträgen der gemeinsame Stand (Zeitstempel 1), Neues von hier kommt dazu
+    const t0 = modus === 'zusammen' ? 1 : syncUhr(SYNC.stand);
+    for (const name of SYNC_SAMMLUNGEN) erfasse(SYNC.doc, name, S[name], t0);
+  }
+  sichereSync();
+  await synchronisiere();
+}
+
+// Vor dem Beitreten: Artikel, die schon offen auf der gemeinsamen Liste stehen, hier entfernen,
+// damit „Milch“ nicht doppelt erscheint. Die gemeinsame Fassung bleibt.
+async function entferneLokaleDoppelte(schluessel) {
+  try {
+    const { raum, aes } = await syncSchluessel(schluessel);
+    const r = await syncAnfrage('GET', raum);
+    if (r.status !== 200) return;
+    const gemeinsam = ausDokument(await entschluessele(r.daten, aes), 'liste', []);
+    const namen = new Set(gemeinsam.filter(i => !i.erledigt).map(i => kompakt(i.name)));
+    const vorher = S.liste.length;
+    S.liste = S.liste.filter(i => i.erledigt || !namen.has(kompakt(i.name)));
+    if (S.liste.length !== vorher) sichereListe();
+  } catch (e) {}
+}
+
+function beendeSync() {
+  clearTimeout(SYNC.zeitgeber);
+  SYNC.stand = null; SYNC.doc = null; SYNC.fehler = '';
+  try { localStorage.removeItem(SPEICHER_PREFIX + 'sync'); localStorage.removeItem(SPEICHER_PREFIX + 'sync.doc'); } catch (e) {}
+  document.dispatchEvent(new Event('sync'));
+}
+
+// Neuer Schlüssel: alter Raum wird gelöscht, die anderen Geräte sind draußen
+async function erneuereSync() {
+  const { raum } = await syncSchluessel(SYNC.stand.schluessel);
+  await syncAnfrage('DELETE', raum).catch(() => {});
+  const doc = SYNC.doc;
+  SYNC.stand = { schluessel: neuerSyncSchluessel(), version: 0, serverHash: '', uhr: SYNC.stand.uhr, zuletzt: 0 };
+  SYNC.doc = doc;
+  sichereSync();
+  await synchronisiere();
+}
+
+const einladungsLink = () => `${appAdresse()}#s=${SYNC.stand.schluessel}`;
+
+function qrSvg(text) {
+  const qr = qrcode(0, 'M');
+  qr.addData(text); qr.make();
+  const n = qr.getModuleCount(), rand = 2;
+  let pfad = '';
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (qr.isDark(y, x)) pfad += `M${x + rand} ${y + rand}h1v1h-1z`;
+  return `<svg class="qr" viewBox="0 0 ${n + 2 * rand} ${n + 2 * rand}" role="img" aria-label="${t`QR-Code`}"><rect width="100%" height="100%" fill="#fff"/><path d="${pfad}" fill="#000"/></svg>`;
+}
+
+function syncStatusText() {
+  if (!SYNC_URL) return t`Der Sync-Server ist noch nicht eingerichtet.`;
+  if (SYNC.fehler) return SYNC.fehler;
+  if (!SYNC.online) return t`Offline. Änderungen werden später übertragen.`;
+  const z = SYNC.stand && SYNC.stand.zuletzt;
+  if (!z) return t`Noch nicht synchronisiert`;
+  const min = Math.round((Date.now() - z) / 60000);
+  return min < 1 ? t`Verbunden · gerade eben` : t`Verbunden · zuletzt vor ${min} Min.`;
+}
+
+// Beitreten über einen Link mit #s=
+function oeffneBeitreten(schluessel) {
+  if (!SYNC_URL) return zeigeToast(t`Der Sync-Server ist noch nicht eingerichtet.`);
+  if (syncAn() && SYNC.stand.schluessel === schluessel) return zeigeToast(t`Schon verbunden`);
+  const homescreen = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  const b = oeffneBlatt(`<div class="blatt-kopf"><h3>${t`Gemeinsame Liste`}</h3><button type="button" class="zurueck" data-schliessen>${t`Abbrechen`}</button></div>
+    <p>${t`Mit der gemeinsamen Liste verbinden? Danach sehen alle verbundenen Geräte dieselbe Liste, dieselben Läden und Rezepte.`}</p>
+    ${syncAn() ? `<p class="text-muted">${t`Die bisherige Verbindung dieses Geräts wird dabei beendet.`}</p>` : ''}
+    ${homescreen ? '' : `<p class="text-muted">${t`Nutzt du die App vom Home-Bildschirm? Dann kopiere den Link aus der Nachricht und füge ihn dort ins Eingabefeld ein. Safari und die App haben getrennte Listen.`}</p>`}
+    <div class="knopfreihe">
+      <button type="button" class="knopf" id="sbZusammen">${t`Verbinden und zusammenführen`}</button>
+      <button type="button" class="knopf zweit" id="sbErsetzen">${t`Verbinden, Daten dieses Geräts ersetzen`}</button>
+    </div>
+    <p class="text-muted">${t`Zusammenführen behält, was nur auf diesem Gerät steht. Ersetzen übernimmt nur die gemeinsame Liste.`}</p>`);
+  b.addEventListener('click', async e => {
+    const knopf = e.target.closest('#sbZusammen, #sbErsetzen');
+    if (!knopf) return;
+    $$('.knopf', b).forEach(k => { k.disabled = true; });
+    knopf.innerHTML = '<span class="laedt"></span>' + t`Wird verbunden`;
+    if (syncAn()) beendeSync();
+    await starteSync(schluessel, knopf.id === 'sbErsetzen' ? 'ersetzen' : 'zusammen');
+    schliesseBlatt(b);
+    if (!SYNC.stand || !SYNC.stand.zuletzt) { zeigeToast(t`Verbindung fehlgeschlagen. Später erneut versuchen.`); return; }
+    zeigeToast(t`Verbunden`);
+    render();
+  });
+}
+
+// Auslöser: Start, zurück in die App, wieder online, alle 10 s solange offen
+function starteSyncZeitgeber() {
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') planeSync(100); });
+  addEventListener('online', () => planeSync(100));
+  setInterval(() => { if (document.visibilityState === 'visible' && syncAn()) synchronisiere().catch(() => {}); }, 10000);
+  if (syncAn()) planeSync(300);
 }
 
 /* ============================================================
@@ -3020,6 +3443,59 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
   pruefe('Chips immer: nie in der Laden-Ansicht', chipsZustand(false), { zeigen: false, griff: null });
   S.einstellungen = standardEinstellungen(); S.liste = []; render();
 
+  // Synchronisierung: Zusammenführen pro Feld, Löschen, Grabsteine, Verschlüsselung
+  {
+    const kopie = x => JSON.parse(JSON.stringify(x));
+    const milch = { id: 'a', name: 'Milch', menge: 1, einheit: 'stk', erledigt: false };
+    const d0 = {}; erfasse(d0, 'liste', [milch], 100);
+    const dA = kopie(d0); erfasse(dA, 'liste', [{ ...milch, erledigt: true }], 200);
+    const dB = kopie(d0); erfasse(dB, 'liste', [{ ...milch, menge: 3 }], 210);
+    const m = zusammenfuehren(dA, dB);
+    pruefe('Sync: verschiedene Felder bleiben beide', kanonisch(ausDokument(m, 'liste', [])), kanonisch([{ ...milch, menge: 3, erledigt: true }]));
+    pruefe('Sync: Reihenfolge egal', kanonisch(zusammenfuehren(dB, dA)), kanonisch(m));
+    pruefe('Sync: zweimal zusammenführen ändert nichts', kanonisch(zusammenfuehren(m, m)), kanonisch(m));
+    const dC = kopie(d0); erfasse(dC, 'liste', [{ ...milch, menge: 5 }], 220);
+    pruefe('Sync: gleiches Feld, jüngerer Wert gewinnt', ausDokument(zusammenfuehren(dB, dC), 'liste', [])[0].menge, 5);
+    const weg = kopie(d0); erfasse(weg, 'liste', [], 200);
+    pruefe('Sync: Löschen', ausDokument(zusammenfuehren(d0, weg), 'liste', []), []);
+    pruefe('Sync: späteres Ändern rettet den ganzen Artikel', kanonisch(ausDokument(zusammenfuehren(weg, dB), 'liste', [])), kanonisch([{ ...milch, menge: 3 }]));
+    const wegSpaet = kopie(d0); erfasse(wegSpaet, 'liste', [], 300);
+    pruefe('Sync: späteres Löschen gewinnt', ausDokument(zusammenfuehren(dB, wegSpaet), 'liste', []), []);
+    pruefe('Sync: alter Grabstein fällt weg', Object.keys(zusammenfuehren(weg, {}, 200 + 61 * 864e5).liste), []);
+    pruefe('Sync: neuer Grabstein bleibt', Object.keys(zusammenfuehren(weg, {}, 300).liste), ['a']);
+    const wieder = kopie(weg); erfasse(wieder, 'liste', [milch], 400);
+    pruefe('Sync: wieder hinzugefügt', ausDokument(zusammenfuehren(weg, wieder), 'liste', []).length, 1);
+    // Feld entfernt (z. B. Einheit im Verlauf)
+    const v0 = {}; erfasse(v0, 'verlauf', { milch: { name: 'Milch', einheit: 'l', menge: 1 } }, 100);
+    const v1 = kopie(v0); erfasse(v1, 'verlauf', { milch: { name: 'Milch' } }, 200);
+    pruefe('Sync: entferntes Feld wird übertragen', kanonisch(ausDokument(zusammenfuehren(v0, v1), 'verlauf', {})), kanonisch({ milch: { name: 'Milch' } }));
+    // Einfache Werte (gelernte Zuordnungen)
+    const k0 = {}; erfasse(k0, 'korrekturen', { tahina: 'konserven' }, 100);
+    const k1 = kopie(k0); erfasse(k1, 'korrekturen', { tahina: 'oel', ajvar: 'konserven' }, 200);
+    pruefe('Sync: einfache Werte', ausDokument(zusammenfuehren(k0, k1), 'korrekturen', {}), { tahina: 'oel', ajvar: 'konserven' });
+    // Einkauf abschließen: Erledigtes verschwindet, Stammartikel wird zurückgesetzt
+    const brot = { id: 'b', name: 'Brot', menge: 1, einheit: 'stk', erledigt: true, stamm: true };
+    const e0 = {}; erfasse(e0, 'liste', [{ ...milch, erledigt: true }, brot], 100);
+    const e1 = kopie(e0); erfasse(e1, 'liste', [{ ...brot, erledigt: false }], 200);
+    pruefe('Sync: Abschließen wird übertragen', ausDokument(zusammenfuehren(e0, e1), 'liste', []).map(i => [i.name, i.erledigt]), [['Brot', false]]);
+    // Vorhandene Objekte werden an Ort und Stelle geändert, lokale Reihenfolge bleibt, Neues kommt ans Ende
+    const obj = { ...milch }, neu = kopie(d0);
+    erfasse(neu, 'liste', [{ id: 'z', name: 'Eier', menge: 1 }, { ...milch, menge: 2 }], 300);
+    const erg = ausDokument(neu, 'liste', [obj]);
+    pruefe('Sync: gleiches Objekt, neue Artikel hinten', [erg[0] === obj, obj.menge, erg.map(i => i.name)], [true, 2, ['Milch', 'Eier']]);
+    pruefe('Sync: nichts geändert wird nicht erfasst', erfasse(kopie(neu), 'liste', erg, 999), false);
+    pruefe('Sync: Uhr läuft nie rückwärts', (() => { const st = { uhr: Date.now() + 1e7 }; return syncUhr(st) > Date.now() + 1e7 - 1; })(), true);
+    pruefe('Sync: Geräte-Einstellungen bleiben lokal', SYNC_SAMMLUNGEN.some(n => ['einstellungen', 'aktivesProfil', 'geteilt'].includes(n)), false);
+    pruefe('Sync: kanonisch unabhängig von der Reihenfolge', kanonisch({ b: 1, a: [2, { d: 1, c: 2 }] }), kanonisch({ a: [2, { c: 2, d: 1 }], b: 1 }));
+    const schl = neuerSyncSchluessel(), { raum, aes } = await syncSchluessel(schl);
+    const geheim = await verschluessele(m, aes);
+    pruefe('Sync: Schlüssel und Raum-ID', [schl.length, raum.length, /^[A-Za-z0-9_-]+$/.test(raum), (await syncSchluessel(schl)).raum === raum], [22, 43, true, true]);
+    pruefe('Sync: Verschlüsselung hin und zurück', kanonisch(await entschluessele(geheim, aes)), kanonisch(m));
+    pruefe('Sync: Inhalt nicht lesbar', geheim.includes('Milch') || (() => { try { return atob(geheim.replace(/-/g, '+').replace(/_/g, '/')).includes('Milch'); } catch (e) { return false; } })(), false);
+    pruefe('Sync: falscher Schlüssel schlägt fehl', await entschluessele(geheim, (await syncSchluessel(neuerSyncSchluessel())).aes).then(() => 'gelesen', e => e.name), 'OperationError');
+    pruefe('Sync: Einladungslink erkannt', linkAus(`Komm dazu: https://x.de/#s=${schl}`), { art: 's', daten: schl });
+  }
+
   // Sprachen: Übersetzungen vollständig, Platzhalter passen
   const html = await (await fetch('index.html', { cache: 'no-store' })).text();
   const quelle = html.slice(0, html.indexOf('async function selbsttest'));   // ohne diesen Test, der die Suchmuster selbst enthält
@@ -3110,9 +3586,11 @@ if (new URLSearchParams(location.search).has('test')) {
 } else {
   uebersetzeSeite();
   ladeAlles();
+  ladeSync();
   wendeDarstellungAn();
   render();
   linkAusAdresse();
+  starteSyncZeitgeber();
   addEventListener('hashchange', linkAusAdresse);
   if (S.einstellungen.standort) waehleLadenPerStandort(false);
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

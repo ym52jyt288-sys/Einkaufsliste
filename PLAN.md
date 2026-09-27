@@ -177,6 +177,50 @@ Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone d
 - Neue Texte in allen drei Sprachpaketen. Selbsttest 220/220, skriptgesteuerter Durchlauf aller Unterseiten auf Französisch
   ohne Fehler und ohne deutsche Reste. Screenshots bei 390 px hell, dunkel und auf Englisch. `sw.js` VERSION `einkauf-13`.
 
+### Runde 11 (27.09.2026): Synchronisierung für den Haushalt, ohne Nutzerkonto
+- **Prinzip**: Ein geheimer Schlüssel (16 Zufallsbytes, 22 Zeichen) ersetzt das Konto. Wer die Einladung hat (QR-Code oder
+  Link `…/#s=<schlüssel>`), gehört zum Haushalt. Aus dem Schlüssel entstehen per Web Crypto die Raum-ID
+  (SHA-256, 43 Zeichen) und ein AES-GCM-Schlüssel (HKDF). Der Server speichert nur `{version, daten}`, verschlüsselt und
+  deflate-komprimiert.
+- **Synchronisiert**: `liste`, `verlauf`, `korrekturen`, `eans`, `profile`, `rezepte`. **Nicht**: `einstellungen`
+  (Thema, Sprache, Schnellauswahl, API-Schlüssel …), `aktivesProfil`, `geteilt`.
+- **Zusammenführen** (`zusammenfuehren()`, reine Funktion): Jedes Feld eines Eintrags hat einen Zeitstempel, der jüngere
+  gewinnt; bei Gleichstand entscheidet der Wert, damit alle Geräte zum selben Ergebnis kommen. Löschen = Grabstein `x`.
+  Ein Eintrag lebt, wenn ein Feld jünger ist als `x`; dann bleibt er vollständig erhalten (Löschen gegen gleichzeitiges
+  Ändern). Grabsteine fallen nach 60 Tagen weg. Die Uhr ist hybrid (`syncUhr`): nie kleiner als ein schon gesehener
+  Zeitstempel.
+- **Änderungen erfassen**: `sichere()` ruft `syncGeaendert()` auf, das den Stand per Vergleich ins Dokument überträgt
+  (`erfasse()`). Deshalb musste keine der Stellen angepasst werden, die die Liste ändern. Das Dokument liegt in
+  `ek.sync.doc`, Schlüssel, Version und Uhr in `ek.sync`. Beim Zurückschreiben (`ausDokument()`) werden vorhandene
+  Objekte an Ort und Stelle geändert, damit offene Blätter gültig bleiben.
+- **Ablauf** `synchronisiere()`: GET (`?v=` → `unveraendert`) → zusammenführen → bei Bedarf PUT mit `basis`. Bei `409`
+  wird neu geholt, höchstens viermal. Ohne Änderung wird nicht hochgeladen (Vergleich über `kanonisch()` + Hash).
+  Auslöser: Start, zurück in die App, `online`, 1,5 s nach einer Änderung, alle 10 s solange sichtbar.
+- **Oberfläche**: Einstellungen → Erweitert → **Synchronisieren**. Aus: Erklärung und „Synchronisierung einrichten“.
+  An: Status, QR-Code (`vendor/qrcode.min.js`, qrcode-generator 1.4.4, MIT), „Einladung teilen“, „Jetzt
+  synchronisieren“, „Auf diesem Gerät beenden“, „Neuen Schlüssel erzeugen“ (löscht den alten Raum und trennt alle anderen).
+- **Beitreten**: Link öffnen, Link ins Eingabefeld einfügen (wichtig für die Home-Bildschirm-App) oder QR-Code mit dem
+  **Scanner der App** (zxing und `BarcodeDetector` lesen jetzt auch QR-Codes; andere QR-Codes werden übergangen).
+  Das Blatt „Gemeinsame Liste“ bietet **Zusammenführen** oder **Ersetzen**. Beim Zusammenführen entfernt das beitretende
+  Gerät vorher eigene offene Artikel, die schon auf der gemeinsamen Liste stehen (keine doppelte Milch). Seine
+  übrigen Daten bekommen Zeitstempel 1, damit bei gleichen Einträgen (Standardläden, Startverlauf) der gemeinsame Stand gewinnt.
+- **Server** in `server/`: `worker.js` (Cloudflare Worker, D1-Bindung `DB`, CORS nur für GitHub Pages und localhost:8765,
+  1 MB Grenze, optional Cron zum Aufräumen), `schema.sql`, `ANLEITUNG.md` (Einrichtung im Browser).
+- **Adresse**: `SYNC_URL_STANDARD` in `index.html` ist noch leer, weil der Nutzer den Worker noch einrichten muss. Bis
+  dahin zeigt die App „Der Sync-Server ist noch nicht eingerichtet“. Zum Testen überschreibbar mit
+  `localStorage['ek.syncUrl']`.
+- **Geprüft**:
+  - Selbsttest 243/243 (20 neue Sync-Fälle).
+  - Zwei-Geräte-Simulation in Headless Chrome, 18/18: zwei iframes auf `localhost` und `127.0.0.1` mit getrennten
+    Speichern gegen den **echten `worker.js`** in Node mit nachgebildeter D1. Geprüft wurden Einrichten per Oberfläche,
+    Beitritt per eingefügtem Link, gleichzeitiges Abhaken und Mengenänderung, Offline-Phase, zwei echte 409-Konflikte,
+    Löschen, Einkauf abschließen, Rezepte, Läden, lokale Einstellungen, kein Hochladen ohne Änderung, Server-Daten
+    unlesbar und die Trennung nach neuem Schlüssel.
+  - Der erzeugte QR-Code wird von zxing gelesen. Screenshots bei 390 px.
+- **Offen**: Cloudflare einrichten (Nutzer, `server/ANLEITUNG.md`), danach `SYNC_URL_STANDARD` eintragen und gegen den
+  echten Worker testen. Nur auf dem iPhone prüfbar: QR-Scan mit der Kamera, zwei Geräte im Laden, Flugmodus.
+- `sw.js` VERSION `einkauf-14`.
+
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
 |---|---|---|
