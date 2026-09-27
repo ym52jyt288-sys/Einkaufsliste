@@ -107,6 +107,9 @@
     'Ohne Schlüssel funktioniert „Zutaten übernehmen“ per Text weiterhin. Mit Schlüssel kostet ein Rezeptfoto etwa 2–3 Cent.':
       'Sin clave, «Añadir ingredientes» sigue funcionando con texto pegado. Con clave, cada foto de receta cuesta unos 2–3 céntimos.',
     'Daten': 'Datos',
+    "Das gilt für alle verbundenen Geräte.": "Afecta a todos los dispositivos conectados.",
+    "{0} auf einem anderen Gerät gelöscht": "{0} eliminado en otro dispositivo",
+    "{0} Artikel auf einem anderen Gerät gelöscht": "{0} artículos eliminados en otro dispositivo",
     "Synchronisieren": "Sincronizar",
     "An": "Activado",
     "Mehrere iPhones teilen sich dieselbe Liste, dieselben Läden und Rezepte. Ein Konto braucht es nicht: Wer die Einladung hat, gehört dazu. Die Daten werden auf dem Gerät verschlüsselt, der Server sieht nur unlesbare Daten.": "Varios iPhone comparten la misma lista, las mismas tiendas y recetas. No hace falta cuenta: quien tenga la invitación forma parte. Los datos se cifran en el dispositivo; el servidor solo ve datos ilegibles.",

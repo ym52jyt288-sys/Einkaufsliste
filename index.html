@@ -827,7 +827,7 @@ function entfernen(id) {
 function listeLeeren() {
   const n = S.liste.length;
   const mitStamm = S.liste.some(i => i.stamm) ? ' ' + t`Auch die Stammartikel werden entfernt.` : '';
-  if (!n || !confirm(t`Die ganze Einkaufsliste löschen (${n} Artikel)?` + mitStamm)) return;
+  if (!n || !confirm(t`Die ganze Einkaufsliste löschen (${n} Artikel)?` + mitStamm + syncWarnung())) return;
   const vorher = S.liste;
   S.liste = [];
   sichereListe(); render();
@@ -1763,7 +1763,7 @@ function oeffneEinstellungen(start = 'haupt') {
     if (e.target.closest('#eExport')) return exportieren();
     if (e.target.closest('#eImport')) return $('#eImportDatei', b).click();
     if (e.target.closest('#eVerlaufLeeren')) {
-      if (!confirm(t`Verlauf, gelernte Abteilungen und gespeicherte Barcodes löschen? Die aktuelle Liste bleibt.`)) return;
+      if (!confirm(t`Verlauf, gelernte Abteilungen und gespeicherte Barcodes löschen? Die aktuelle Liste bleibt.` + syncWarnung())) return;
       for (const i of S.liste) if (i.stamm) merkeVerlauf(i);
       S.verlauf = Object.fromEntries(Object.entries(S.verlauf).filter(([, v]) => v.stamm));
       S.korrekturen = {}; S.eans = {};
@@ -1827,7 +1827,7 @@ function oeffneProfil(p, nachher) {
     }
     if (e.target.closest('#pOrtWeg')) { delete p.ort; sichereProfile(); zeichne(); }
     if (e.target.closest('#pKarte')) oeffneKarte(p, zeichne);
-    if (e.target.closest('#pLoeschen') && confirm(t`„${p.name}“ löschen?`)) {
+    if (e.target.closest('#pLoeschen') && confirm(t`„${p.name}“ löschen?` + syncWarnung())) {
       S.profile = S.profile.filter(x => x !== p);
       if (S.aktivesProfil === p.id) S.aktivesProfil = S.profile[0].id;
       sichereProfile(); schliesseBlatt(b);
@@ -2573,7 +2573,7 @@ function oeffneRezeptBearbeiten(rz, nachher) {
     const weg = e.target.closest('[data-zutat-weg]');
     if (weg) { rz.zutaten.splice(+weg.dataset.zutatWeg, 1); sichereRezepte(); zeichne(); return; }
     if (e.target.closest('#rzListe')) { schliesseBlatt(b); setTimeout(() => rezepteAbrufen([rz]), 220); return; }
-    if (e.target.closest('#rzLoeschen') && confirm(t`Rezept „#${rz.name}“ löschen?`)) {
+    if (e.target.closest('#rzLoeschen') && confirm(t`Rezept „#${rz.name}“ löschen?` + syncWarnung())) {
       S.rezepte = S.rezepte.filter(x => x !== rz); sichereRezepte(); schliesseBlatt(b);
     }
   });
@@ -3059,6 +3059,8 @@ async function synchronisiere() {
   if (SYNC.laeuft) { SYNC.nochmal = true; return; }
   SYNC.laeuft = true;
   const st = SYNC.stand;
+  const warVerbunden = !!st.zuletzt;                 // beim Einrichten und Beitreten keine Hinweise
+  const offenVorher = S.liste.filter(i => !i.erledigt);
   let geaendert = false;
   try {
     const { raum, aes } = await syncSchluessel(st.schluessel);
@@ -3072,7 +3074,11 @@ async function synchronisiere() {
         serverDoc = await entschluessele(r.daten, aes);
         const neu = zusammenfuehren(SYNC.doc, serverDoc);
         for (const s of Object.values(serverDoc)) for (const e of Object.values(s)) for (const w of Object.values(e.f || {}).concat(e.x ? [[e.x]] : [])) st.uhr = Math.max(st.uhr || 0, w.at(-1));
-        if (syncAnwenden(neu)) geaendert = true;
+        if (syncAnwenden(neu)) {
+          geaendert = true;
+          const zusammen = fasseDoppelteZusammen(S.liste);
+          if (zusammen) { S.liste = zusammen; sichereListe(); }   // wird gleich mit hochgeladen
+        }
         st.version = r.version; st.serverHash = textHash(kanonisch(serverDoc));
       }
       const hash = textHash(kanonisch(SYNC.doc));
@@ -3083,6 +3089,7 @@ async function synchronisiere() {
     }
     st.zuletzt = Date.now(); SYNC.fehler = ''; SYNC.online = true;
     sichereSync();
+    if (geaendert && warVerbunden) meldeFremdesLoeschen(offenVorher);
   } catch (e) {
     const netz = navigator.onLine === false || e.name === 'AbortError' || e instanceof TypeError;
     SYNC.online = !netz;
@@ -3093,6 +3100,16 @@ async function synchronisiere() {
     document.dispatchEvent(new Event('sync'));
     if (SYNC.nochmal) { SYNC.nochmal = false; planeSync(300); }
   }
+}
+
+// Hinweis, wenn ein anderes Gerät offene Artikel gelöscht hat (nicht bei „Einkauf abschließen“, das nur Abgehaktes
+// entfernt, und nicht, wenn nur Doppelte zusammengefasst wurden). „Rückgängig“ holt sie für alle zurück.
+function meldeFremdesLoeschen(offenVorher) {
+  const offenJetzt = new Set(S.liste.filter(i => !i.erledigt).map(i => kompakt(i.name)));
+  const weg = offenVorher.filter(i => !S.liste.includes(i) && !offenJetzt.has(kompakt(i.name)));
+  if (!weg.length) return;
+  zeigeToast(weg.length === 1 ? t`${weg[0].name} auf einem anderen Gerät gelöscht` : t`${weg.length} Artikel auf einem anderen Gerät gelöscht`,
+    t`Rückgängig`, () => { S.liste.push(...weg); sichereListe(); render(); });
 }
 
 // modus: 'neu' (erstes Gerät), 'zusammen' (beitreten, eigene Daten behalten), 'ersetzen' (beitreten, nur gemeinsame Daten)
@@ -3140,6 +3157,34 @@ async function erneuereSync() {
   SYNC.doc = doc;
   sichereSync();
   await synchronisiere();
+}
+
+// Zusatz für Rückfragen bei Löschungen, die über die Synchronisierung alle Geräte treffen
+const syncWarnung = () => syncAn() ? ' ' + t`Das gilt für alle verbundenen Geräte.` : '';
+
+// Haben zwei Geräte gleichzeitig denselben Artikel eingetragen, steht er nach dem Abgleich zweimal da.
+// Zusammenfassen: Es bleibt der Eintrag mit der kleinsten id (auf allen Geräten derselbe), mit der größeren Menge
+// bei gleicher Einheit – beide wollten ja dasselbe. Notiz und Stammartikel werden übernommen.
+function fasseDoppelteZusammen(liste) {
+  const gruppen = new Map();
+  for (const i of liste) {
+    if (i.erledigt || i.pausiert) continue;
+    const k = kompakt(i.name);
+    gruppen.set(k, [...(gruppen.get(k) || []), i]);
+  }
+  const weg = new Set();
+  for (const g of gruppen.values()) {
+    if (g.length < 2) continue;
+    g.sort((a, b) => (a.id < b.id ? -1 : 1));
+    const [bleibt, ...rest] = g;
+    for (const i of rest) {
+      if ((i.einheit || 'stk') === (bleibt.einheit || 'stk')) bleibt.menge = Math.max(bleibt.menge || 1, i.menge || 1);
+      if (!bleibt.notiz && i.notiz) bleibt.notiz = i.notiz;
+      if (i.stamm) bleibt.stamm = true;
+      weg.add(i);
+    }
+  }
+  return weg.size ? liste.filter(i => !weg.has(i)) : null;
 }
 
 const einladungsLink = () => `${appAdresse()}#s=${SYNC.stand.schluessel}`;
@@ -3493,6 +3538,11 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
     pruefe('Sync: Verschlüsselung hin und zurück', kanonisch(await entschluessele(geheim, aes)), kanonisch(m));
     pruefe('Sync: Inhalt nicht lesbar', geheim.includes('Milch') || (() => { try { return atob(geheim.replace(/-/g, '+').replace(/_/g, '/')).includes('Milch'); } catch (e) { return false; } })(), false);
     pruefe('Sync: falscher Schlüssel schlägt fehl', await entschluessele(geheim, (await syncSchluessel(neuerSyncSchluessel())).aes).then(() => 'gelesen', e => e.name), 'OperationError');
+    const d1 = { id: 'm2', name: 'Milch', menge: 1, einheit: 'stk', erledigt: false, notiz: 'Bio' };
+    const d2 = { id: 'm1', name: 'milch', menge: 2, einheit: 'stk', erledigt: false };
+    const zus = fasseDoppelteZusammen([d1, { id: 'x', name: 'Brot', erledigt: false }, d2, { id: 'm0', name: 'Milch', erledigt: true }]);
+    pruefe('Sync: Doppelte zusammengefasst, kleinste id bleibt', zus.map(i => [i.id, i.menge || null, i.notiz || '']), [['x', null, ''], ['m1', 2, 'Bio'], ['m0', null, '']]);
+    pruefe('Sync: keine Doppelten, nichts zu tun', fasseDoppelteZusammen([d1, { id: 'x', name: 'Brot', erledigt: false }]), null);
     pruefe('Sync: Einladungslink erkannt', linkAus(`Komm dazu: https://x.de/#s=${schl}`), { art: 's', daten: schl });
   }
 

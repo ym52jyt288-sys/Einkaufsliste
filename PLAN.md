@@ -223,6 +223,22 @@ Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone d
 - **Offen, nur auf dem iPhone prüfbar**: QR-Scan mit der Kamera, zwei Geräte im Laden, Flugmodus.
 - `sw.js` VERSION `einkauf-15`.
 
+### Runde 12 (27.09.2026): Sync-Regeln beim Löschen
+Mit dem Nutzer besprochen. Die Grundregel bleibt **„Ändern gewinnt“**: Wird ein gelöschter Artikel auf einem anderen Gerät
+später noch geändert (abgehakt, Menge, Notiz), bleibt er für alle erhalten. Lieber einmal zu viel als vergessen.
+„Einkauf abschließen“ entfernt weiter alles Abgehakte **bei allen**, weil der Haushalt fast nie gleichzeitig in
+getrennten Läden einkauft. Neu:
+- **Warnung**: Die Rückfragen bei „Ganze Liste löschen“, „Verlauf … löschen“, „Laden löschen“ und „Rezept löschen“ enthalten bei
+  aktiver Synchronisierung „Das gilt für alle verbundenen Geräte.“ (`syncWarnung()`).
+- **Hinweis bei fremden Löschungen** (`meldeFremdesLoeschen`): Verschwinden durch den Abgleich offene Artikel, erscheint
+  „Eier auf einem anderen Gerät gelöscht“ bzw. „3 Artikel …“ mit „Rückgängig“. Rückgängig holt sie für alle zurück.
+  Kein Hinweis beim Einrichten und Beitreten, bei „Einkauf abschließen“ (nur Abgehaktes) und beim Zusammenfassen.
+- **Doppelte zusammenfassen** (`fasseDoppelteZusammen`): Haben zwei Geräte gleichzeitig denselben Artikel eingetragen,
+  bleibt nach dem Abgleich einer. Es bleibt die kleinste id, damit alle Geräte denselben behalten. Bei gleicher Einheit
+  gilt die **größere** Menge, nicht die Summe, weil beide dasselbe gemeint haben. Notiz und Stammartikel werden übernommen.
+- Selbsttest 245/245, Zwei-Geräte-Simulation 24/24 (neu: gleichzeitig eingetragen, Hinweis und Rückgängig, kein
+  Hinweis beim Abschließen, Warnung in der Rückfrage). `sw.js` VERSION `einkauf-16`.
+
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
 |---|---|---|
