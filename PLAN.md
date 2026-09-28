@@ -321,6 +321,11 @@ getrennten Läden einkauft. Neu:
   die Menge zu erhöhen. Häufig gekaufte füllen nur die Plätze, die danach noch frei sind (ohne Artikel auf der Liste).
 - Selbsttest 266/266. `sw.js` VERSION `einkauf-21`.
 
+- Nachtrag: Beide Varianten sind wählbar, Einstellungen → Schnellauswahl → „Angeheftete Artikel, die schon auf der Liste
+  stehen“: **Platz behalten** (Standard, wie oben) oder **Ausblenden** (bisheriges Verhalten: fällt weg, häufig gekaufte
+  rücken nach). `einstellungen.chips.aufListe` = `behalten` | `ausblenden`, gilt nur für dieses Gerät. Selbsttest 267/267.
+  `sw.js` VERSION `einkauf-22`.
+
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
 |---|---|---|

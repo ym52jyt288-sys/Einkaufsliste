@@ -378,6 +378,10 @@
     'Noch kein anderes Gerät verbunden. Mit dem QR-Code unten einladen.': 'Aún no hay otro dispositivo conectado. Invita uno con el código QR de abajo.',
     'Safari und die App vom Home-Bildschirm zählen als zwei Geräte.': 'Safari y la app de la pantalla de inicio cuentan como dos dispositivos.',
     '{0} steht schon auf der Liste': '{0} ya está en la lista',
+    'Angeheftete Artikel, die schon auf der Liste stehen': 'Artículos fijados que ya están en la lista',
+    'Platz behalten': 'Mantener su lugar',
+    'Sie bleiben an ihrer Stelle, mit Haken markiert. Häufig gekaufte Artikel füllen nur die Plätze nach allen angehefteten.': 'Se quedan en su lugar, marcados con una marca. Los artículos comprados a menudo solo ocupan los huecos tras todos los fijados.',
+    'Sie verschwinden aus der Schnellauswahl, bis sie gekauft sind. An ihre Stelle rücken häufig gekaufte Artikel.': 'Desaparecen de la selección rápida hasta que se compran. Artículos comprados a menudo ocupan su lugar.',
     // Feste Texte im HTML
     'Liste': 'Lista',
     'Geteilte Liste': 'Lista compartida',

@@ -375,6 +375,10 @@
     'Noch kein anderes Gerät verbunden. Mit dem QR-Code unten einladen.': 'No other device connected yet. Invite one with the QR code below.',
     'Safari und die App vom Home-Bildschirm zählen als zwei Geräte.': 'Safari and the Home Screen app count as two devices.',
     '{0} steht schon auf der Liste': '{0} is already on the list',
+    'Angeheftete Artikel, die schon auf der Liste stehen': 'Pinned items already on the list',
+    'Platz behalten': 'Keep their place',
+    'Sie bleiben an ihrer Stelle, mit Haken markiert. Häufig gekaufte Artikel füllen nur die Plätze nach allen angehefteten.': 'They stay in place, marked with a check. Frequently bought items only fill the slots after all pinned ones.',
+    'Sie verschwinden aus der Schnellauswahl, bis sie gekauft sind. An ihre Stelle rücken häufig gekaufte Artikel.': 'They disappear from quick picks until they are bought. Frequently bought items take their place.',
     // Feste Texte im HTML
     'Liste': 'List',
     'Geteilte Liste': 'Shared list',

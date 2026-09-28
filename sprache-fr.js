@@ -377,6 +377,10 @@
     'Noch kein anderes Gerät verbunden. Mit dem QR-Code unten einladen.': 'Aucun autre appareil connecté. Invitez-en un avec le QR code ci-dessous.',
     'Safari und die App vom Home-Bildschirm zählen als zwei Geräte.': 'Safari et l’app de l’écran d’accueil comptent comme deux appareils.',
     '{0} steht schon auf der Liste': '{0} est déjà sur la liste',
+    'Angeheftete Artikel, die schon auf der Liste stehen': 'Articles épinglés déjà sur la liste',
+    'Platz behalten': 'Garder leur place',
+    'Sie bleiben an ihrer Stelle, mit Haken markiert. Häufig gekaufte Artikel füllen nur die Plätze nach allen angehefteten.': 'Ils restent à leur place, marqués d’une coche. Les articles achetés souvent ne remplissent que les places après tous les épinglés.',
+    'Sie verschwinden aus der Schnellauswahl, bis sie gekauft sind. An ihre Stelle rücken häufig gekaufte Artikel.': 'Ils disparaissent de la sélection rapide jusqu’à leur achat. Des articles achetés souvent prennent leur place.',
     // Feste Texte im HTML
     'Liste': 'Liste',
     'Geteilte Liste': 'Liste partagée',

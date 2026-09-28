@@ -557,7 +557,8 @@ function standardEinstellungen() {
     abteilungInListe: true,                                 // Abteilungsname neben dem Artikel in der Listenansicht
     thema: 'system',                                        // system | light | dark
     farben: { an: true, schema: 'markt', stil: 'streifen' }, // stil: streifen | flaeche
-    chips: { an: true, anzahl: 12, angeheftet: [], ausgeblendet: [], modus: 'antippen', eingeklappt: false }, // modus: antippen | immer
+    chips: { an: true, anzahl: 12, angeheftet: [], ausgeblendet: [], modus: 'antippen', eingeklappt: false, aufListe: 'behalten' }, // modus: antippen | immer
+    // aufListe: angehefteter Artikel, der schon auf der Liste steht – 'behalten' (Platz bleibt, markiert) | 'ausblenden' (häufiger rückt nach)
   };
 }
 
@@ -1023,11 +1024,14 @@ function haeufige({ alle = false } = {}) {
   const weg = new Set(c.ausgeblendet);
   const aus = [];
   const gesehen = new Set();
-  // Angeheftete immer, in fester Reihenfolge. Steht einer schon offen auf der Liste, bleibt sein Platz (markiert);
-  // häufig gekaufte füllen nur die Plätze, die nach allen angehefteten noch frei sind.
+  // Angeheftete zuerst, in fester Reihenfolge. Steht einer schon offen auf der Liste: Einstellung „aufListe“ –
+  // 'behalten': sein Platz bleibt (markiert), häufig gekaufte füllen nur, was nach allen angehefteten frei ist;
+  // 'ausblenden': er fällt weg, ein häufig gekaufter rückt nach.
+  const ausblenden = c.aufListe === 'ausblenden';
   for (const n of c.angeheftet) {
     const k = kompakt(n);
-    if (!gesehen.has(k)) { gesehen.add(k); aus.push({ name: n, gepinnt: true, aufListe: offenKeys.has(k) }); }
+    if (gesehen.has(k) || (ausblenden && offenKeys.has(k))) continue;
+    gesehen.add(k); aus.push({ name: n, gepinnt: true, aufListe: offenKeys.has(k) });
   }
   const auto = Object.entries(S.verlauf)
     .filter(([k, v]) => !v.stamm && !offenKeys.has(k) && !weg.has(k) && !gesehen.has(k))
@@ -1709,6 +1713,11 @@ function oeffneEinstellungen(start = 'haupt') {
           <p class="text-muted" style="margin:6px 0 0">${c.modus === 'immer'
             ? t`Immer unter dem Eingabefeld. Nach oben wischen blendet sie aus, antippen oder nach unten wischen holt sie zurück.`
             : t`Erscheint, sobald du ins Eingabefeld tippst, und bei leerer Liste.`}</p></div>
+        <div class="feld"><span>${t`Angeheftete Artikel, die schon auf der Liste stehen`}</span><div class="segment klein" id="eAufListe">${[['behalten', t`Platz behalten`], ['ausblenden', t`Ausblenden`]].map(([id, n]) =>
+          `<button type="button" data-auf-liste="${id}" class="${(c.aufListe || 'behalten') === id ? 'an' : ''}">${n}</button>`).join('')}</div>
+          <p class="text-muted" style="margin:6px 0 0">${(c.aufListe || 'behalten') === 'behalten'
+            ? t`Sie bleiben an ihrer Stelle, mit Haken markiert. Häufig gekaufte Artikel füllen nur die Plätze nach allen angehefteten.`
+            : t`Sie verschwinden aus der Schnellauswahl, bis sie gekauft sind. An ihre Stelle rücken häufig gekaufte Artikel.`}</p></div>
         <div class="feld"><span>${t`Anzahl`}</span><div class="segment klein" id="eAnzahl">${[6, 9, 12, 18].map(n =>
           `<button type="button" data-anzahl="${n}" class="${c.anzahl === n ? 'an' : ''}">${n}</button>`).join('')}</div></div>
         <div class="abschnitt">${t`Artikel`}</div>
@@ -1838,6 +1847,8 @@ function oeffneEinstellungen(start = 'haupt') {
     if (stil) { e1.farben.stil = stil.dataset.stil; sichereEinstellungen(); wendeDarstellungAn(); zeichne(); return; }
     const chipModus = e.target.closest('[data-chip-modus]');
     if (chipModus) { e1.chips.modus = chipModus.dataset.chipModus; e1.chips.eingeklappt = false; sichereEinstellungen(); zeichne(); return; }
+    const aufListe = e.target.closest('[data-auf-liste]');
+    if (aufListe) { e1.chips.aufListe = aufListe.dataset.aufListe; sichereEinstellungen(); zeichne(); return; }
     const anzahl = e.target.closest('[data-anzahl]');
     if (anzahl) { e1.chips.anzahl = +anzahl.dataset.anzahl; sichereEinstellungen(); zeichne(); return; }
     const ca = e.target.closest('[data-chip-aktion]');
@@ -3885,6 +3896,11 @@ async function selbsttest() {
   S.liste = ['Butter', 'Brot'].map((n, i) => ({ id: 'c' + i, name: n, abteilung: 'molkerei', erledigt: false }));
   pruefe('Angeheftete zuerst, in fester Reihenfolge, auch wenn auf der Liste', haeufige().map(c => [c.name, c.gepinnt, !!c.aufListe]),
     [['Kaffee', true, false], ['Butter', true, true], ['Joghurt', true, false], ['Äpfel', true, false], ['Brot', true, true], ['Käse', true, false]]);
+  S.einstellungen.chips.aufListe = 'ausblenden';
+  const ausgebl = haeufige();
+  pruefe('Einstellung „Ausblenden“: auf der Liste fällt weg, häufige rücken nach', [ausgebl.filter(c => c.gepinnt).map(c => c.name),
+    ausgebl.some(c => ['Butter', 'Brot'].includes(c.name)), ausgebl.length > 4], [['Kaffee', 'Joghurt', 'Äpfel', 'Käse'], false, true]);
+  S.einstellungen.chips.aufListe = 'behalten';
   S.einstellungen.chips.angeheftet = ['Kaffee', 'Butter'];
   const reihe = haeufige().map(c => c.gepinnt);
   pruefe('Häufige erst nach allen angehefteten', [reihe.slice(0, 2), reihe.slice(2).every(g => !g), reihe.length > 2], [[true, true], true, true]);
