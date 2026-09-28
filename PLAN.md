@@ -312,6 +312,15 @@ getrennten Läden einkauft. Neu:
 - Selbsttest 263/263, Zwei-Geräte-Test gegen den echten `worker.js` 14/14 (neu: Umstellung des alten Codes, Zählung, Seite).
   `sw.js` VERSION `einkauf-20`.
 
+### Bugfix 28.09.2026: Reihenfolge der Schnellauswahl
+- Rückmeldung: Trotz vieler angehefteter Artikel standen häufig gekaufte dazwischen bzw. an ihrer Stelle. Ursache: Ein
+  angehefteter Artikel, der schon offen auf der Liste stand, fiel aus der Schnellauswahl, und ein häufig gekaufter rückte
+  nach. Das traf besonders nach dem Anheften per Wischen (Runde 14), weil diese Artikel ja auf der Liste stehen.
+- Regel jetzt (`haeufige`): **alle angehefteten zuerst, in fester Reihenfolge**. Steht einer schon auf der Liste, behält er
+  seinen Platz, gestrichelt mit Haken. Antippen lässt die Zeile aufblinken und meldet „… steht schon auf der Liste“, ohne
+  die Menge zu erhöhen. Häufig gekaufte füllen nur die Plätze, die danach noch frei sind (ohne Artikel auf der Liste).
+- Selbsttest 266/266. `sw.js` VERSION `einkauf-21`.
+
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
 |---|---|---|

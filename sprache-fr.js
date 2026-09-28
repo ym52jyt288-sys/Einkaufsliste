@@ -376,6 +376,7 @@
     'Unter diesem Namen erscheint es auf den anderen Geräten.': 'C’est le nom que voient les autres appareils. Les mots restent en allemand dans toutes les langues, pour que le nom soit partout le même.',
     'Noch kein anderes Gerät verbunden. Mit dem QR-Code unten einladen.': 'Aucun autre appareil connecté. Invitez-en un avec le QR code ci-dessous.',
     'Safari und die App vom Home-Bildschirm zählen als zwei Geräte.': 'Safari et l’app de l’écran d’accueil comptent comme deux appareils.',
+    '{0} steht schon auf der Liste': '{0} est déjà sur la liste',
     // Feste Texte im HTML
     'Liste': 'Liste',
     'Geteilte Liste': 'Liste partagée',

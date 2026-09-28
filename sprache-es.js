@@ -377,6 +377,7 @@
     'Unter diesem Namen erscheint es auf den anderen Geräten.': 'Es el nombre que ven los demás dispositivos. Las palabras quedan en alemán en todos los idiomas, para que el nombre sea igual en todas partes.',
     'Noch kein anderes Gerät verbunden. Mit dem QR-Code unten einladen.': 'Aún no hay otro dispositivo conectado. Invita uno con el código QR de abajo.',
     'Safari und die App vom Home-Bildschirm zählen als zwei Geräte.': 'Safari y la app de la pantalla de inicio cuentan como dos dispositivos.',
+    '{0} steht schon auf der Liste': '{0} ya está en la lista',
     // Feste Texte im HTML
     'Liste': 'Lista',
     'Geteilte Liste': 'Lista compartida',

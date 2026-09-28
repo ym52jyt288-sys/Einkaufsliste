@@ -374,6 +374,7 @@
     'Unter diesem Namen erscheint es auf den anderen Geräten.': 'This is the name the other devices see. The words stay German in every language, so the name looks the same everywhere.',
     'Noch kein anderes Gerät verbunden. Mit dem QR-Code unten einladen.': 'No other device connected yet. Invite one with the QR code below.',
     'Safari und die App vom Home-Bildschirm zählen als zwei Geräte.': 'Safari and the Home Screen app count as two devices.',
+    '{0} steht schon auf der Liste': '{0} is already on the list',
     // Feste Texte im HTML
     'Liste': 'List',
     'Geteilte Liste': 'Shared list',

@@ -336,6 +336,8 @@
   .muster i { width: 14px; height: 14px; border-radius: 4px; background: var(--c); }
   .segment.klein { margin-top: 8px; }
   .chip.gepinnt { border-color: var(--accent); }
+  .chip.auf-liste { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); border-style: dashed; }
+  .chip.auf-liste svg { width: 14px; height: 14px; fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 
   /* Scanner */
   .scanner { position: fixed; inset: 0; z-index: 50; background: #000; color: #fff; }
@@ -1021,9 +1023,11 @@ function haeufige({ alle = false } = {}) {
   const weg = new Set(c.ausgeblendet);
   const aus = [];
   const gesehen = new Set();
+  // Angeheftete immer, in fester Reihenfolge. Steht einer schon offen auf der Liste, bleibt sein Platz (markiert);
+  // häufig gekaufte füllen nur die Plätze, die nach allen angehefteten noch frei sind.
   for (const n of c.angeheftet) {
     const k = kompakt(n);
-    if (!offenKeys.has(k) && !gesehen.has(k)) { gesehen.add(k); aus.push({ name: n, gepinnt: true }); }
+    if (!gesehen.has(k)) { gesehen.add(k); aus.push({ name: n, gepinnt: true, aufListe: offenKeys.has(k) }); }
   }
   const auto = Object.entries(S.verlauf)
     .filter(([k, v]) => !v.stamm && !offenKeys.has(k) && !weg.has(k) && !gesehen.has(k))
@@ -1267,7 +1271,7 @@ function renderHilfe() {
     g.className = `chips-griff ${griff || ''}`;
     g.innerHTML = griff === 'zu' ? t`Schnellauswahl` + ' <svg class="ico" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M6 9l6 6 6-6"/></svg>' : '';
     g.setAttribute('aria-label', griff === 'zu' ? t`Schnellauswahl zeigen` : t`Schnellauswahl ausblenden`);
-    chips.innerHTML = liste.map(c => `<button type="button" class="chip${c.gepinnt ? ' gepinnt' : ''}" data-chip="${esc(c.name)}">${esc(c.name)}</button>`).join('');
+    chips.innerHTML = liste.map(c => `<button type="button" class="chip${c.gepinnt ? ' gepinnt' : ''}${c.aufListe ? ' auf-liste' : ''}" data-chip="${esc(c.name)}"${c.aufListe ? ` aria-label="${esc(t`${c.name} steht schon auf der Liste`)}"` : ''}>${c.aufListe ? ICON_HAKEN : ''}${esc(c.name)}</button>`).join('');
   }
 }
 
@@ -1387,7 +1391,11 @@ function oeffneChipMenue(name) {
 }
 $('#chips').addEventListener('click', e => {
   const b = e.target.closest('[data-chip]');
-  if (b && !b._langGedrueckt && !$('#chips')._gewischt) eintragen([{ name: b.dataset.chip }]);
+  if (!b || b._langGedrueckt || $('#chips')._gewischt) return;
+  // Angehefteter Artikel, der schon auf der Liste steht: nur zeigen, nicht die Menge erhöhen
+  const offen = b.classList.contains('auf-liste') && findeOffen(kompakt(b.dataset.chip));
+  if (offen) { blitze(offen.id); return zeigeToast(t`${offen.name} steht schon auf der Liste`); }
+  eintragen([{ name: b.dataset.chip }]);
 });
 $('#chipsGriff').addEventListener('click', () => { if (!$('#chipsGriff')._gewischt) chipsEinklappen(!S.einstellungen.chips.eingeklappt); });
 
@@ -3871,6 +3879,17 @@ async function selbsttest() {
   hefteAn('Milch');
   pruefe('Angehefteter Stammartikel bleibt', haeufige()[0].name, 'Kaffee');
   pruefe('… und steht bei den angehefteten', haeufige().filter(c => c.gepinnt).map(c => c.name), ['Kaffee', 'Milch']);
+  // Angeheftete behalten ihren Platz, auch wenn sie schon auf der Liste stehen; häufige füllen erst danach auf
+  S.einstellungen.chips.anzahl = 6;
+  S.einstellungen.chips.angeheftet = ['Kaffee', 'Butter', 'Joghurt', 'Äpfel', 'Brot', 'Käse'];
+  S.liste = ['Butter', 'Brot'].map((n, i) => ({ id: 'c' + i, name: n, abteilung: 'molkerei', erledigt: false }));
+  pruefe('Angeheftete zuerst, in fester Reihenfolge, auch wenn auf der Liste', haeufige().map(c => [c.name, c.gepinnt, !!c.aufListe]),
+    [['Kaffee', true, false], ['Butter', true, true], ['Joghurt', true, false], ['Äpfel', true, false], ['Brot', true, true], ['Käse', true, false]]);
+  S.einstellungen.chips.angeheftet = ['Kaffee', 'Butter'];
+  const reihe = haeufige().map(c => c.gepinnt);
+  pruefe('Häufige erst nach allen angehefteten', [reihe.slice(0, 2), reihe.slice(2).every(g => !g), reihe.length > 2], [[true, true], true, true]);
+  pruefe('Häufige ohne Artikel auf der Liste', haeufige().filter(c => !c.gepinnt).some(c => ['Butter', 'Brot'].includes(c.name)), false);
+  S.liste = [];
   S.einstellungen = standardEinstellungen();
 
   // Farben: jede Abteilung außer Sonstiges hat in jedem Schema einen Ton
