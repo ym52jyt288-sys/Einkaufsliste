@@ -370,6 +370,10 @@
     '{0} erkannt.': '{0} reconocido.',
     'Code wird gesucht': 'Buscando el código',
     'Das Bild konnte nicht gelesen werden ({0}).': 'No se pudo leer la imagen ({0}).',
+    'Angeheftet': 'Fijado',
+    '{0} in der Schnellauswahl angeheftet': '{0} fijado en la selección rápida',
+    '{0} nicht mehr angeheftet': '{0} ya no está fijado',
+    'Oder einen Artikel auf der Liste nach rechts wischen.': 'O desliza un artículo de la lista hacia la derecha.',
     // Feste Texte im HTML
     'Liste': 'Lista',
     'Geteilte Liste': 'Lista compartida',

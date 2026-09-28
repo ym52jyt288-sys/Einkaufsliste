@@ -369,6 +369,10 @@
     '{0} erkannt.': '{0} reconnu.',
     'Code wird gesucht': 'Recherche du code',
     'Das Bild konnte nicht gelesen werden ({0}).': 'Impossible de lire l’image ({0}).',
+    'Angeheftet': 'Épinglé',
+    '{0} in der Schnellauswahl angeheftet': '{0} épinglé dans la sélection rapide',
+    '{0} nicht mehr angeheftet': '{0} n’est plus épinglé',
+    'Oder einen Artikel auf der Liste nach rechts wischen.': 'Ou balayez un article de la liste vers la droite.',
     // Feste Texte im HTML
     'Liste': 'Liste',
     'Geteilte Liste': 'Liste partagée',

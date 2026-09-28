@@ -367,6 +367,10 @@
     '{0} erkannt.': '{0} recognized.',
     'Code wird gesucht': 'Looking for a code',
     'Das Bild konnte nicht gelesen werden ({0}).': 'The image could not be read ({0}).',
+    'Angeheftet': 'Pinned',
+    '{0} in der Schnellauswahl angeheftet': '{0} pinned to quick picks',
+    '{0} nicht mehr angeheftet': '{0} unpinned',
+    'Oder einen Artikel auf der Liste nach rechts wischen.': 'Or swipe an item on the list to the right.',
     // Feste Texte im HTML
     'Liste': 'List',
     'Geteilte Liste': 'Shared list',

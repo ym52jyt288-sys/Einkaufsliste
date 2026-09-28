@@ -290,6 +290,14 @@ getrennten Läden einkauft. Neu:
   Screenshot, invertiert, BarcodeDetector. `sw.js` VERSION `einkauf-18`.
 - Offen: Echter Screenshot aus der REWE-App ist nicht getestet. Ob REWE den Code zeitweise wechselt, ist unklar.
 
+### Runde 14 (28.09.2026): Anheften per Wischen nach rechts
+- Artikel auf der Liste **nach rechts wischen** heftet ihn in der Schnellauswahl an (grüner Hintergrund „Anheften“). Ist er schon
+  angeheftet, steht dort „Lösen“ und das Wischen löst ihn. Danach schnappt die Zeile zurück, Hinweis mit „Rückgängig“
+  (`wechsleAngeheftet`). Nach links wischen löscht wie bisher. In der geteilten Liste ist das Wischen weiter aus.
+- Angeheftete Artikel tragen in der Liste ein kleines Pin-Symbol. Einstellungen → Schnellauswahl weist auf die Geste hin.
+- Geprüft mit echten Touch-Ereignissen (DevTools): anheften, kurzes Wischen unter der Schwelle tut nichts, erneut wischen löst,
+  Rückgängig, links wischen löscht weiter. Selbsttest 261/261. `sw.js` VERSION `einkauf-19`.
+
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
 |---|---|---|

@@ -153,6 +153,10 @@
     background: var(--danger); color: #fff; font-size: 15px; font-weight: 500;
   }
   .zeile .wisch.pause { background: var(--muted); }
+  /* Nach rechts wischen: Anheften (Schnellauswahl). Sichtbar ist nur der Hintergrund der aktuellen Richtung. */
+  .zeile .wisch.anheften { justify-content: flex-start; padding: 0 0 0 18px; background: var(--accent); color: var(--accent-text); }
+  .zeile .wisch.anheften, .zeile.nach-rechts .wisch:not(.anheften) { visibility: hidden; }
+  .zeile.nach-rechts .wisch.anheften { visibility: visible; }
   .item {
     position: relative; display: flex; align-items: center; gap: 12px; min-height: 52px; background: var(--bg);
     touch-action: pan-y; transition: transform .2s ease;
@@ -168,7 +172,7 @@
   .item .menge { font-weight: 600; margin-right: 6px; font-variant-numeric: tabular-nums; }
   .item .sub { display: block; font-size: 13px; color: var(--muted); margin-top: 1px; }
   .item .rechts { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; flex: none; }
-  .item .stamm-ico { width: 16px; height: 16px; }
+  .item .stamm-ico, .item .pin-ico { width: 16px; height: 16px; }
   .erledigt .txt { color: var(--muted); }
   .erledigt .name { text-decoration: line-through; text-decoration-color: var(--muted); }
   .zuordnen { font-size: 13px; color: var(--accent); padding: 8px 0 8px 8px; }
@@ -490,6 +494,7 @@ function uebersetzeSeite() {
 
 const ICON_STAMM = '<svg class="ico stamm-ico" viewBox="0 0 24 24" aria-label="' + t('Stammartikel') + '"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>';
 const ICON_HAKEN = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const ICON_PIN = '<svg class="ico pin-ico" viewBox="0 0 24 24" aria-label="' + t('Angeheftet') + '"><path d="M12 17v5"/><path d="M9 3h6l-1 5 3 3v2H7v-2l3-3z"/></svg>';
 const ICON_GRIFF = '<svg class="ico" viewBox="0 0 24 24"><path d="M5 9h14M5 15h14"/></svg>';
 
 /* ============================================================
@@ -1026,6 +1031,17 @@ function haeufige({ alle = false } = {}) {
   }
   return aus.slice(0, Math.max(c.anzahl, c.angeheftet.length));
 }
+const istAngeheftet = name => S.einstellungen.chips.angeheftet.some(n => kompakt(n) === kompakt(name));
+// Wischen nach rechts: anheften bzw. wieder lösen, mit Rückgängig
+function wechsleAngeheftet(name) {
+  const an = !istAngeheftet(name);
+  an ? hefteAn(name) : loeseAn(name);
+  render();
+  zeigeToast(an ? t`${name} in der Schnellauswahl angeheftet` : t`${name} nicht mehr angeheftet`, t`Rückgängig`, () => {
+    an ? loeseAn(name) : hefteAn(name);
+    render();
+  });
+}
 function hefteAn(name) {
   const c = S.einstellungen.chips, k = kompakt(name);
   if (!c.angeheftet.some(n => kompakt(n) === k)) c.angeheftet.push(name);
@@ -1129,10 +1145,11 @@ function zeileHTML(item, mitAbteilung) {
   const abt = mitAbteilung && item.abteilung !== 'sonstiges' ? `<span class="punkt"></span><span>${esc(ABT_NAME[item.abteilung] || '')}</span>` : '';
   return `<li class="zeile" data-id="${item.id}" style="${zf(item.abteilung)}">
     <div class="wisch${item.stamm ? ' pause' : ''}">${item.stamm ? t`Diesmal nicht` : t`Löschen`}</div>
+    ${S.geteilt ? '' : `<div class="wisch anheften">${istAngeheftet(item.name) ? t`Lösen` : t`Anheften`}</div>`}
     <div class="item${item.erledigt ? ' erledigt' : ''}">
       <button type="button" class="check" data-aktion="abhaken" aria-label="${item.erledigt ? t`Zurückholen` : t`Abhaken`}"><span>${ICON_HAKEN}</span></button>
       <div class="txt" data-aktion="details">${menge}<span class="name">${esc(item.name)}</span>${sub}</div>
-      <div class="rechts">${zuordnen}${abt}${item.stamm ? ICON_STAMM : ''}</div>
+      <div class="rechts">${zuordnen}${abt}${!S.geteilt && istAngeheftet(item.name) ? ICON_PIN : ''}${item.stamm ? ICON_STAMM : ''}</div>
     </div>
   </li>`;
 }
@@ -1445,22 +1462,34 @@ $('#main').addEventListener('click', e => {
     const dy = e.touches[0].clientY - start.y;
     if (!start.aktiv) {
       if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { start = null; return; }
-      if (dx < -10) { start.aktiv = true; start.item.classList.add('zieht'); }
+      if (Math.abs(dx) > 10) {
+        start.aktiv = true; start.rechts = dx > 0;
+        start.item.classList.add('zieht');
+        start.item.closest('.zeile').classList.toggle('nach-rechts', start.rechts);
+      }
       else return;
     }
-    start.dx = Math.min(0, dx);
+    start.dx = start.rechts ? Math.max(0, dx) : Math.min(0, dx);
     start.item.style.transform = `translateX(${start.dx}px)`;
   }, { passive: true });
   main.addEventListener('touchend', () => {
     if (!start) return;
-    const { item, dx, aktiv } = start;
+    const { item, dx, aktiv, rechts } = start;
     start = null;
     if (!aktiv) return;
     item.classList.remove('zieht');
     const zeile = item.closest('.zeile');
     zeile._gewischt = true;
     setTimeout(() => { zeile._gewischt = false; }, 350);
-    if (dx < -Math.min(110, item.offsetWidth * 0.3)) {
+    const schwelle = Math.min(110, item.offsetWidth * 0.3);
+    if (rechts) {
+      // Zeile schnappt zurück, dann anheften bzw. lösen
+      item.style.transform = '';
+      if (dx > schwelle) {
+        const i = S.liste.find(x => x.id === zeile.dataset.id);
+        if (i) setTimeout(() => wechsleAngeheftet(i.name), 200);
+      }
+    } else if (dx < -schwelle) {
       item.style.transform = 'translateX(-100%)';
       setTimeout(() => entfernen(zeile.dataset.id), 180);
     } else {
@@ -1674,6 +1703,7 @@ function oeffneEinstellungen(start = 'haupt') {
         <div class="abschnitt">${t`Artikel`}</div>
         <form class="eingabe" id="ePinForm"><input id="ePinName" type="text" placeholder="${t`Artikel anheften`}" autocapitalize="sentences" autocorrect="off" enterkeyhint="done" autocomplete="off"></form>
         <ul class="vorschlaege" id="ePinVorschlaege" hidden></ul>
+        <p class="text-muted" style="margin:8px 0 0">${t`Oder einen Artikel auf der Liste nach rechts wischen.`}</p>
         ${chipVerwaltungHTML()}
       </div>`; },
     sprache: () => {
