@@ -241,7 +241,7 @@ getrennten Läden einkauft. Neu:
 
 ### Runde 13 (28.09.2026): Verbundene Geräte, Kundenkarten
 - **Verbundene Geräte** (Einstellungen → Synchronisieren): Jedes Gerät hat einen festen Code aus drei Wörtern wie bei
-  what3words (`///ruder.sand.kahn`). Er wird beim ersten Start zufällig erzeugt und steht nur lokal (`ek.geraet`, 3 Zufallsbytes
+  what3words (`///ruder.sand.kahn`; in Runde 15 ersetzt durch `Butter-Tiger-71`). Er wird beim ersten Start zufällig erzeugt und steht nur lokal (`ek.geraet`, 3 Zufallsbytes
   aus `GERAETE_WOERTER`, 256 deutsche Wörter, also 16,7 Mio. Codes). Die Wörter sind in allen Sprachen gleich, damit der Code
   auf jedem Gerät gleich aussieht.
   - Neue synchronisierte Sammlung `geraete`: `{ code: { art, app, gesehen } }`. `meldeGeraet()` läuft zu Beginn jedes Abgleichs
@@ -297,6 +297,20 @@ getrennten Läden einkauft. Neu:
 - Angeheftete Artikel tragen in der Liste ein kleines Pin-Symbol. Einstellungen → Schnellauswahl weist auf die Geste hin.
 - Geprüft mit echten Touch-Ereignissen (DevTools): anheften, kurzes Wischen unter der Schwelle tut nichts, erneut wischen löst,
   Rückgängig, links wischen löscht weiter. Selbsttest 261/261. `sw.js` VERSION `einkauf-19`.
+
+### Runde 15 (28.09.2026): Gerätename statt what3words-Code
+- Wunsch des Nutzers: Das eigene Gerät soll einen Namen haben, der auf den anderen Geräten erscheint, und man soll sehen, mit
+  wie vielen Geräten das iPhone verbunden ist. Der Drei-Wörter-Code war zu nah an what3words.
+- **Name** jetzt aus zwei Wörtern und einer Zahl, großgeschrieben mit Bindestrichen: `Butter-Tiger-71` (`GERAET_MUSTER`,
+  256 × 256 × 90 ≈ 5,9 Mio.). Kein `///`, keine Punkte, nicht drei Wörter.
+- **Umstellung**: Ein gespeicherter alter Code (`ruder.sand.kahn`) wird zum gleichen neuen Namen umgerechnet (`ausAltemCode`).
+  Der alte Eintrag (`GERAET_ALT`) wird beim nächsten Abgleich aus der Geräteliste entfernt, und zwar gleich nach dem
+  Zusammenführen, nicht erst bei der nächsten Meldung 5 Minuten später.
+- **Sync-Seite**: oben „Dieses Gerät“ mit dem eigenen Namen groß („Unter diesem Namen erscheint es auf den anderen Geräten“),
+  darunter „Verbunden mit 2 Geräten“ mit nur den anderen Geräten, oder „Noch kein anderes Gerät verbunden“. Die Einstellungszeile
+  zeigt „Mit 2 Geräten“ (Einzahl „Mit 1 Gerät“).
+- Selbsttest 263/263, Zwei-Geräte-Test gegen den echten `worker.js` 14/14 (neu: Umstellung des alten Codes, Zählung, Seite).
+  `sw.js` VERSION `einkauf-20`.
 
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |

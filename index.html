@@ -348,12 +348,15 @@
   .scanner .rahmen.quadrat { left: 50%; right: auto; top: 44%; width: min(68vw, 46vh); height: auto; aspect-ratio: 1; transform: translate(-50%, -50%); }
 
   /* Verbundene Geräte (Synchronisieren) */
+  .mein-geraet { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--bg2); }
+  .mein-geraet .code { font-size: 22px; font-weight: 700; letter-spacing: .01em; overflow-wrap: anywhere; }
+  .mein-geraet small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
   .geraete li { align-items: flex-start; padding: 9px 0; gap: 12px; }
   .geraete .code { font-weight: 600; overflow-wrap: anywhere; }
-  .geraete .code::before { content: '///'; color: var(--accent); font-weight: 700; margin-right: 1px; }
   .geraete small { display: block; color: var(--muted); font-size: 13px; margin-top: 1px; }
-  .geraete .status { width: 10px; height: 10px; border-radius: 50%; background: var(--line); flex: none; margin-top: 7px; }
-  .geraete .status.aktiv { background: var(--accent); }
+  .geraete .status, .mein-geraet .status { width: 10px; height: 10px; border-radius: 50%; background: var(--line); flex: none; margin-top: 7px; }
+  .mein-geraet .status { margin-top: 0; }
+  .geraete .status.aktiv, .mein-geraet .status.aktiv { background: var(--accent); }
 
   /* Kundenkarten */
   .ketten { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
@@ -474,7 +477,7 @@ let SPRACHE = ermittleSprache();
 const gebietsschema = () => (navigator.language || '').toLowerCase().startsWith(SPRACHE) ? navigator.language
   : { de: 'de-DE', en: 'en-GB', fr: 'fr-FR', es: 'es-ES' }[SPRACHE];
 // Deutsche Einzahl, wo sich das Wort ändert (die Schlüssel stehen in der Mehrzahl)
-const DE_EINZAHL = { 'Rezept · {0} Zutaten': 'Rezept · {0} Zutat', '{0} Zutaten': '{0} Zutat', '{0} Abteilungen': '{0} Abteilung' };
+const DE_EINZAHL = { 'Mit {0} Geräten': 'Mit {0} Gerät', 'Verbunden mit {0} Geräten': 'Verbunden mit {0} Gerät', 'Rezept · {0} Zutaten': 'Rezept · {0} Zutat', '{0} Zutaten': '{0} Zutat', '{0} Abteilungen': '{0} Abteilung' };
 function t(teile, ...werte) {
   const key = typeof teile === 'string' ? teile : teile.reduce((k, x, i) => k + (i ? `{${i - 1}}` : '') + x, '');
   let text = (SPRACHE !== 'de' && SPRACHPAKETE[SPRACHE] && SPRACHPAKETE[SPRACHE].texte[key]) || key;
@@ -1650,7 +1653,7 @@ function oeffneEinstellungen(start = 'haupt') {
       </ul>
       <div class="abschnitt">${t`Erweitert`}</div>
       <ul class="liste-einst">
-        ${zeile('sync', t`Synchronisieren`, !syncAn() ? t`Aus` : Object.keys(S.geraete).length > 1 ? t`${Object.keys(S.geraete).length} Geräte` : t`An`)}
+        ${zeile('sync', t`Synchronisieren`, !syncAn() ? t`Aus` : andereGeraete().length ? t`Mit ${andereGeraete().length} Geräten` : t`An`)}
         ${zeile('foto', t`Rezept-Fotos`, e.apiKey ? t`Eingerichtet` : t`Aus`)}
         ${zeile('daten', t`Daten`)}
       </ul>`;
@@ -1720,9 +1723,7 @@ function oeffneEinstellungen(start = 'haupt') {
       <p class="text-muted" style="margin-top:18px">${t`Schon eingeladen? Den Link ins Eingabefeld der Liste einfügen oder den QR-Code mit dem Scanner der App scannen.`}</p>`
       : `
       <p class="text-muted" id="eSyncStatus">${esc(syncStatusText())}</p>
-      <div class="abschnitt">${t`Verbundene Geräte`}</div>
-      <ul class="liste-einst geraete" id="eGeraete">${geraeteHTML()}</ul>
-      <p class="text-muted">${t`Jedes Gerät hat einen festen Code aus drei Wörtern. Er steht auf allen Geräten gleich da, so lässt sich jedes zuordnen. Safari und die App vom Home-Bildschirm zählen als zwei Geräte.`}</p>
+      <div id="eGeraete">${geraeteHTML()}</div>
       <div class="abschnitt">${t`Weiteres Gerät einladen`}</div>
       <div class="qr-rahmen" id="eQr"></div>
       <p class="text-muted">${t`Auf dem anderen iPhone in der App den Scanner öffnen und diesen Code scannen. Oder den Link schicken.`}</p>
@@ -3500,6 +3501,7 @@ async function synchronisiere() {
         for (const s of Object.values(serverDoc)) for (const e of Object.values(s)) for (const w of Object.values(e.f || {}).concat(e.x ? [[e.x]] : [])) st.uhr = Math.max(st.uhr || 0, w.at(-1));
         if (syncAnwenden(neu)) {
           geaendert = true;
+          if (GERAET_ALT && S.geraete[GERAET_ALT]) meldeGeraet(st, Date.now(), true);   // eigenen alten Namen entfernen
           const zusammen = fasseDoppelteZusammen(S.liste);
           if (zusammen) { S.liste = zusammen; sichereListe(); }   // wird gleich mit hochgeladen
         }
@@ -3640,10 +3642,10 @@ function syncStatusText() {
 }
 
 /* Verbundene Geräte
-   Jedes Gerät hat einen festen Code aus drei Wörtern (wie bei what3words), zufällig beim ersten Start erzeugt und nur
-   hier gespeichert. Beim Abgleich trägt es sich mit Art und Zeitpunkt in die Sammlung „geraete“ ein, höchstens alle
-   5 Minuten, damit nicht ständig hochgeladen wird. Die Wörter sind in allen Sprachen dieselben, damit der Code auf jedem
-   Gerät gleich aussieht. 256 Wörter hoch 3 ergibt 16,7 Millionen Codes. */
+   Jedes Gerät hat einen festen Namen aus zwei Wörtern und einer Zahl („Tiger-Hafen-42“), zufällig beim ersten Start erzeugt
+   und nur hier gespeichert. Unter diesem Namen erscheint es auf den anderen Geräten. Beim Abgleich trägt es sich mit Art
+   und Zeitpunkt in die Sammlung „geraete“ ein, höchstens alle 5 Minuten, damit nicht ständig hochgeladen wird.
+   Die Wörter sind in allen Sprachen dieselben, damit der Name auf jedem Gerät gleich aussieht. 256 × 256 × 90 ≈ 5,9 Mio. Namen. */
 const GERAETE_WOERTER = ('adler ahorn ameise amsel anker anzug apfel arena atlas auster bach ball banane bank bart bauer ' +
   'baum beere berg besen biber birke birne blatt blitz blume bohne boot brief brille brot brunnen buch burg butter dach ' +
   'dachs damm dattel decke degen delfin diamant docht dohle dom dorf drache eiche eimer eis elch engel ente erbse esel ' +
@@ -3659,16 +3661,24 @@ const GERAETE_WOERTER = ('adler ahorn ameise amsel anker anzug apfel arena atlas
   'schuh see segel sessel sonne specht spiegel stern storch strand tanne tasche taube teller tiger tisch topf turm uhr ' +
   'ufer vogel vulkan waage wal wald wiese wolke wolle zebra zelt').split(' ');
 const GERAET_MELDEN_MS = 5 * 60e3, GERAET_AKTIV_MS = 15 * 60e3, GERAET_VERGESSEN_TAGE = 60;
-const neuerGeraeteCode = () => [...crypto.getRandomValues(new Uint8Array(3))].map(b => GERAETE_WOERTER[b]).join('.');
+const GERAET_MUSTER = /^[A-Z][a-z]+-[A-Z][a-z]+-\d{2}$/;
+const geraeteName = (w1, w2, zahl) => [gross(GERAETE_WOERTER[w1]), gross(GERAETE_WOERTER[w2]), 10 + zahl % 90].join('-');
+const neuerGeraeteCode = () => { const z = crypto.getRandomValues(new Uint8Array(3)); return geraeteName(z[0], z[1], z[2]); };
+// Frühere Fassung: drei Wörter mit Punkten („ruder.sand.kahn“). Daraus derselbe neue Name, der alte wird beim nächsten
+// Abgleich aus der Geräteliste entfernt (GERAET_ALT).
+const ausAltemCode = alt => { const i = alt.split('.').map(w => GERAETE_WOERTER.indexOf(w)); return i.every(x => x >= 0) ? geraeteName(i[0], i[1], i[2]) : null; };
+let GERAET_ALT = null;
 const GERAET_CODE = (() => {
   let code = null;
   try { code = localStorage.getItem(SPEICHER_PREFIX + 'geraet'); } catch (e) {}
-  if (!code || !/^[a-z]+\.[a-z]+\.[a-z]+$/.test(code)) {
-    code = neuerGeraeteCode();
-    try { localStorage.setItem(SPEICHER_PREFIX + 'geraet', code); } catch (e) {}
-  }
+  if (code && /^[a-z]+\.[a-z]+\.[a-z]+$/.test(code)) { GERAET_ALT = code; code = ausAltemCode(code); }
+  if (!code || !GERAET_MUSTER.test(code)) code = neuerGeraeteCode();
+  try { localStorage.setItem(SPEICHER_PREFIX + 'geraet', code); } catch (e) {}
   return code;
 })();
+// Die anderen Geräte im Haushalt, zuletzt aktive zuerst
+const andereGeraete = () => Object.entries(S.geraete).filter(([code]) => code !== GERAET_CODE && code !== GERAET_ALT)
+  .sort(([, x], [, y]) => (y.gesehen || 0) - (x.gesehen || 0));
 
 function geraeteArt() {
   const ua = navigator.userAgent;
@@ -3679,11 +3689,11 @@ function geraeteArt() {
 
 // Beim Abgleich: eigenen Eintrag auffrischen, lange nicht gesehene Geräte vergessen. Direkt ins Dokument,
 // ohne sichere() → planeSync, weil der Abgleich gerade ohnehin läuft.
-function meldeGeraet(st, jetzt = Date.now()) {
+function meldeGeraet(st, jetzt = Date.now(), sofort = false) {
   if (SYNC.abmelden) return;
   const ich = S.geraete[GERAET_CODE], info = geraeteArt();
-  const alt = Object.entries(S.geraete).filter(([code, g]) => code !== GERAET_CODE && jetzt - (g.gesehen || 0) > GERAET_VERGESSEN_TAGE * 864e5);
-  if (ich && jetzt - ich.gesehen < GERAET_MELDEN_MS && ich.art === info.art && ich.app === info.app && !alt.length) return;
+  const alt = Object.entries(S.geraete).filter(([code, g]) => code !== GERAET_CODE && (code === GERAET_ALT || jetzt - (g.gesehen || 0) > GERAET_VERGESSEN_TAGE * 864e5));
+  if (!sofort && ich && jetzt - ich.gesehen < GERAET_MELDEN_MS && ich.art === info.art && ich.app === info.app && !alt.length) return;
   S.geraete = { ...Object.fromEntries(Object.entries(S.geraete).filter(([code]) => !alt.some(([c]) => c === code))),
     [GERAET_CODE]: { ...info, gesehen: jetzt } };
   SYNC.anwenden = true;
@@ -3696,8 +3706,7 @@ function meldeGeraet(st, jetzt = Date.now()) {
 async function meldeGeraetAb() {
   if (syncAn() && S.geraete[GERAET_CODE]) {
     SYNC.abmelden = true;
-    const { [GERAET_CODE]: _, ...rest } = S.geraete;
-    S.geraete = rest;
+    S.geraete = Object.fromEntries(Object.entries(S.geraete).filter(([code]) => code !== GERAET_CODE && code !== GERAET_ALT));
     sichere('geraete', S.geraete);
     clearTimeout(SYNC.zeitgeber);
     await Promise.race([synchronisiere().catch(() => {}), new Promise(ok => setTimeout(ok, 8000))]);
@@ -3714,17 +3723,20 @@ function vorWann(ms, jetzt = Date.now()) {
   return new Date(ms).toLocaleDateString(gebietsschema(), { day: 'numeric', month: 'numeric', year: 'numeric' });
 }
 
+const artText = g => [g.art, g.art ? (g.app ? t`App` : t`Browser`) : ''].filter(Boolean).join(' · ');
 function geraeteHTML(jetzt = Date.now()) {
-  const liste = Object.entries(S.geraete);
-  if (!liste.some(([code]) => code === GERAET_CODE)) liste.push([GERAET_CODE, { ...geraeteArt(), gesehen: 0 }]);
-  liste.sort(([a, x], [b, y]) => (b === GERAET_CODE) - (a === GERAET_CODE) || (y.gesehen || 0) - (x.gesehen || 0));
-  return liste.map(([code, g]) => {
-    const ich = code === GERAET_CODE, aktiv = ich || jetzt - (g.gesehen || 0) < GERAET_AKTIV_MS;
-    const art = [g.art, g.art ? (g.app ? t`App` : t`Browser`) : ''].filter(Boolean).join(' · ');
-    const wann = ich ? t`Dieses Gerät` : aktiv ? t`Gerade aktiv` : t`Zuletzt aktiv ${vorWann(g.gesehen, jetzt)}`;
-    return `<li><span class="status${aktiv ? ' aktiv' : ''}"></span><div><span class="code">${esc(code)}</span>
-      <small>${esc([art, wann].filter(Boolean).join(' · '))}</small></div></li>`;
-  }).join('');
+  const andere = andereGeraete();
+  return `<div class="abschnitt">${t`Dieses Gerät`}</div>
+    <div class="mein-geraet"><span class="status aktiv"></span><div><span class="code">${esc(GERAET_CODE)}</span><small>${esc(artText(geraeteArt()))}</small></div></div>
+    <p class="text-muted">${t`Unter diesem Namen erscheint es auf den anderen Geräten.`}</p>
+    <div class="abschnitt">${andere.length ? t`Verbunden mit ${andere.length} Geräten` : t`Andere Geräte`}</div>
+    ${andere.length ? `<ul class="liste-einst geraete">${andere.map(([code, g]) => {
+      const aktiv = jetzt - (g.gesehen || 0) < GERAET_AKTIV_MS;
+      const wann = aktiv ? t`Gerade aktiv` : t`Zuletzt aktiv ${vorWann(g.gesehen, jetzt)}`;
+      return `<li><span class="status${aktiv ? ' aktiv' : ''}"></span><div><span class="code">${esc(code)}</span>
+        <small>${esc([artText(g), wann].filter(Boolean).join(' · '))}</small></div></li>`;
+    }).join('')}</ul>` : `<p class="text-muted">${t`Noch kein anderes Gerät verbunden. Mit dem QR-Code unten einladen.`}</p>`}
+    <p class="text-muted">${t`Safari und die App vom Home-Bildschirm zählen als zwei Geräte.`}</p>`;
 }
 
 // Beitreten über einen Link mit #s=
@@ -4068,7 +4080,9 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
   // Verbundene Geräte
   {
     pruefe('Geräte: 256 verschiedene Wörter, nur a–z', [GERAETE_WOERTER.length, new Set(GERAETE_WOERTER).size, GERAETE_WOERTER.every(w => /^[a-z]{2,8}$/.test(w))], [256, 256, true]);
-    pruefe('Geräte: Code aus drei Wörtern', [/^[a-z]+\.[a-z]+\.[a-z]+$/.test(GERAET_CODE), neuerGeraeteCode().split('.').every(w => GERAETE_WOERTER.includes(w))], [true, true]);
+    pruefe('Geräte: Name aus zwei Wörtern und Zahl, nicht wie what3words', [GERAET_MUSTER.test(GERAET_CODE), GERAET_MUSTER.test(neuerGeraeteCode()), /\./.test(neuerGeraeteCode())], [true, true, false]);
+    pruefe('Geräte: alter Drei-Wörter-Code wird umgewandelt, immer gleich', [ausAltemCode('ruder.sand.kahn'), ausAltemCode('ruder.sand.kahn'), ausAltemCode('xyz.sand.kahn')],
+      ['Ruder-Sand-' + (10 + GERAETE_WOERTER.indexOf('kahn') % 90), 'Ruder-Sand-' + (10 + GERAETE_WOERTER.indexOf('kahn') % 90), null]);
     pruefe('Geräte und Karten werden synchronisiert', ['karten', 'geraete'].every(n => SYNC_SAMMLUNGEN.includes(n)), true);
     const jetzt = Date.now(), sichern = { doc: SYNC.doc, geraete: S.geraete };
     SYNC.doc = {};
@@ -4085,7 +4099,10 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
     pruefe('Geräte: zwei Geräte zusammengeführt', Object.keys(ausDokument(zusammenfuehren(SYNC.doc, anderes), 'geraete', {})).sort(),
       [GERAET_CODE, 'wal.see.hut', 'zebra.mond.eis'].sort());
     const html = geraeteHTML(jetzt + GERAET_MELDEN_MS + 1);
-    pruefe('Geräte: Liste mit eigenem Gerät zuerst', [html.indexOf(GERAET_CODE) < html.indexOf('wal.see.hut'), html.includes('Dieses Gerät'), html.includes('Zuletzt aktiv vor 3 Stunden')], [true, true, true]);
+    pruefe('Geräte: eigener Name oben, darunter die anderen gezählt', [html.indexOf(GERAET_CODE) < html.indexOf('wal.see.hut'), html.includes('Verbunden mit 1 Gerät<'),
+      html.includes('Zuletzt aktiv vor 3 Stunden'), andereGeraete().map(([c]) => c)], [true, true, true, ['wal.see.hut']]);
+    S.geraete = {};
+    pruefe('Geräte: allein', geraeteHTML().includes('Noch kein anderes Gerät verbunden'), true);
     SYNC.doc = sichern.doc; S.geraete = sichern.geraete;
   }
 
