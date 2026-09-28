@@ -1,6 +1,6 @@
 # Einkaufsliste – Plan und Stand
 
-## Stand — 27.09.2026
+## Stand — 28.09.2026
 
 **Online unter https://ym52jyt288-sys.github.io/Einkaufsliste/** (GitHub Pages, Repo `ym52jyt288-sys/Einkaufsliste`, Branch `main`).
 Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone durch den Nutzer steht noch aus.
@@ -238,6 +238,41 @@ getrennten Läden einkauft. Neu:
   gilt die **größere** Menge, nicht die Summe, weil beide dasselbe gemeint haben. Notiz und Stammartikel werden übernommen.
 - Selbsttest 245/245, Zwei-Geräte-Simulation 24/24 (neu: gleichzeitig eingetragen, Hinweis und Rückgängig, kein
   Hinweis beim Abschließen, Warnung in der Rückfrage). `sw.js` VERSION `einkauf-16`.
+
+### Runde 13 (28.09.2026): Verbundene Geräte, Kundenkarten
+- **Verbundene Geräte** (Einstellungen → Synchronisieren): Jedes Gerät hat einen festen Code aus drei Wörtern wie bei
+  what3words (`///ruder.sand.kahn`). Er wird beim ersten Start zufällig erzeugt und steht nur lokal (`ek.geraet`, 3 Zufallsbytes
+  aus `GERAETE_WOERTER`, 256 deutsche Wörter, also 16,7 Mio. Codes). Die Wörter sind in allen Sprachen gleich, damit der Code
+  auf jedem Gerät gleich aussieht.
+  - Neue synchronisierte Sammlung `geraete`: `{ code: { art, app, gesehen } }`. `meldeGeraet()` läuft zu Beginn jedes Abgleichs
+    und schreibt den eigenen Eintrag direkt ins Dokument, **höchstens alle 5 Minuten**. Sonst würde bei jedem 10-s-Abgleich
+    hochgeladen. Wer 60 Tage lang nicht gesehen wurde, wird vergessen.
+  - Anzeige: eigenes Gerät zuerst, dann „Gerade aktiv“ (unter 15 Min.) oder „Zuletzt aktiv vor 3 Stunden“
+    (`Intl.RelativeTimeFormat`). Art (iPhone/iPad/Mac …) und „App“ oder „Browser“, weil Safari und die Home-Bildschirm-App
+    getrennte Speicher haben und als zwei Geräte zählen. Die Einstellungszeile zeigt „3 Geräte“.
+  - „Auf diesem Gerät beenden“ trägt das Gerät vorher aus (`meldeGeraetAb`, höchstens 8 s Wartezeit). „Neuen Schlüssel
+    erzeugen“ lässt nur das eigene Gerät in der Liste.
+- **Kundenkarten** (Einstellungen → Einkaufen → Kundenkarten, `S.karten`, Schlüssel `ek.karten`, synchronisiert und in der
+  Sicherung): `{ id, kette, name, inhalt }`. Gespeichert wird nur der Text im QR-Code, angezeigt wird ein neu erzeugter
+  QR-Code als SVG (`qrSvg(text, 4)`, Ruhezone 4 Module, Modus Numeric/Alphanumeric/Byte, UTF-8).
+  - Hinzufügen: Screenshot wählen (`qrAusBild`: BarcodeDetector, sonst zxing `QRCodeReader` mit TRY_HARDER bei 1200/800/2000 px,
+    jeweils auch invertiert für helle Codes auf dunklem Grund) oder die Plastikkarte scannen (`oeffneScanner(beiQr)`, quadratischer
+    Rahmen, nur QR). Die Kette wird aus dem Namen des gewählten Ladens vorgeschlagen, dazu Chips für die großen Ketten.
+  - **Knopf unten links** neben „Einkauf abschließen“, sobald eine Karte hinterlegt ist. Ohne Abgehaktes steht er allein, mit dem
+    Namen der Kette. Welche Karte: `kartenFuerLaden()` vergleicht ganze Wörter mit dem Namen des aktiven Ladens („Rewe
+    Sendlinger Straße“ → REWE, „Edmund“ ≠ dm). Bei mehreren Karten gibt es Reiter, passende zuerst.
+  - **Vollbild an der Kasse**: weiß auch im Dunkelmodus, `theme-color` weiß, Nummer darunter (bis 40 Zeichen), **Wake Lock** hält
+    das Display an. **Die Bildschirmhelligkeit kann eine Web-App nicht setzen**, auch nicht auf dem iPhone. Deshalb steht dort der
+    Hinweis auf das Kontrollzentrum.
+- Geprüft: Selbsttest 258/258 (neu u. a. Wortliste, Melde-Takt, Zusammenführen der Geräte, Ladenname → Karte, Screenshot
+  1170×2532 → Vektor-QR → wieder gelesen über zxing *und* BarcodeDetector, invertiert, Bild ohne Code). Zwei-Geräte-Test gegen
+  den echten `worker.js` (Node, D1 nachgebildet) 13/13: beide sehen sich, kein Hochladen ohne Änderung, Karte kommt an,
+  Abmelden, neuer Schlüssel. UI-Durchlauf mit Screenshots bei 390 px hell und dunkel; en/fr/es ohne deutsche Reste.
+  Headless Chrome mit `--dump-dom` wartet nicht auf Bild-Dekodierung; der Selbsttest läuft jetzt per DevTools-Protokoll.
+- Offen, nur auf dem iPhone prüfbar: echter Screenshot aus REWE-/Lidl-App, Kassenscanner liest den erzeugten Code, Wake Lock.
+  Karten mit Strichcode (z. B. Payback-Plastikkarte) werden noch nicht unterstützt, nur QR.
+  Manche Apps zeigen wechselnde Codes (zeitabhängig); die funktionieren als gespeicherter Screenshot nicht.
+- `sw.js` VERSION `einkauf-17`.
 
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |

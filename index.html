@@ -188,6 +188,17 @@
     padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
     background: linear-gradient(to top, var(--bg) 70%, transparent);
   }
+  .abschluss { display: flex; gap: 10px; }
+  .abschluss .knopf { flex: 1; min-width: 0; }
+  /* Nur der Kartenknopf: keine Fläche über der Liste */
+  .abschluss.nur-karte { background: none; pointer-events: none; }
+  .abschluss.nur-karte .karten-knopf { pointer-events: auto; box-shadow: var(--schatten); }
+  .karten-knopf {
+    flex: none; display: flex; align-items: center; justify-content: center; gap: 8px; height: 50px; min-width: 50px; padding: 0 13px;
+    border-radius: 12px; background: var(--bg2); color: var(--fg); font-weight: 600; font-size: 16px; border: 1px solid var(--line);
+  }
+  .karten-knopf:active { background: var(--accent-weich); }
+  .karten-knopf span:empty { display: none; }
   .knopf {
     width: 100%; height: 50px; border-radius: 12px; background: var(--accent); color: var(--accent-text); font-weight: 600; font-size: 17px;
   }
@@ -223,6 +234,7 @@
   .blatt-kopf { display: flex; align-items: center; gap: 8px; min-height: 48px; position: sticky; top: -8px; background: var(--sheet); z-index: 2; }
   .blatt-kopf h3 { flex: 1; margin: 0; font-size: 17px; font-weight: 600; }
   .blatt-kopf .zurueck { color: var(--accent); font-size: 17px; min-height: 44px; padding: 0 4px; }
+  .blatt-kopf .zurueck:disabled { opacity: .4; }
   .feld { display: block; margin: 14px 0; }
   .feld > span { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
   .feld input[type=text], .feld input[type=password], .feld select, .feld textarea {
@@ -329,6 +341,41 @@
   .scanner .oben button { color: #fff; font-size: 17px; min-height: 44px; }
   .scanner .unten { position: absolute; bottom: 0; left: 0; right: 0; padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); text-align: center; font-size: 15px; background: linear-gradient(transparent, rgba(0,0,0,.6)); }
 
+  .scanner .rahmen.quadrat { left: 50%; right: auto; top: 44%; width: min(68vw, 46vh); height: auto; aspect-ratio: 1; transform: translate(-50%, -50%); }
+
+  /* Verbundene Geräte (Synchronisieren) */
+  .geraete li { align-items: flex-start; padding: 9px 0; gap: 12px; }
+  .geraete .code { font-weight: 600; overflow-wrap: anywhere; }
+  .geraete .code::before { content: '///'; color: var(--accent); font-weight: 700; margin-right: 1px; }
+  .geraete small { display: block; color: var(--muted); font-size: 13px; margin-top: 1px; }
+  .geraete .status { width: 10px; height: 10px; border-radius: 50%; background: var(--line); flex: none; margin-top: 7px; }
+  .geraete .status.aktiv { background: var(--accent); }
+
+  /* Kundenkarten */
+  .ketten { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .ketten button { height: 32px; padding: 0 11px; border-radius: 16px; border: 1px solid var(--line); font-size: 14px; }
+  .ketten button.an { border-color: var(--accent); background: var(--accent-weich); }
+  .karte-code { text-align: center; }
+  .karte-code .qr-rahmen { width: 180px; border: 1px solid var(--line); padding: 0; }
+  .karte-code .nummer { font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); overflow-wrap: anywhere; }
+  /* Karte an der Kasse: immer hell, damit der Scanner sie liest */
+  .kartenansicht {
+    position: fixed; inset: 0; z-index: 60; background: #fff; color: #111; color-scheme: light;
+    display: flex; flex-direction: column; padding: calc(6px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  }
+  .kartenansicht .ka-kopf { display: flex; justify-content: flex-end; min-height: 44px; }
+  .kartenansicht .ka-kopf button { color: #2e6b4f; font-size: 17px; font-weight: 600; min-height: 44px; padding: 0 4px; }
+  .kartenansicht .ka-reiter { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+  .kartenansicht .ka-reiter button { flex: none; height: 34px; padding: 0 14px; border-radius: 17px; border: 1px solid #d8d8dc; font-size: 15px; color: #111; }
+  .kartenansicht .ka-reiter button.an { background: #111; border-color: #111; color: #fff; }
+  .kartenansicht .ka-mitte { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 0; }
+  .kartenansicht h2 { margin: 0; font-size: 26px; }
+  .kartenansicht .ka-name { margin: 2px 0 0; color: #555; }
+  .kartenansicht .ka-code { width: min(88vw, 58vh, 480px); margin: 18px 0 10px; }
+  .kartenansicht .ka-code svg { width: 100%; height: auto; shape-rendering: crispEdges; }
+  .kartenansicht .ka-nummer { margin: 0; font: 17px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; overflow-wrap: anywhere; }
+  .kartenansicht .ka-tipp { margin: 0; text-align: center; font-size: 13px; color: #666; }
+
   .laedt { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: dreh .8s linear infinite; vertical-align: -3px; margin-right: 8px; }
   @keyframes dreh { to { transform: rotate(360deg); } }
 
@@ -373,6 +420,10 @@
 <main id="main"></main>
 
 <div class="abschluss" id="abschluss" hidden>
+  <button type="button" class="karten-knopf" id="btnKarte" aria-label="Kundenkarte zeigen" hidden>
+    <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM21 14v.01M14 21h.01M17.5 21H21v-3.5"/></svg>
+    <span id="btnKarteText"></span>
+  </button>
   <button type="button" class="knopf" id="btnAbschluss">Einkauf abschließen</button>
 </div>
 
@@ -481,6 +532,8 @@ const S = {
   einstellungen: null,
   geteilt: null,   // Liste, die jemand anderes geteilt hat: { id, t, artikel: [...] }
   rezepte: [],     // gespeicherte Rezepte: { id, name, zutaten: [{ name, menge, einheit, abteilung }] }
+  karten: [],      // Kundenkarten: { id, kette, name, inhalt } – inhalt ist der Text im QR-Code
+  geraete: {},     // Geräte im synchronisierten Haushalt: { code: { art, app, gesehen } }
 };
 
 function standardEinstellungen() {
@@ -503,6 +556,8 @@ function ladeAlles() {
   S.aktivesProfil = lade('aktivesProfil', S.profile[0].id);
   S.geteilt = lade('geteilt', null);
   S.rezepte = lade('rezepte', []);
+  S.karten = lade('karten', []);
+  S.geraete = lade('geraete', {});
   const std = standardEinstellungen(), gel = lade('einstellungen', {});
   S.einstellungen = { ...std, ...gel, farben: { ...std.farben, ...(gel.farben || {}) }, chips: { ...std.chips, ...(gel.chips || {}) } };
   for (const i of S.liste) if (!ABT_IDS.includes(i.abteilung)) i.abteilung = klassifiziere(i.name).abt;
@@ -520,6 +575,7 @@ const sichereVerlauf = () => sichere('verlauf', S.verlauf);
 const sichereProfile = () => { sichere('profile', S.profile); sichere('aktivesProfil', S.aktivesProfil); };
 const sichereEinstellungen = () => sichere('einstellungen', S.einstellungen);
 const sichereRezepte = () => sichere('rezepte', S.rezepte);
+const sichereKarten = () => sichere('karten', S.karten);
 
 /* ============================================================
    Katalog, Normalisierung und Klassifizierung
@@ -1126,9 +1182,23 @@ function render() {
 
   $('#main').innerHTML = html;
   const nErledigt = S.liste.filter(i => i.erledigt).length;
-  $('#abschluss').hidden = !nErledigt;
   $('#btnAbschluss').textContent = t`Einkauf abschließen · ${nErledigt} erledigt`;
+  renderUnten(nErledigt > 0, S.karten.length > 0);
   renderHilfe();
+}
+
+// Leiste unten: Kundenkarte links (sobald eine hinterlegt ist), daneben „Einkauf abschließen“, wenn etwas abgehakt ist.
+// Ohne abgehakte Artikel steht der Kartenknopf allein, mit Namen der Kette.
+function renderUnten(abschluss, karte) {
+  const leiste = $('#abschluss');
+  leiste.hidden = !abschluss && !karte;
+  leiste.classList.toggle('nur-karte', !abschluss && karte);
+  $('#btnAbschluss').hidden = !abschluss;
+  $('#btnKarte').hidden = !karte;
+  if (karte) {
+    const passend = kartenFuerLaden();
+    $('#btnKarteText').textContent = abschluss ? '' : passend.length === 1 ? passend[0].kette : S.karten.length === 1 ? S.karten[0].kette : t`Karte`;
+  }
 }
 
 // Schnellauswahl nur in der Listenansicht – im Laden zählt jeder Zentimeter Bildschirm.
@@ -1324,6 +1394,7 @@ $$('.segment button').forEach(b => b.addEventListener('click', () => {
 }));
 
 $('#btnAbschluss').addEventListener('click', () => S.geteilt ? rueckmeldungSchicken() : einkaufAbschliessen());
+$('#btnKarte').addEventListener('click', () => zeigeKarte());
 $('#btnTeilen').addEventListener('click', teileListe);
 $('#btnGeteiltSchliessen').addEventListener('click', geteiltSchliessen);
 
@@ -1536,6 +1607,7 @@ function oeffneEinstellungen(start = 'haupt') {
         ${zeile('laeden', t`Läden`, S.profile.length)}
         ${zeile('stamm', t`Stammartikel`, stammZahl || t`Keine`)}
         ${zeile('rezepte', t`Rezepte`, S.rezepte.length || t`Keine`)}
+        ${zeile('karten', t`Kundenkarten`, S.karten.length || t`Keine`)}
       </ul>
       <div class="abschnitt">${t`Anzeige`}</div>
       <ul class="liste-einst">
@@ -1545,7 +1617,7 @@ function oeffneEinstellungen(start = 'haupt') {
       </ul>
       <div class="abschnitt">${t`Erweitert`}</div>
       <ul class="liste-einst">
-        ${zeile('sync', t`Synchronisieren`, syncAn() ? t`An` : t`Aus`)}
+        ${zeile('sync', t`Synchronisieren`, !syncAn() ? t`Aus` : Object.keys(S.geraete).length > 1 ? t`${Object.keys(S.geraete).length} Geräte` : t`An`)}
         ${zeile('foto', t`Rezept-Fotos`, e.apiKey ? t`Eingerichtet` : t`Aus`)}
         ${zeile('daten', t`Daten`)}
       </ul>`;
@@ -1564,6 +1636,12 @@ function oeffneEinstellungen(start = 'haupt') {
     rezepte: () => S.rezepte.length ? `<ul class="liste-einst">${S.rezepte.map(x => `<li><button type="button" class="fuellen zeile" data-rezept="${x.id}"><span>#${esc(x.name)}
         <span class="klein">· ${t`${x.zutaten.length} Zutaten`}</span></span>${ICON_PFEIL}</button></li>`).join('')}</ul>`
         : `<p class="text-muted">${t`Noch keine. Beim Übernehmen eines Rezepts einen Namen vergeben, dann im Eingabefeld mit #Name abrufen.`}</p>`,
+    karten: () => `
+      <ul class="liste-einst">${S.karten.map(k => `<li><button type="button" class="fuellen zeile" data-karte="${k.id}"><span>${esc(k.kette)}
+        <span class="klein">${k.name ? '· ' + esc(k.name) : ''}</span></span>${ICON_PFEIL}</button></li>`).join('')}
+        <li><button type="button" class="fuellen" id="eNeueKarte" style="color:var(--accent)">${t`Karte hinzufügen`}</button></li></ul>
+      <p class="text-muted">${t`QR-Code aus der Bonus-App der Kette als Screenshot hinterlegen oder die Plastikkarte scannen. Im Laden zeigt der Knopf unten links die Karte. Welche Kette gemeint ist, erkennt die App am Namen des gewählten Ladens, z. B. „REWE Hauptstraße“.`}</p>
+      ${syncAn() ? `<p class="text-muted">${t`Kundenkarten werden mit den verbundenen Geräten geteilt.`}</p>` : ''}`,
     darstellung: () => { const e = S.einstellungen; return `
       <div class="abschnitt">${t`Erscheinungsbild`}</div>
       <div class="segment klein" id="eThema">${['system', 'light', 'dark'].map(id =>
@@ -1608,6 +1686,9 @@ function oeffneEinstellungen(start = 'haupt') {
       <p class="text-muted" style="margin-top:18px">${t`Schon eingeladen? Den Link ins Eingabefeld der Liste einfügen oder den QR-Code mit dem Scanner der App scannen.`}</p>`
       : `
       <p class="text-muted" id="eSyncStatus">${esc(syncStatusText())}</p>
+      <div class="abschnitt">${t`Verbundene Geräte`}</div>
+      <ul class="liste-einst geraete" id="eGeraete">${geraeteHTML()}</ul>
+      <p class="text-muted">${t`Jedes Gerät hat einen festen Code aus drei Wörtern. Er steht auf allen Geräten gleich da, so lässt sich jedes zuordnen. Safari und die App vom Home-Bildschirm zählen als zwei Geräte.`}</p>
       <div class="abschnitt">${t`Weiteres Gerät einladen`}</div>
       <div class="qr-rahmen" id="eQr"></div>
       <p class="text-muted">${t`Auf dem anderen iPhone in der App den Scanner öffnen und diesen Code scannen. Oder den Link schicken.`}</p>
@@ -1634,7 +1715,7 @@ function oeffneEinstellungen(start = 'haupt') {
       <input type="file" id="eImportDatei" accept="application/json,.json" hidden>
       <p class="text-muted" style="margin-top:20px">${t`${Object.keys(S.verlauf).length} Artikel im Verlauf · ${Object.keys(S.korrekturen).length} gelernte Zuordnungen · ${INDEX_KEYS.length} Katalogbegriffe`}</p>`,
   };
-  const titel = { haupt: t`Einstellungen`, laeden: t`Läden`, stamm: t`Stammartikel`, rezepte: t`Rezepte`, darstellung: t`Darstellung`,
+  const titel = { haupt: t`Einstellungen`, laeden: t`Läden`, stamm: t`Stammartikel`, rezepte: t`Rezepte`, karten: t`Kundenkarten`, darstellung: t`Darstellung`,
     schnell: t`Schnellauswahl`, sprache: t`Sprache`, sync: t`Synchronisieren`, foto: t`Rezept-Fotos`, daten: t`Daten` };
   const zeichne = () => {
     const kopf = seite === 'haupt'
@@ -1651,7 +1732,11 @@ function oeffneEinstellungen(start = 'haupt') {
     if (el && syncAn()) el.innerHTML = qrSvg(einladungsLink());
   };
   // Status der Synchronisierung aktuell halten, ohne die Seite neu aufzubauen
-  const beiSync = () => { const st = $('#eSyncStatus', b); if (st) st.textContent = syncStatusText(); };
+  const beiSync = () => {
+    const st = $('#eSyncStatus', b), ger = $('#eGeraete', b);
+    if (st) st.textContent = syncStatusText();
+    if (ger) ger.innerHTML = geraeteHTML();
+  };
   document.addEventListener('sync', beiSync);
   const gehe = ziel => {
     zurueck = ziel === 'haupt';
@@ -1721,6 +1806,9 @@ function oeffneEinstellungen(start = 'haupt') {
       if (ca.dataset.chipAktion === 'zeig') { e1.chips.ausgeblendet = e1.chips.ausgeblendet.filter(k => k !== kompakt(n)); sichereEinstellungen(); }
       zeichne(); return;
     }
+    const kaKnopf = e.target.closest('[data-karte]');
+    if (kaKnopf) return oeffneKarteBearbeiten(S.karten.find(x => x.id === kaKnopf.dataset.karte), zeichne);
+    if (e.target.closest('#eNeueKarte')) return oeffneKarteBearbeiten(null, zeichne);
     const rzKnopf = e.target.closest('[data-rezept]');
     if (rzKnopf) return oeffneRezeptBearbeiten(S.rezepte.find(x => x.id === rzKnopf.dataset.rezept), zeichne);
     const p = e.target.closest('[data-profil]');
@@ -1750,9 +1838,11 @@ function oeffneEinstellungen(start = 'haupt') {
     if (e.target.closest('#eSyncTeilen')) return teile(t`Einladung zu unserer gemeinsamen Einkaufsliste:` + '\n' + einladungsLink(), t`Einladung teilen`);
     const syncJetzt = e.target.closest('#eSyncJetzt');
     if (syncJetzt) { warte(syncJetzt, t`Wird synchronisiert`); return synchronisiere().finally(zeichne); }
-    if (e.target.closest('#eSyncEnde')) {
+    const syncEnde = e.target.closest('#eSyncEnde');
+    if (syncEnde) {
       if (!confirm(t`Synchronisierung auf diesem Gerät beenden? Die Daten bleiben hier, werden aber nicht mehr abgeglichen.`)) return;
-      beendeSync(); return zeichne();
+      warte(syncEnde, t`Wird beendet`);
+      return meldeGeraetAb().finally(zeichne);
     }
     const syncNeu = e.target.closest('#eSyncNeu');
     if (syncNeu) {
@@ -1873,7 +1963,7 @@ function ziehbar(ul, beiEnde) {
 /* Sicherung */
 async function exportieren() {
   const daten = { version: 1, exportiert: new Date().toISOString(), liste: S.liste, verlauf: S.verlauf, korrekturen: S.korrekturen,
-    eans: S.eans, profile: S.profile, aktivesProfil: S.aktivesProfil, rezepte: S.rezepte, einstellungen: { ...S.einstellungen, apiKey: '' } };
+    eans: S.eans, profile: S.profile, aktivesProfil: S.aktivesProfil, rezepte: S.rezepte, karten: S.karten, einstellungen: { ...S.einstellungen, apiKey: '' } };
   const name = `einkaufsliste-${new Date().toISOString().slice(0, 10)}.json`;
   const datei = new File([JSON.stringify(daten, null, 1)], name, { type: 'application/json' });
   if (navigator.canShare && navigator.canShare({ files: [datei] })) {
@@ -1892,8 +1982,9 @@ async function importieren(datei, nachher) {
     S.liste = d.liste; S.verlauf = d.verlauf || {}; S.korrekturen = d.korrekturen || {}; S.eans = d.eans || {};
     S.profile = d.profile; S.aktivesProfil = d.aktivesProfil || d.profile[0].id;
     S.rezepte = Array.isArray(d.rezepte) ? d.rezepte : S.rezepte;
+    S.karten = Array.isArray(d.karten) ? d.karten : S.karten;
     S.einstellungen = { ...S.einstellungen, ...(d.einstellungen || {}), apiKey: S.einstellungen.apiKey };
-    sichereListe(); sichereVerlauf(); sichere('korrekturen', S.korrekturen); sichere('eans', S.eans); sichereProfile(); sichereEinstellungen(); sichereRezepte();
+    sichereListe(); sichereVerlauf(); sichere('korrekturen', S.korrekturen); sichere('eans', S.eans); sichereProfile(); sichereEinstellungen(); sichereRezepte(); sichereKarten();
     if (ermittleSprache() !== SPRACHE) return location.reload();   // Sicherung mit anderer Sprache
     zeigeToast(t`Sicherung eingespielt`); nachher(); render();
   } catch (e) { zeigeToast(t`Datei konnte nicht gelesen werden`); }
@@ -2111,24 +2202,26 @@ function ladeSkript(src) {
   });
 }
 
-async function oeffneScanner() {
+// beiQr: Nur QR-Codes lesen und den Text zurückgeben (Kundenkarte), statt Barcode oder Einladung zu verarbeiten
+async function oeffneScanner(beiQr = null) {
   const el = document.createElement('div');
   el.className = 'scanner';
-  el.innerHTML = `<video playsinline muted autoplay></video><div class="rahmen"></div>
-    <div class="oben"><button type="button" data-zu>${t`Abbrechen`}</button><button type="button" data-hand>${t`Nummer eingeben`}</button></div>
-    <div class="unten" id="scanHinweis">${t`Barcode in den Rahmen halten`}</div>`;
+  el.innerHTML = `<video playsinline muted autoplay></video><div class="rahmen${beiQr ? ' quadrat' : ''}"></div>
+    <div class="oben"><button type="button" data-zu>${t`Abbrechen`}</button>${beiQr ? '' : `<button type="button" data-hand>${t`Nummer eingeben`}</button>`}</div>
+    <div class="unten" id="scanHinweis">${beiQr ? t`QR-Code in den Rahmen halten` : t`Barcode in den Rahmen halten`}</div>`;
   document.body.appendChild(el);
   const video = $('video', el);
   let stopp = () => {};
   let fertig = false;
   const schliessen = () => { fertig = true; stopp(); el.remove(); };
   el.querySelector('[data-zu]').onclick = schliessen;
-  el.querySelector('[data-hand]').onclick = () => {
+  if (!beiQr) el.querySelector('[data-hand]').onclick = () => {
     const ean = prompt(t`EAN-Nummer (unter dem Barcode):`);
     if (ean && /^\d{8,14}$/.test(ean.trim())) { schliessen(); barcodeGefunden(ean.trim()); }
   };
   const gefunden = code => {
     if (fertig) return;
+    if (beiQr) { schliessen(); return beiQr(code); }
     const link = linkAus(code);
     if (!link && !/^\d{6,14}$/.test(code)) return;          // anderer QR-Code: weiter suchen
     schliessen();
@@ -2142,7 +2235,7 @@ async function oeffneScanner() {
       stopp = () => stream.getTracks().forEach(t => t.stop());
       video.srcObject = stream;
       await video.play();
-      const detektor = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code'] });
+      const detektor = new BarcodeDetector({ formats: beiQr ? ['qr_code'] : ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code'] });
       const schleife = async () => {
         if (fertig) return;
         try { const r = await detektor.detect(video); if (r[0]) return gefunden(r[0].rawValue); } catch (e) {}
@@ -2152,7 +2245,8 @@ async function oeffneScanner() {
     } else {
       if (!window.ZXing) await ladeSkript('vendor/zxing.min.js');
       const hints = new Map();
-      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E, ZXing.BarcodeFormat.QR_CODE]);
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, beiQr ? [ZXing.BarcodeFormat.QR_CODE]
+        : [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E, ZXing.BarcodeFormat.QR_CODE]);
       const leser = new ZXing.BrowserMultiFormatReader(hints, 300);
       stopp = () => leser.reset();
       await leser.decodeFromConstraints({ video: { facingMode: 'environment' }, audio: false }, video, r => { if (r) gefunden(r.getText()); });
@@ -2162,6 +2256,167 @@ async function oeffneScanner() {
       ? t`Kamera nicht verfügbar. Zugriff in den Einstellungen erlauben oder Nummer eingeben.`
       : t`Die Kamera geht nur, wenn die App über https geöffnet wird. Nummer eingeben geht trotzdem.`;
   }
+}
+
+/* ============================================================
+   Kundenkarten (REWE, Lidl, EDEKA …)
+   Der QR-Code kommt aus einem Screenshot der Bonus-App oder vom Scan der Plastikkarte. Gespeichert wird nur sein Inhalt;
+   angezeigt wird ein neu erzeugter QR-Code als Vektorgrafik, gestochen scharf in jeder Größe.
+   ============================================================ */
+
+const KETTEN = ['REWE', 'Lidl', 'EDEKA', 'Kaufland', 'Aldi', 'Penny', 'Netto', 'Norma', 'Globus', 'dm', 'Rossmann', 'Müller', 'Payback', 'DeutschlandCard'];
+const woerterVon = s => norm(s).split(' ').filter(Boolean);
+
+// Karten, deren Kette im Namen des Ladens steht („Rewe Sendlinger Straße“ → REWE). Ganze Wörter, damit „dm“ nicht in „Edmund“ passt.
+function kartenFuerLaden(p = aktivesProfil()) {
+  const w = new Set(woerterVon(p && p.name));
+  return S.karten.filter(k => { const kw = woerterVon(k.kette); return kw.length && kw.every(x => w.has(x)); });
+}
+
+// QR-Code aus einem Bild (Screenshot) lesen. Mehrere Größen und auch hell auf dunkel, weil Screenshots sehr groß sind
+// und manche Apps im Dunkelmodus den Code invertieren.
+async function qrAusBild(datei) {
+  const url = URL.createObjectURL(datei);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    if ('BarcodeDetector' in window) {
+      try { const r = await new BarcodeDetector({ formats: ['qr_code'] }).detect(img); if (r[0]) return r[0].rawValue; } catch (e) {}
+    }
+    if (!window.ZXing) await ladeSkript('vendor/zxing.min.js');
+    const hints = new Map([[ZXing.DecodeHintType.TRY_HARDER, true], [ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.QR_CODE]]]);
+    const laenge = Math.max(img.naturalWidth, img.naturalHeight);
+    for (const kante of [1200, 800, 2000]) {
+      const f = Math.min(1, kante / laenge);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * f); c.height = Math.round(img.naturalHeight * f);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);   // transparente Bilder: weißer Grund
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      const quelle = new ZXing.HTMLCanvasElementLuminanceSource(c);
+      for (const q of [quelle, quelle.invert()]) {
+        try { return new ZXing.QRCodeReader().decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(q)), hints).getText(); } catch (e) {}
+      }
+      if (f === 1) break;
+    }
+    return null;
+  } finally { URL.revokeObjectURL(url); }
+}
+
+// Karte an der Kasse: Vollbild, weiß, großer QR-Code. Die Bildschirmhelligkeit kann eine Web-App nicht ändern;
+// sie hält aber das Display wach (Wake Lock), solange die Karte offen ist.
+async function zeigeKarte(start = null) {
+  if (!S.karten.length) return;
+  try { if (!window.qrcode) await ladeSkript('vendor/qrcode.min.js'); } catch (e) { return zeigeToast(t`QR-Code konnte nicht geladen werden`); }
+  const passend = kartenFuerLaden();
+  const reihe = [...passend, ...S.karten.filter(k => !passend.includes(k))];
+  let aktiv = start || reihe[0];
+  const el = document.createElement('div');
+  el.className = 'kartenansicht';
+  el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+  const zeichne = () => {
+    let code;
+    try { code = qrSvg(aktiv.inhalt, 4); } catch (e) { code = `<p>${t`Der Code ist zu lang für einen QR-Code.`}</p>`; }
+    el.innerHTML = `<div class="ka-kopf"><button type="button" data-zu>${t`Fertig`}</button></div>
+      ${reihe.length > 1 ? `<div class="ka-reiter">${reihe.map(k => `<button type="button" data-k="${k.id}" class="${k === aktiv ? 'an' : ''}">${esc(k.kette)}${k.name ? ' · ' + esc(k.name) : ''}</button>`).join('')}</div>` : ''}
+      <div class="ka-mitte"><h2>${esc(aktiv.kette)}</h2>${aktiv.name ? `<p class="ka-name">${esc(aktiv.name)}</p>` : ''}
+        <div class="ka-code">${code}</div>
+        ${aktiv.inhalt.length <= 40 ? `<p class="ka-nummer">${esc(aktiv.inhalt)}</p>` : ''}</div>
+      <p class="ka-tipp">${t`Das Display bleibt an. Heller geht es über das Kontrollzentrum.`}</p>`;
+  };
+  zeichne();
+  document.body.appendChild(el);
+  document.body.style.overflow = 'hidden';
+  const farbe = $('#themeFarbe'), farbeVorher = farbe.content;
+  farbe.content = '#ffffff';
+  let sperre = null;
+  const wach = async () => { try { if (navigator.wakeLock && document.visibilityState === 'visible') sperre = await navigator.wakeLock.request('screen'); } catch (e) {} };
+  const beiSichtbar = () => { if (document.visibilityState === 'visible') wach(); };
+  wach();
+  document.addEventListener('visibilitychange', beiSichtbar);
+  el.addEventListener('click', e => {
+    const k = e.target.closest('[data-k]');
+    if (k) { aktiv = S.karten.find(x => x.id === k.dataset.k) || aktiv; return zeichne(); }
+    if (e.target.closest('[data-zu]')) {
+      document.removeEventListener('visibilitychange', beiSichtbar);
+      if (sperre) sperre.release().catch(() => {});
+      farbe.content = farbeVorher;
+      el.remove();
+      if (!$('.hinterlegt')) document.body.style.overflow = '';
+    }
+  });
+}
+
+function oeffneKarteBearbeiten(karte, nachher) {
+  const neu = !karte;
+  // Neue Karte: Kette aus dem Namen des gewählten Ladens vorschlagen
+  const laden = woerterVon(aktivesProfil().name);
+  const k = neu ? { id: uid(), kette: KETTEN.find(x => woerterVon(x).every(w => laden.includes(w))) || '', name: '', inhalt: '' } : { ...karte };
+  const b = oeffneBlatt('<div id="ka"></div>', { voll: true });
+  let status = '';
+  const zeichne = async () => {
+    $('#ka', b).innerHTML = `
+      <div class="blatt-kopf"><button type="button" class="zurueck" data-schliessen>${t`Abbrechen`}</button><h3></h3>
+        <button type="button" class="zurueck" id="kaOk" style="font-weight:600"${k.kette.trim() && k.inhalt ? '' : ' disabled'}>${t`Speichern`}</button></div>
+      <h2 class="seiten-titel">${neu ? t`Neue Kundenkarte` : esc(k.kette)}</h2>
+      <label class="feld"><span>${t`Kette`}</span><input type="text" id="kaKette" value="${esc(k.kette)}" placeholder="${t`z. B. REWE`}" autocapitalize="words" autocorrect="off" autocomplete="off"></label>
+      <div class="ketten">${KETTEN.map(x => `<button type="button" data-kette="${esc(x)}" class="${norm(x) === norm(k.kette) ? 'an' : ''}">${esc(x)}</button>`).join('')}</div>
+      <label class="feld"><span>${t`Bezeichnung (freiwillig)`}</span><input type="text" id="kaName" value="${esc(k.name)}" placeholder="${t`z. B. Anna oder Familienkarte`}" autocapitalize="sentences" autocomplete="off"></label>
+      <div class="abschnitt">${t`QR-Code`}</div>
+      ${k.inhalt ? `<div class="karte-code"><div class="qr-rahmen" id="kaQr"></div><p class="nummer">${esc(k.inhalt.length > 80 ? k.inhalt.slice(0, 80) + '…' : k.inhalt)}</p></div>` : ''}
+      <p class="text-muted" id="kaStatus">${status || (k.inhalt ? '' : t`Screenshot vom QR-Code aus der App der Kette wählen oder die Karte scannen.`)}</p>
+      <div class="knopfreihe">
+        <button type="button" class="knopf${k.inhalt ? ' zweit' : ''}" id="kaBild">${k.inhalt ? t`Anderen Screenshot wählen` : t`Screenshot wählen`}</button>
+        <button type="button" class="knopf zweit" id="kaScan">${t`Mit der Kamera scannen`}</button>
+        ${neu ? '' : `<button type="button" class="knopf gefahr" id="kaLoeschen">${t`Karte löschen`}</button>`}
+      </div>
+      <input type="file" id="kaDatei" accept="image/*" hidden>`;
+    if (k.inhalt) {
+      try { if (!window.qrcode) await ladeSkript('vendor/qrcode.min.js'); $('#kaQr', b).innerHTML = qrSvg(k.inhalt, 4); }
+      catch (e) { $('#kaQr', b).innerHTML = ''; }
+    }
+  };
+  const uebernimm = text => {
+    text = String(text || '').trim();
+    if (!text) { status = t`Kein QR-Code gefunden. Den Screenshot so wählen, dass der Code ganz zu sehen ist.`; return zeichne(); }
+    k.inhalt = text; status = t`QR-Code erkannt.`;
+    zeichne();
+  };
+  zeichne();
+  b.addEventListener('input', e => {
+    if (e.target.id === 'kaKette') {
+      k.kette = e.target.value;
+      $('#kaOk', b).disabled = !(k.kette.trim() && k.inhalt);
+      $$('[data-kette]', b).forEach(x => x.classList.toggle('an', norm(x.dataset.kette) === norm(k.kette)));
+    }
+    if (e.target.id === 'kaName') k.name = e.target.value;
+  });
+  b.addEventListener('change', async e => {
+    if (e.target.id !== 'kaDatei' || !e.target.files[0]) return;
+    $('#kaStatus', b).innerHTML = '<span class="laedt"></span>' + esc(t`QR-Code wird gesucht`);
+    let text = null;
+    try { text = await qrAusBild(e.target.files[0]); } catch (err) {}
+    uebernimm(text);
+  });
+  b.addEventListener('click', e => {
+    const kette = e.target.closest('[data-kette]');
+    if (kette) { k.kette = kette.dataset.kette; return zeichne(); }
+    if (e.target.closest('#kaBild')) return $('#kaDatei', b).click();
+    if (e.target.closest('#kaScan')) return oeffneScanner(uebernimm);
+    if (e.target.closest('#kaOk')) {
+      const fertig = { id: k.id, kette: k.kette.trim(), name: k.name.trim(), inhalt: k.inhalt };
+      const i = S.karten.findIndex(x => x.id === k.id);
+      if (i >= 0) S.karten[i] = fertig; else S.karten.push(fertig);
+      sichereKarten(); schliesseBlatt(b); nachher && nachher(); render();
+      return;
+    }
+    if (e.target.closest('#kaLoeschen')) {
+      if (!confirm(t`Kundenkarte ${k.kette} löschen?` + syncWarnung())) return;
+      S.karten = S.karten.filter(x => x.id !== k.id);
+      sichereKarten(); schliesseBlatt(b); nachher && nachher(); render();
+    }
+  });
 }
 
 function abteilungAusTags(tags, standard) {
@@ -2777,8 +3032,8 @@ function renderGeteilt() {
   $('#geteiltInfo').textContent = t`${n} Artikel` + datum;
   $('#main').innerHTML = nachAbteilung(g.artikel).map(([abt, items]) => gruppeHTML(abt, items)).join('')
     || `<div class="leer">${t`Die geteilte Liste ist leer.`}</div>`;
-  $('#abschluss').hidden = !n;
   $('#btnAbschluss').textContent = t`Erledigt zurückschicken · ${erledigt} von ${n}`;
+  renderUnten(n > 0, false);
 }
 
 function geteiltAbhaken(item) {
@@ -2849,8 +3104,8 @@ function oeffneRueckmeldung(r) {
 
 const SYNC_URL_STANDARD = 'https://einkaufsliste-sync.56nr5tc89d.workers.dev';   // Worker-Adresse, siehe server/ANLEITUNG.md; zum Testen überschreibbar mit localStorage „ek.syncUrl“
 const SYNC_URL = (() => { try { return localStorage.getItem('ek.syncUrl') || SYNC_URL_STANDARD; } catch (e) { return SYNC_URL_STANDARD; } })().replace(/\/+$/, '');
-const SYNC_SAMMLUNGEN = ['liste', 'verlauf', 'korrekturen', 'eans', 'profile', 'rezepte'];
-const SYNC_LISTEN = ['liste', 'profile', 'rezepte'];      // Arrays mit id, der Rest sind Objekte mit Schlüssel
+const SYNC_SAMMLUNGEN = ['liste', 'verlauf', 'korrekturen', 'eans', 'profile', 'rezepte', 'karten', 'geraete'];
+const SYNC_LISTEN = ['liste', 'profile', 'rezepte', 'karten'];      // Arrays mit id, der Rest sind Objekte mit Schlüssel
 const SYNC_GRABSTEIN_TAGE = 60;
 const SYNC = { stand: null, doc: null, laeuft: false, nochmal: false, zeitgeber: null, fehler: '', online: true };
 
@@ -3063,6 +3318,7 @@ async function synchronisiere() {
   const offenVorher = S.liste.filter(i => !i.erledigt);
   let geaendert = false;
   try {
+    meldeGeraet(st);
     const { raum, aes } = await syncSchluessel(st.schluessel);
     for (let versuch = 0; versuch < 4; versuch++) {
       const r = await syncAnfrage('GET', raum, null, st.version ? `?v=${st.version}` : '');
@@ -3117,6 +3373,7 @@ async function starteSync(schluessel, modus) {
   if (modus === 'zusammen') await entferneLokaleDoppelte(schluessel);
   SYNC.stand = { schluessel, version: 0, serverHash: '', uhr: 0, zuletzt: 0 };
   SYNC.doc = {};
+  S.geraete = {};     // Geräteliste gehört zum Haushalt; dieses Gerät trägt sich beim ersten Abgleich ein
   if (modus !== 'ersetzen') {
     // Beim Beitreten gewinnt bei gleichen Einträgen der gemeinsame Stand (Zeitstempel 1), Neues von hier kommt dazu
     const t0 = modus === 'zusammen' ? 1 : syncUhr(SYNC.stand);
@@ -3143,7 +3400,8 @@ async function entferneLokaleDoppelte(schluessel) {
 
 function beendeSync() {
   clearTimeout(SYNC.zeitgeber);
-  SYNC.stand = null; SYNC.doc = null; SYNC.fehler = '';
+  SYNC.stand = null; SYNC.doc = null; SYNC.fehler = ''; SYNC.abmelden = false;
+  S.geraete = {}; sichere('geraete', S.geraete);
   try { localStorage.removeItem(SPEICHER_PREFIX + 'sync'); localStorage.removeItem(SPEICHER_PREFIX + 'sync.doc'); } catch (e) {}
   document.dispatchEvent(new Event('sync'));
 }
@@ -3155,6 +3413,9 @@ async function erneuereSync() {
   const doc = SYNC.doc;
   SYNC.stand = { schluessel: neuerSyncSchluessel(), version: 0, serverHash: '', uhr: SYNC.stand.uhr, zuletzt: 0 };
   SYNC.doc = doc;
+  // Die anderen Geräte sind getrennt: nur dieses bleibt in der Liste
+  S.geraete = Object.fromEntries(Object.entries(S.geraete).filter(([code]) => code === GERAET_CODE));
+  sichere('geraete', S.geraete);
   sichereSync();
   await synchronisiere();
 }
@@ -3189,13 +3450,15 @@ function fasseDoppelteZusammen(liste) {
 
 const einladungsLink = () => `${appAdresse()}#s=${SYNC.stand.schluessel}`;
 
-function qrSvg(text) {
+// rand in Modulen; für Kassenscanner 4 (Ruhezone nach Norm). Reine Ziffern und Großbuchstaben werden dichter kodiert.
+function qrSvg(text, rand = 2) {
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
   const qr = qrcode(0, 'M');
-  qr.addData(text); qr.make();
-  const n = qr.getModuleCount(), rand = 2;
+  qr.addData(text, /^\d+$/.test(text) ? 'Numeric' : /^[0-9A-Z $%*+\-./:]+$/.test(text) ? 'Alphanumeric' : 'Byte'); qr.make();
+  const n = qr.getModuleCount();
   let pfad = '';
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (qr.isDark(y, x)) pfad += `M${x + rand} ${y + rand}h1v1h-1z`;
-  return `<svg class="qr" viewBox="0 0 ${n + 2 * rand} ${n + 2 * rand}" role="img" aria-label="${t`QR-Code`}"><rect width="100%" height="100%" fill="#fff"/><path d="${pfad}" fill="#000"/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="qr" viewBox="0 0 ${n + 2 * rand} ${n + 2 * rand}" role="img" aria-label="${t`QR-Code`}"><rect width="100%" height="100%" fill="#fff"/><path d="${pfad}" fill="#000"/></svg>`;
 }
 
 function syncStatusText() {
@@ -3206,6 +3469,94 @@ function syncStatusText() {
   if (!z) return t`Noch nicht synchronisiert`;
   const min = Math.round((Date.now() - z) / 60000);
   return min < 1 ? t`Verbunden · gerade eben` : t`Verbunden · zuletzt vor ${min} Min.`;
+}
+
+/* Verbundene Geräte
+   Jedes Gerät hat einen festen Code aus drei Wörtern (wie bei what3words), zufällig beim ersten Start erzeugt und nur
+   hier gespeichert. Beim Abgleich trägt es sich mit Art und Zeitpunkt in die Sammlung „geraete“ ein, höchstens alle
+   5 Minuten, damit nicht ständig hochgeladen wird. Die Wörter sind in allen Sprachen dieselben, damit der Code auf jedem
+   Gerät gleich aussieht. 256 Wörter hoch 3 ergibt 16,7 Millionen Codes. */
+const GERAETE_WOERTER = ('adler ahorn ameise amsel anker anzug apfel arena atlas auster bach ball banane bank bart bauer ' +
+  'baum beere berg besen biber birke birne blatt blitz blume bohne boot brief brille brot brunnen buch burg butter dach ' +
+  'dachs damm dattel decke degen delfin diamant docht dohle dom dorf drache eiche eimer eis elch engel ente erbse esel ' +
+  'eule fabrik fackel faden falke farn feder fee feld fels fenster ferse fichte fisch flagge flasche floh flosse flur ' +
+  'fluss fohlen forelle frosch fuchs gabel gans garten geige gipfel giraffe glas glocke gold gras griff gurke hafen ' +
+  'hagel hahn hai hammer hase haus hecht hecke held helm hemd herd hering hirsch hobel honig horn hose hotel huhn hummel ' +
+  'hund hut igel insel jacke jaguar kabel kaffee kahn kakao kaktus kamel kamin kanal kanne kater kerze kessel kiefer ' +
+  'kirche kirsche kiste kiwi klee knopf koala koch koffer komet kompass korb kran krone kuchen kugel lachs lampe land ' +
+  'laterne lauch leiter lerche linde lotse luchs lupe mais mantel marder maus meer melone messer mond moos motte ' +
+  'muschel nadel nagel nashorn nebel nest netz nixe nudel oase ofen olive onkel orange orgel otter paket palme panda ' +
+  'papier pauke perle pfanne pfau pferd pflaume pilz pinsel pirat planet posaune puppe quelle rabe rad rahmen rakete ' +
+  'regen reh reis riese ring ritter robbe rose rubin ruder saft salz sand sattel schaf schal schiff schloss schnee ' +
+  'schuh see segel sessel sonne specht spiegel stern storch strand tanne tasche taube teller tiger tisch topf turm uhr ' +
+  'ufer vogel vulkan waage wal wald wiese wolke wolle zebra zelt').split(' ');
+const GERAET_MELDEN_MS = 5 * 60e3, GERAET_AKTIV_MS = 15 * 60e3, GERAET_VERGESSEN_TAGE = 60;
+const neuerGeraeteCode = () => [...crypto.getRandomValues(new Uint8Array(3))].map(b => GERAETE_WOERTER[b]).join('.');
+const GERAET_CODE = (() => {
+  let code = null;
+  try { code = localStorage.getItem(SPEICHER_PREFIX + 'geraet'); } catch (e) {}
+  if (!code || !/^[a-z]+\.[a-z]+\.[a-z]+$/.test(code)) {
+    code = neuerGeraeteCode();
+    try { localStorage.setItem(SPEICHER_PREFIX + 'geraet', code); } catch (e) {}
+  }
+  return code;
+})();
+
+function geraeteArt() {
+  const ua = navigator.userAgent;
+  const art = /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'iPad' : /iPhone|iPod/.test(ua) ? 'iPhone'
+    : /Android/.test(ua) ? 'Android' : /Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
+  return { art, app: !!(navigator.standalone || matchMedia('(display-mode: standalone)').matches) };
+}
+
+// Beim Abgleich: eigenen Eintrag auffrischen, lange nicht gesehene Geräte vergessen. Direkt ins Dokument,
+// ohne sichere() → planeSync, weil der Abgleich gerade ohnehin läuft.
+function meldeGeraet(st, jetzt = Date.now()) {
+  if (SYNC.abmelden) return;
+  const ich = S.geraete[GERAET_CODE], info = geraeteArt();
+  const alt = Object.entries(S.geraete).filter(([code, g]) => code !== GERAET_CODE && jetzt - (g.gesehen || 0) > GERAET_VERGESSEN_TAGE * 864e5);
+  if (ich && jetzt - ich.gesehen < GERAET_MELDEN_MS && ich.art === info.art && ich.app === info.app && !alt.length) return;
+  S.geraete = { ...Object.fromEntries(Object.entries(S.geraete).filter(([code]) => !alt.some(([c]) => c === code))),
+    [GERAET_CODE]: { ...info, gesehen: jetzt } };
+  SYNC.anwenden = true;
+  try { sichere('geraete', S.geraete); } finally { SYNC.anwenden = false; }
+  erfasse(SYNC.doc, 'geraete', S.geraete, syncUhr(st));
+  sichereSync();
+}
+
+// „Auf diesem Gerät beenden“: erst aus der Geräteliste austragen (wenn der Server erreichbar ist), dann trennen
+async function meldeGeraetAb() {
+  if (syncAn() && S.geraete[GERAET_CODE]) {
+    SYNC.abmelden = true;
+    const { [GERAET_CODE]: _, ...rest } = S.geraete;
+    S.geraete = rest;
+    sichere('geraete', S.geraete);
+    clearTimeout(SYNC.zeitgeber);
+    await Promise.race([synchronisiere().catch(() => {}), new Promise(ok => setTimeout(ok, 8000))]);
+  }
+  beendeSync();
+}
+
+function vorWann(ms, jetzt = Date.now()) {
+  const d = Math.max(0, jetzt - ms) / 1000;
+  const rtf = new Intl.RelativeTimeFormat(gebietsschema(), { numeric: 'auto' });
+  if (d < 3600) return rtf.format(-Math.max(1, Math.round(d / 60)), 'minute');
+  if (d < 86400) return rtf.format(-Math.round(d / 3600), 'hour');
+  if (d < 7 * 86400) return rtf.format(-Math.round(d / 86400), 'day');
+  return new Date(ms).toLocaleDateString(gebietsschema(), { day: 'numeric', month: 'numeric', year: 'numeric' });
+}
+
+function geraeteHTML(jetzt = Date.now()) {
+  const liste = Object.entries(S.geraete);
+  if (!liste.some(([code]) => code === GERAET_CODE)) liste.push([GERAET_CODE, { ...geraeteArt(), gesehen: 0 }]);
+  liste.sort(([a, x], [b, y]) => (b === GERAET_CODE) - (a === GERAET_CODE) || (y.gesehen || 0) - (x.gesehen || 0));
+  return liste.map(([code, g]) => {
+    const ich = code === GERAET_CODE, aktiv = ich || jetzt - (g.gesehen || 0) < GERAET_AKTIV_MS;
+    const art = [g.art, g.art ? (g.app ? t`App` : t`Browser`) : ''].filter(Boolean).join(' · ');
+    const wann = ich ? t`Dieses Gerät` : aktiv ? t`Gerade aktiv` : t`Zuletzt aktiv ${vorWann(g.gesehen, jetzt)}`;
+    return `<li><span class="status${aktiv ? ' aktiv' : ''}"></span><div><span class="code">${esc(code)}</span>
+      <small>${esc([art, wann].filter(Boolean).join(' · '))}</small></div></li>`;
+  }).join('');
 }
 
 // Beitreten über einen Link mit #s=
@@ -3546,6 +3897,66 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
     pruefe('Sync: Einladungslink erkannt', linkAus(`Komm dazu: https://x.de/#s=${schl}`), { art: 's', daten: schl });
   }
 
+  // Verbundene Geräte
+  {
+    pruefe('Geräte: 256 verschiedene Wörter, nur a–z', [GERAETE_WOERTER.length, new Set(GERAETE_WOERTER).size, GERAETE_WOERTER.every(w => /^[a-z]{2,8}$/.test(w))], [256, 256, true]);
+    pruefe('Geräte: Code aus drei Wörtern', [/^[a-z]+\.[a-z]+\.[a-z]+$/.test(GERAET_CODE), neuerGeraeteCode().split('.').every(w => GERAETE_WOERTER.includes(w))], [true, true]);
+    pruefe('Geräte und Karten werden synchronisiert', ['karten', 'geraete'].every(n => SYNC_SAMMLUNGEN.includes(n)), true);
+    const jetzt = Date.now(), sichern = { doc: SYNC.doc, geraete: S.geraete };
+    SYNC.doc = {};
+    S.geraete = { 'alt.alt.alt': { art: 'iPad', app: true, gesehen: jetzt - 90 * 864e5 }, 'wal.see.hut': { art: 'iPhone', app: true, gesehen: jetzt - 3 * 3600e3 } };
+    const st = { uhr: 0 };
+    meldeGeraet(st, jetzt);
+    pruefe('Geräte: eigenes eingetragen, altes vergessen', Object.keys(S.geraete).sort(), [GERAET_CODE, 'wal.see.hut'].sort());
+    const docVorher = kanonisch(SYNC.doc);
+    meldeGeraet(st, jetzt + 60e3);
+    pruefe('Geräte: nicht bei jedem Abgleich neu melden', kanonisch(SYNC.doc) === docVorher, true);
+    meldeGeraet(st, jetzt + GERAET_MELDEN_MS + 1);
+    pruefe('Geräte: nach 5 Minuten wieder melden', S.geraete[GERAET_CODE].gesehen, jetzt + GERAET_MELDEN_MS + 1);
+    const anderes = {}; erfasse(anderes, 'geraete', { 'zebra.mond.eis': { art: 'iPhone', app: false, gesehen: jetzt } }, jetzt);
+    pruefe('Geräte: zwei Geräte zusammengeführt', Object.keys(ausDokument(zusammenfuehren(SYNC.doc, anderes), 'geraete', {})).sort(),
+      [GERAET_CODE, 'wal.see.hut', 'zebra.mond.eis'].sort());
+    const html = geraeteHTML(jetzt + GERAET_MELDEN_MS + 1);
+    pruefe('Geräte: Liste mit eigenem Gerät zuerst', [html.indexOf(GERAET_CODE) < html.indexOf('wal.see.hut'), html.includes('Dieses Gerät'), html.includes('Zuletzt aktiv vor 3 Stunden')], [true, true, true]);
+    SYNC.doc = sichern.doc; S.geraete = sichern.geraete;
+  }
+
+  // Kundenkarten
+  {
+    const sichern = S.karten;
+    S.karten = [{ id: 'r', kette: 'REWE', inhalt: '1' }, { id: 'd', kette: 'dm', inhalt: '2' }, { id: 'c', kette: 'DeutschlandCard', inhalt: '3' }, { id: 'e', kette: 'EDEKA', inhalt: '4' }];
+    const fuer = name => kartenFuerLaden({ name }).map(k => k.id);
+    pruefe('Karten: passende Karte am Ladennamen', [fuer('Rewe Sendlinger Straße'), fuer('dm Marienplatz'), fuer('Supermarkt'), fuer('Edmund'), fuer('EDEKA Center')],
+      [['r'], ['d'], [], [], ['e']]);
+    S.karten = sichern;
+    if (!window.qrcode) await ladeSkript('vendor/qrcode.min.js');
+    // QR-Code als Vektorgrafik erzeugen, als „Screenshot“ in ein großes Bild setzen und wieder lesen
+    const screenshot = async (svg, dunkel) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+      await img.decode();
+      const c = document.createElement('canvas'); c.width = 1170; c.height = 2532;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = dunkel ? '#000' : '#f2f2f2'; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.fillStyle = dunkel ? '#fff' : '#333'; ctx.font = '60px sans-serif'; ctx.fillText('Kundenkarte', 100, 300);
+      ctx.drawImage(img, 285, 900, 600, 600);
+      return new Promise(ok => c.toBlob(ok, 'image/png'));
+    };
+    const faelle = ['9276000012345678', 'LIDLPLUS:ABC-123/45', 'https://example.org/k?id=a1b2c3&x=Ä'];
+    // Safari hat keinen BarcodeDetector: den Weg über zxing gezielt prüfen
+    const detektor = Object.getOwnPropertyDescriptor(window, 'BarcodeDetector');
+    if (detektor) delete window.BarcodeDetector;
+    try {
+      const gelesen = [];
+      for (const text of faelle) gelesen.push(await qrAusBild(await screenshot(qrSvg(text, 4))));
+      pruefe('Karten: Screenshot → Vektor-QR → wieder lesbar (zxing)', gelesen, faelle);
+      const invertiert = qrSvg(faelle[0], 4).replace('fill="#fff"', 'fill="#X"').replace('fill="#000"', 'fill="#fff"').replace('fill="#X"', 'fill="#000"');
+      pruefe('Karten: heller Code auf dunklem Grund (zxing)', await qrAusBild(await screenshot(invertiert, true)), faelle[0]);
+      pruefe('Karten: Bild ohne QR-Code', await qrAusBild(await screenshot('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>')), null);
+    } finally { if (detektor) Object.defineProperty(window, 'BarcodeDetector', detektor); }
+    if ('BarcodeDetector' in window) pruefe('Karten: Screenshot lesbar (BarcodeDetector)', await qrAusBild(await screenshot(qrSvg(faelle[1], 4))), faelle[1]);
+  }
+
   // Sprachen: Übersetzungen vollständig, Platzhalter passen
   const html = await (await fetch('index.html', { cache: 'no-store' })).text();
   const quelle = html.slice(0, html.indexOf('async function selbsttest'));   // ohne diesen Test, der die Suchmuster selbst enthält
@@ -3568,7 +3979,7 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
   for (const x of [...ABTEILUNGEN, ...BEREICHE]) schluessel.add(x.name);
   for (const f of FARBSCHEMATA) { schluessel.add(f.name); schluessel.add(f.text); for (const z of f.zonen || []) schluessel.add(z.name); }
   for (const x of ['Liste', 'Laden', 'Geteilte Liste', 'Schließen', 'Liste teilen', 'Einstellungen', 'Artikel hinzufügen', 'Barcode scannen',
-    'Rezept übernehmen', 'Einkauf abschließen', 'Neuer Laden', 'Supermarkt', 'Drogerie']) schluessel.add(x);
+    'Rezept übernehmen', 'Einkauf abschließen', 'Kundenkarte zeigen', 'Neuer Laden', 'Supermarkt', 'Drogerie']) schluessel.add(x);
   schluessel.delete('…');  // aus einem Kommentar
   const platzhalter = x => typeof x === 'object' ? platzhalter(x.other) : (x.match(/\{\d+\}/g) || []).sort().join();
   for (const spr of ['en', 'fr', 'es']) {
