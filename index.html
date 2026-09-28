@@ -356,7 +356,10 @@
   .ketten button { height: 32px; padding: 0 11px; border-radius: 16px; border: 1px solid var(--line); font-size: 14px; }
   .ketten button.an { border-color: var(--accent); background: var(--accent-weich); }
   .karte-code { text-align: center; }
-  .karte-code .qr-rahmen { width: 180px; border: 1px solid var(--line); padding: 0; }
+  .code-rahmen { width: 180px; margin: 8px auto 4px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; }
+  .code-rahmen.strich { width: 100%; max-width: 340px; }
+  .code-rahmen svg, .ka-code svg { display: block; width: 100%; height: auto; }
+  .code-rahmen.strich svg { aspect-ratio: 3 / 1; height: auto; }
   .karte-code .nummer { font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); overflow-wrap: anywhere; }
   /* Karte an der Kasse: immer hell, damit der Scanner sie liest */
   .kartenansicht {
@@ -372,7 +375,8 @@
   .kartenansicht h2 { margin: 0; font-size: 26px; }
   .kartenansicht .ka-name { margin: 2px 0 0; color: #555; }
   .kartenansicht .ka-code { width: min(88vw, 58vh, 480px); margin: 18px 0 10px; }
-  .kartenansicht .ka-code svg { width: 100%; height: auto; shape-rendering: crispEdges; }
+  .kartenansicht .ka-code.strich { width: min(94vw, 640px); }
+  .kartenansicht .ka-code.strich svg { height: min(30vh, 34vw); }
   .kartenansicht .ka-nummer { margin: 0; font: 17px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; overflow-wrap: anywhere; }
   .kartenansicht .ka-tipp { margin: 0; text-align: center; font-size: 13px; color: #666; }
 
@@ -532,7 +536,7 @@ const S = {
   einstellungen: null,
   geteilt: null,   // Liste, die jemand anderes geteilt hat: { id, t, artikel: [...] }
   rezepte: [],     // gespeicherte Rezepte: { id, name, zutaten: [{ name, menge, einheit, abteilung }] }
-  karten: [],      // Kundenkarten: { id, kette, name, inhalt } – inhalt ist der Text im QR-Code
+  karten: [],      // Kundenkarten: { id, kette, name, inhalt, format } – inhalt ist der Text im Code, format siehe CODE_FORMATE
   geraete: {},     // Geräte im synchronisierten Haushalt: { code: { art, app, gesehen } }
 };
 
@@ -1640,7 +1644,7 @@ function oeffneEinstellungen(start = 'haupt') {
       <ul class="liste-einst">${S.karten.map(k => `<li><button type="button" class="fuellen zeile" data-karte="${k.id}"><span>${esc(k.kette)}
         <span class="klein">${k.name ? '· ' + esc(k.name) : ''}</span></span>${ICON_PFEIL}</button></li>`).join('')}
         <li><button type="button" class="fuellen" id="eNeueKarte" style="color:var(--accent)">${t`Karte hinzufügen`}</button></li></ul>
-      <p class="text-muted">${t`QR-Code aus der Bonus-App der Kette als Screenshot hinterlegen oder die Plastikkarte scannen. Im Laden zeigt der Knopf unten links die Karte. Welche Kette gemeint ist, erkennt die App am Namen des gewählten Ladens, z. B. „REWE Hauptstraße“.`}</p>
+      <p class="text-muted">${t`Code aus der Bonus-App der Kette als Screenshot hinterlegen oder die Plastikkarte scannen. Im Laden zeigt der Knopf unten links die Karte. Welche Kette gemeint ist, erkennt die App am Namen des gewählten Ladens, z. B. „REWE Hauptstraße“.`}</p>
       ${syncAn() ? `<p class="text-muted">${t`Kundenkarten werden mit den verbundenen Geräten geteilt.`}</p>` : ''}`,
     darstellung: () => { const e = S.einstellungen; return `
       <div class="abschnitt">${t`Erscheinungsbild`}</div>
@@ -2202,13 +2206,13 @@ function ladeSkript(src) {
   });
 }
 
-// beiQr: Nur QR-Codes lesen und den Text zurückgeben (Kundenkarte), statt Barcode oder Einladung zu verarbeiten
+// beiQr: Kundenkarte scannen – alle Formate, Text und Format zurückgeben, statt Barcode oder Einladung zu verarbeiten
 async function oeffneScanner(beiQr = null) {
   const el = document.createElement('div');
   el.className = 'scanner';
   el.innerHTML = `<video playsinline muted autoplay></video><div class="rahmen${beiQr ? ' quadrat' : ''}"></div>
     <div class="oben"><button type="button" data-zu>${t`Abbrechen`}</button>${beiQr ? '' : `<button type="button" data-hand>${t`Nummer eingeben`}</button>`}</div>
-    <div class="unten" id="scanHinweis">${beiQr ? t`QR-Code in den Rahmen halten` : t`Barcode in den Rahmen halten`}</div>`;
+    <div class="unten" id="scanHinweis">${beiQr ? t`Code der Karte in den Rahmen halten` : t`Barcode in den Rahmen halten`}</div>`;
   document.body.appendChild(el);
   const video = $('video', el);
   let stopp = () => {};
@@ -2219,9 +2223,9 @@ async function oeffneScanner(beiQr = null) {
     const ean = prompt(t`EAN-Nummer (unter dem Barcode):`);
     if (ean && /^\d{8,14}$/.test(ean.trim())) { schliessen(); barcodeGefunden(ean.trim()); }
   };
-  const gefunden = code => {
+  const gefunden = (code, format) => {
     if (fertig) return;
-    if (beiQr) { schliessen(); return beiQr(code); }
+    if (beiQr) { schliessen(); return beiQr(code, format); }
     const link = linkAus(code);
     if (!link && !/^\d{6,14}$/.test(code)) return;          // anderer QR-Code: weiter suchen
     schliessen();
@@ -2235,21 +2239,21 @@ async function oeffneScanner(beiQr = null) {
       stopp = () => stream.getTracks().forEach(t => t.stop());
       video.srcObject = stream;
       await video.play();
-      const detektor = new BarcodeDetector({ formats: beiQr ? ['qr_code'] : ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code'] });
+      const detektor = new BarcodeDetector({ formats: beiQr ? (await BarcodeDetector.getSupportedFormats()).filter(f => CODE_FORMATE[f]) : ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code'] });
       const schleife = async () => {
         if (fertig) return;
-        try { const r = await detektor.detect(video); if (r[0]) return gefunden(r[0].rawValue); } catch (e) {}
+        try { const r = await detektor.detect(video); if (r[0]) return gefunden(r[0].rawValue, r[0].format); } catch (e) {}
         requestAnimationFrame(schleife);
       };
       schleife();
     } else {
       if (!window.ZXing) await ladeSkript('vendor/zxing.min.js');
       const hints = new Map();
-      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, beiQr ? [ZXing.BarcodeFormat.QR_CODE]
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, beiQr ? Object.values(CODE_FORMATE).map(f => ZXing.BarcodeFormat[f.zx])
         : [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E, ZXing.BarcodeFormat.QR_CODE]);
       const leser = new ZXing.BrowserMultiFormatReader(hints, 300);
       stopp = () => leser.reset();
-      await leser.decodeFromConstraints({ video: { facingMode: 'environment' }, audio: false }, video, r => { if (r) gefunden(r.getText()); });
+      await leser.decodeFromConstraints({ video: { facingMode: 'environment' }, audio: false }, video, r => { if (r) gefunden(r.getText(), formatVon(ZXing.BarcodeFormat[r.getBarcodeFormat()])); });
     }
   } catch (e) {
     $('#scanHinweis', el).textContent = location.protocol === 'https:' || location.hostname === 'localhost'
@@ -2260,8 +2264,8 @@ async function oeffneScanner(beiQr = null) {
 
 /* ============================================================
    Kundenkarten (REWE, Lidl, EDEKA …)
-   Der QR-Code kommt aus einem Screenshot der Bonus-App oder vom Scan der Plastikkarte. Gespeichert wird nur sein Inhalt;
-   angezeigt wird ein neu erzeugter QR-Code als Vektorgrafik, gestochen scharf in jeder Größe.
+   Der Code kommt aus einem Screenshot der Bonus-App oder vom Scan der Plastikkarte. Gespeichert werden nur Inhalt und Format;
+   angezeigt wird ein neu erzeugter Code als Vektorgrafik, gestochen scharf in jeder Größe.
    ============================================================ */
 
 const KETTEN = ['REWE', 'Lidl', 'EDEKA', 'Kaufland', 'Aldi', 'Penny', 'Netto', 'Norma', 'Globus', 'dm', 'Rossmann', 'Müller', 'Payback', 'DeutschlandCard'];
@@ -2273,42 +2277,170 @@ function kartenFuerLaden(p = aktivesProfil()) {
   return S.karten.filter(k => { const kw = woerterVon(k.kette); return kw.length && kw.every(x => w.has(x)); });
 }
 
-// QR-Code aus einem Bild (Screenshot) lesen. Mehrere Größen und auch hell auf dunkel, weil Screenshots sehr groß sind
-// und manche Apps im Dunkelmodus den Code invertieren.
-async function qrAusBild(datei) {
+// Code-Formate der Kundenkarten. Namen wie beim BarcodeDetector; zx = Name in zxing. Angezeigt werden können die mit „zeichnen“,
+// die anderen erkennt die App und sagt dann, dass sie sie nicht darstellen kann (statt „kein Code gefunden“).
+// REWE Bonus nutzt einen Aztec-Code, Lidl Plus einen QR-Code, Plastikkarten oft EAN-13 oder Code 128.
+const CODE_FORMATE = {
+  qr_code: { name: 'QR-Code', zx: 'QR_CODE', zeichnen: true },
+  aztec: { name: 'Aztec-Code', zx: 'AZTEC', zeichnen: true },
+  data_matrix: { name: 'Data Matrix', zx: 'DATA_MATRIX', zeichnen: true },
+  ean_13: { name: 'EAN-13', zx: 'EAN_13', zeichnen: true, strich: true },
+  ean_8: { name: 'EAN-8', zx: 'EAN_8', zeichnen: true, strich: true },
+  upc_a: { name: 'UPC-A', zx: 'UPC_A', zeichnen: true, strich: true },
+  code_128: { name: 'Code 128', zx: 'CODE_128', zeichnen: true, strich: true },
+  code_39: { name: 'Code 39', zx: 'CODE_39', zeichnen: true, strich: true },
+  pdf417: { name: 'PDF417', zx: 'PDF_417' },
+  itf: { name: 'ITF', zx: 'ITF', strich: true },
+  codabar: { name: 'Codabar', zx: 'CODABAR', strich: true },
+};
+const formatVon = zxName => Object.keys(CODE_FORMATE).find(k => CODE_FORMATE[k].zx === zxName) || null;
+const kartenFormat = k => k.format || 'qr_code';   // Karten aus der ersten Fassung haben kein Format
+
+// Code aus einem Bild (Screenshot) lesen → { text, format } oder null. Erst in voller Größe (kleine Codes in großen
+// Screenshots), dann verkleinert, jeweils auch hell auf dunkel, weil manche Apps im Dunkelmodus den Code invertieren.
+async function codeAusBild(datei) {
   const url = URL.createObjectURL(datei);
   try {
     const img = new Image();
     img.src = url;
     await img.decode();
     if ('BarcodeDetector' in window) {
-      try { const r = await new BarcodeDetector({ formats: ['qr_code'] }).detect(img); if (r[0]) return r[0].rawValue; } catch (e) {}
+      try {
+        const formate = (await BarcodeDetector.getSupportedFormats()).filter(f => CODE_FORMATE[f]);
+        const r = await new BarcodeDetector({ formats: formate }).detect(img);
+        if (r[0]) return { text: r[0].rawValue, format: r[0].format };
+      } catch (e) {}
     }
     if (!window.ZXing) await ladeSkript('vendor/zxing.min.js');
-    const hints = new Map([[ZXing.DecodeHintType.TRY_HARDER, true], [ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.QR_CODE]]]);
+    const leser = new ZXing.MultiFormatReader();
+    leser.setHints(new Map([[ZXing.DecodeHintType.TRY_HARDER, true],
+      [ZXing.DecodeHintType.POSSIBLE_FORMATS, Object.values(CODE_FORMATE).map(f => ZXing.BarcodeFormat[f.zx])]]));
     const laenge = Math.max(img.naturalWidth, img.naturalHeight);
-    for (const kante of [1200, 800, 2000]) {
-      const f = Math.min(1, kante / laenge);
+    // Ausschnitt (x, y, b, h in Bildpixeln) auf höchstens „kante“ Pixel verkleinert in ein Canvas zeichnen
+    const zeichne = (x, y, b, h, kante) => {
+      const f = Math.min(1, kante / Math.max(b, h));
       const c = document.createElement('canvas');
-      c.width = Math.round(img.naturalWidth * f); c.height = Math.round(img.naturalHeight * f);
+      c.width = Math.round(b * f); c.height = Math.round(h * f);
       const ctx = c.getContext('2d');
       ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);   // transparente Bilder: weißer Grund
-      ctx.drawImage(img, 0, 0, c.width, c.height);
-      const quelle = new ZXing.HTMLCanvasElementLuminanceSource(c);
-      for (const q of [quelle, quelle.invert()]) {
-        try { return new ZXing.QRCodeReader().decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(q)), hints).getText(); } catch (e) {}
+      ctx.drawImage(img, x, y, b, h, 0, 0, c.width, c.height);
+      return c;
+    };
+    const lies = (c, invertiert, l = leser) => {
+      // Für jeden Versuch eine neue Quelle: Die Strichcode-Leser drehen sie bei TRY_HARDER in sich selbst
+      const q = invertiert ? new ZXing.HTMLCanvasElementLuminanceSource(c).invert() : new ZXing.HTMLCanvasElementLuminanceSource(c);
+      try {
+        const r = l.decodeWithState(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(q)));
+        return { text: r.getText(), format: formatVon(ZXing.BarcodeFormat[r.getBarcodeFormat()]) };
+      } catch (e) { if (!(e instanceof ZXing.NotFoundException || e instanceof ZXing.ChecksumException || e instanceof ZXing.FormatException)) throw e; }
+      return null;
+    };
+    const kanten = [...new Set([Math.min(laenge, 2000), 1200].filter(k => k <= laenge))];
+    if (!kanten.length) kanten.push(laenge);
+    for (const kante of kanten) {
+      const c = zeichne(0, 0, img.naturalWidth, img.naturalHeight, kante);
+      for (const inv of [false, true]) { const r = lies(c, inv); if (r) return r; }
+    }
+    // Der Aztec-Leser sucht den Code von der Bildmitte aus. Liegt er in einem hohen Screenshot weiter oben oder unten,
+    // findet er ihn nicht: dann überlappende Ausschnitte absuchen, nur nach Aztec (schnell).
+    const aztec = new ZXing.MultiFormatReader();
+    aztec.setHints(new Map([[ZXing.DecodeHintType.TRY_HARDER, true], [ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.AZTEC]]]));
+    const kurz = Math.min(img.naturalWidth, img.naturalHeight);
+    for (const [anteil, inverse] of [[1, [false, true]], [0.55, [false]]]) {
+      const g = Math.round(kurz * anteil), schritt = Math.max(1, Math.round(g / 3));
+      for (let y = 0; y + g <= img.naturalHeight + schritt - 1; y += schritt) {
+        await new Promise(ok => setTimeout(ok));   // Oberfläche (Ladekreis) nicht blockieren
+        for (let x = 0; x + g <= img.naturalWidth + schritt - 1; x += schritt) {
+          const c = zeichne(Math.min(x, img.naturalWidth - g), Math.min(y, img.naturalHeight - g), g, g, 600);
+          for (const inv of inverse) { const r = lies(c, inv, aztec); if (r) return r; }
+        }
       }
-      if (f === 1) break;
     }
     return null;
   } finally { URL.revokeObjectURL(url); }
 }
 
-// Karte an der Kasse: Vollbild, weiß, großer QR-Code. Die Bildschirmhelligkeit kann eine Web-App nicht ändern;
+/* Codes als Vektorgrafik (SVG). QR über qrcode-generator, Aztec und Data Matrix über zxing, Strichcodes selbst kodiert. */
+function matrixSvg(breite, hoehe, dunkel, rand) {
+  let pfad = '';
+  for (let y = 0; y < hoehe; y++) for (let x = 0; x < breite; x++) if (dunkel(x, y)) pfad += `M${x + rand} ${y + rand}h1v1h-1z`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="code-2d" viewBox="0 0 ${breite + 2 * rand} ${hoehe + 2 * rand}" shape-rendering="crispEdges">` +
+    `<rect width="100%" height="100%" fill="#fff"/><path d="${pfad}" fill="#000"/></svg>`;
+}
+// Strichcode aus Modulbreiten, abwechselnd Strich und Lücke, beginnend mit einem Strich. Ruhezone 10 Module.
+function strichSvg(breiten) {
+  const rand = 10, summe = breiten.reduce((a, b) => a + b, 0), hoehe = Math.max(40, Math.round((summe + 2 * rand) * 0.32));
+  let x = rand, pfad = '';
+  breiten.forEach((b, i) => { if (i % 2 === 0) pfad += `M${x} 0h${b}v${hoehe}h-${b}z`; x += b; });
+  return `<svg xmlns="http://www.w3.org/2000/svg" class="code-1d" viewBox="0 0 ${summe + 2 * rand} ${hoehe}" preserveAspectRatio="none" shape-rendering="crispEdges">` +
+    `<rect width="100%" height="100%" fill="#fff"/><path d="${pfad}" fill="#000"/></svg>`;
+}
+const ausBits = bits => bits.replace(/(1+|0+)/g, m => m.length + ',').split(',').filter(Boolean).map(Number);   // '1101' → [2,1,1]
+
+const EAN_L = ['0001101', '0011001', '0010011', '0111101', '0100011', '0110001', '0101111', '0111011', '0110111', '0001011'];
+const EAN_G = EAN_L.map(c => [...c].reverse().map(b => b === '1' ? '0' : '1').join(''));
+const EAN_R = EAN_L.map(c => [...c].map(b => b === '1' ? '0' : '1').join(''));
+const EAN_PARITAET = ['LLLLLL', 'LLGLGG', 'LLGGLG', 'LLGGGL', 'LGLLGG', 'LGGLLG', 'LGGGLL', 'LGLGLG', 'LGLGGL', 'LGGLGL'];
+function eanBits(ziffern) {
+  const d = [...ziffern].map(Number);
+  if (d.length === 8) return '101' + d.slice(0, 4).map(x => EAN_L[x]).join('') + '01010' + d.slice(4).map(x => EAN_R[x]).join('') + '101';
+  const par = EAN_PARITAET[d[0]];
+  return '101' + d.slice(1, 7).map((x, i) => (par[i] === 'L' ? EAN_L : EAN_G)[x]).join('') + '01010' + d.slice(7).map(x => EAN_R[x]).join('') + '101';
+}
+const C128 = ('212222 222122 222221 121223 121322 131222 122213 122312 132212 221213 221312 231212 112232 122132 122231 113222 123122 123221 ' +
+  '223211 221132 221231 213212 223112 312131 311222 321122 321221 312212 322112 322211 212123 212321 232121 111323 131123 131321 112313 ' +
+  '132113 132311 211313 231113 231311 112133 112331 132131 113123 113321 133121 313121 211331 231131 213113 213311 213131 311123 311321 ' +
+  '331121 312113 312311 332111 314111 221411 431111 111224 111422 121124 121421 141122 141221 112214 112412 122114 122411 142112 142211 ' +
+  '241211 221114 413111 241112 134111 111242 121142 121241 114212 124112 124211 411212 421112 421211 212141 214121 412121 111143 111341 ' +
+  '131141 114113 114311 411113 411311 113141 114131 311141 411131 211412 211214 211232 2331112').split(' ');
+// Code 128: reine Ziffern gerader Länge in Zeichensatz C (kompakt), sonst B (druckbares ASCII)
+function code128Breiten(text) {
+  let werte;
+  if (/^(\d\d)+$/.test(text)) werte = [105, ...text.match(/\d\d/g).map(Number)];
+  else if (/^[\x20-\x7e]+$/.test(text)) werte = [104, ...[...text].map(c => c.charCodeAt(0) - 32)];
+  else throw new Error('Code 128: Zeichen');
+  werte.push(werte.reduce((s, w, i) => s + w * (i || 1), 0) % 103, 106);
+  return werte.flatMap(w => [...C128[w]].map(Number));
+}
+const C39 = { 0: '000110100', 1: '100100001', 2: '001100001', 3: '101100000', 4: '000110001', 5: '100110000', 6: '001110000', 7: '000100101',
+  8: '100100100', 9: '001100100', A: '100001001', B: '001001001', C: '101001000', D: '000011001', E: '100011000', F: '001011000', G: '000001101',
+  H: '100001100', I: '001001100', J: '000011100', K: '100000011', L: '001000011', M: '101000010', N: '000010011', O: '100010010', P: '001010010',
+  Q: '000000111', R: '100000110', S: '001000110', T: '000010110', U: '110000001', V: '011000001', W: '111000000', X: '010010001', Y: '110010000',
+  Z: '011010000', '-': '010000101', '.': '110000100', ' ': '011000100', '*': '010010100', $: '010101000', '/': '010100010', '+': '010001010', '%': '000101010' };
+function code39Breiten(text) {
+  if (![...text].every(c => C39[c] && c !== '*')) throw new Error('Code 39: Zeichen');
+  return [...('*' + text + '*')].flatMap((c, i) => [...(i ? [1] : []), ...[...C39[c]].map(b => b === '1' ? 3 : 1)]);
+}
+
+function codeSvg(text, format) {
+  if (format === 'qr_code') return qrSvg(text, 4).replace('class="qr"', 'class="code-2d"');
+  if (format === 'aztec' || format === 'data_matrix') {
+    const hints = new Map();
+    if (format === 'data_matrix') hints.set(ZXing.EncodeHintType.DATA_MATRIX_SHAPE, ZXing.DataMatrixSymbolShapeHint.FORCE_SQUARE);
+    const m = format === 'aztec' ? new ZXing.AztecCodeWriter().encode(text, ZXing.BarcodeFormat.AZTEC, 0, 0, hints)
+      : new ZXing.DataMatrixWriter().encode(text, ZXing.BarcodeFormat.DATA_MATRIX, 0, 0, hints);
+    return matrixSvg(m.getWidth(), m.getHeight(), (x, y) => m.get(x, y), format === 'aztec' ? 2 : 3);
+  }
+  if (format === 'ean_13' || format === 'ean_8' || format === 'upc_a') {
+    const z = format === 'upc_a' ? '0' + text : text;
+    if (!/^(\d{13}|\d{8})$/.test(z)) throw new Error('EAN: Ziffern');
+    return strichSvg(ausBits(eanBits(z)));
+  }
+  if (format === 'code_128') return strichSvg(code128Breiten(text));
+  if (format === 'code_39') return strichSvg(code39Breiten(text));
+  throw new Error('Format nicht darstellbar');
+}
+// Lädt die Bibliotheken, die für ein Format nötig sind
+async function codeBibliothek(format) {
+  if (format === 'qr_code' && !window.qrcode) await ladeSkript('vendor/qrcode.min.js');
+  if ((format === 'aztec' || format === 'data_matrix') && !window.ZXing) await ladeSkript('vendor/zxing.min.js');
+}
+
+// Karte an der Kasse: Vollbild, weiß, großer Code. Die Bildschirmhelligkeit kann eine Web-App nicht ändern;
 // sie hält aber das Display wach (Wake Lock), solange die Karte offen ist.
 async function zeigeKarte(start = null) {
   if (!S.karten.length) return;
-  try { if (!window.qrcode) await ladeSkript('vendor/qrcode.min.js'); } catch (e) { return zeigeToast(t`QR-Code konnte nicht geladen werden`); }
+  try { for (const f of new Set(S.karten.map(kartenFormat))) await codeBibliothek(f); } catch (e) { return zeigeToast(t`Der Code konnte nicht geladen werden`); }
   const passend = kartenFuerLaden();
   const reihe = [...passend, ...S.karten.filter(k => !passend.includes(k))];
   let aktiv = start || reihe[0];
@@ -2317,11 +2449,11 @@ async function zeigeKarte(start = null) {
   el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
   const zeichne = () => {
     let code;
-    try { code = qrSvg(aktiv.inhalt, 4); } catch (e) { code = `<p>${t`Der Code ist zu lang für einen QR-Code.`}</p>`; }
+    try { code = codeSvg(aktiv.inhalt, kartenFormat(aktiv)); } catch (e) { code = `<p>${t`Dieser Code lässt sich nicht darstellen.`}</p>`; }
     el.innerHTML = `<div class="ka-kopf"><button type="button" data-zu>${t`Fertig`}</button></div>
       ${reihe.length > 1 ? `<div class="ka-reiter">${reihe.map(k => `<button type="button" data-k="${k.id}" class="${k === aktiv ? 'an' : ''}">${esc(k.kette)}${k.name ? ' · ' + esc(k.name) : ''}</button>`).join('')}</div>` : ''}
       <div class="ka-mitte"><h2>${esc(aktiv.kette)}</h2>${aktiv.name ? `<p class="ka-name">${esc(aktiv.name)}</p>` : ''}
-        <div class="ka-code">${code}</div>
+        <div class="ka-code${CODE_FORMATE[kartenFormat(aktiv)] && CODE_FORMATE[kartenFormat(aktiv)].strich ? ' strich' : ''}">${code}</div>
         ${aktiv.inhalt.length <= 40 ? `<p class="ka-nummer">${esc(aktiv.inhalt)}</p>` : ''}</div>
       <p class="ka-tipp">${t`Das Display bleibt an. Heller geht es über das Kontrollzentrum.`}</p>`;
   };
@@ -2352,7 +2484,8 @@ function oeffneKarteBearbeiten(karte, nachher) {
   const neu = !karte;
   // Neue Karte: Kette aus dem Namen des gewählten Ladens vorschlagen
   const laden = woerterVon(aktivesProfil().name);
-  const k = neu ? { id: uid(), kette: KETTEN.find(x => woerterVon(x).every(w => laden.includes(w))) || '', name: '', inhalt: '' } : { ...karte };
+  const k = neu ? { id: uid(), kette: KETTEN.find(x => woerterVon(x).every(w => laden.includes(w))) || '', name: '', inhalt: '', format: 'qr_code' }
+    : { ...karte, format: kartenFormat(karte) };
   const b = oeffneBlatt('<div id="ka"></div>', { voll: true });
   let status = '';
   const zeichne = async () => {
@@ -2363,9 +2496,10 @@ function oeffneKarteBearbeiten(karte, nachher) {
       <label class="feld"><span>${t`Kette`}</span><input type="text" id="kaKette" value="${esc(k.kette)}" placeholder="${t`z. B. REWE`}" autocapitalize="words" autocorrect="off" autocomplete="off"></label>
       <div class="ketten">${KETTEN.map(x => `<button type="button" data-kette="${esc(x)}" class="${norm(x) === norm(k.kette) ? 'an' : ''}">${esc(x)}</button>`).join('')}</div>
       <label class="feld"><span>${t`Bezeichnung (freiwillig)`}</span><input type="text" id="kaName" value="${esc(k.name)}" placeholder="${t`z. B. Anna oder Familienkarte`}" autocapitalize="sentences" autocomplete="off"></label>
-      <div class="abschnitt">${t`QR-Code`}</div>
-      ${k.inhalt ? `<div class="karte-code"><div class="qr-rahmen" id="kaQr"></div><p class="nummer">${esc(k.inhalt.length > 80 ? k.inhalt.slice(0, 80) + '…' : k.inhalt)}</p></div>` : ''}
-      <p class="text-muted" id="kaStatus">${status || (k.inhalt ? '' : t`Screenshot vom QR-Code aus der App der Kette wählen oder die Karte scannen.`)}</p>
+      <div class="abschnitt">${t`Code`}</div>
+      ${k.inhalt ? `<div class="karte-code"><div class="code-rahmen${CODE_FORMATE[k.format].strich ? ' strich' : ''}" id="kaQr"></div>
+        <p class="nummer">${esc(CODE_FORMATE[k.format].name)} · ${esc(k.inhalt.length > 80 ? k.inhalt.slice(0, 80) + '…' : k.inhalt)}</p></div>` : ''}
+      <p class="text-muted" id="kaStatus">${status || (k.inhalt ? '' : t`Screenshot vom Code aus der App der Kette wählen oder die Karte scannen. Erkannt werden QR-Code, Aztec-Code (REWE), Data Matrix und Strichcodes.`)}</p>
       <div class="knopfreihe">
         <button type="button" class="knopf${k.inhalt ? ' zweit' : ''}" id="kaBild">${k.inhalt ? t`Anderen Screenshot wählen` : t`Screenshot wählen`}</button>
         <button type="button" class="knopf zweit" id="kaScan">${t`Mit der Kamera scannen`}</button>
@@ -2373,14 +2507,16 @@ function oeffneKarteBearbeiten(karte, nachher) {
       </div>
       <input type="file" id="kaDatei" accept="image/*" hidden>`;
     if (k.inhalt) {
-      try { if (!window.qrcode) await ladeSkript('vendor/qrcode.min.js'); $('#kaQr', b).innerHTML = qrSvg(k.inhalt, 4); }
+      try { await codeBibliothek(k.format); $('#kaQr', b).innerHTML = codeSvg(k.inhalt, k.format); }
       catch (e) { $('#kaQr', b).innerHTML = ''; }
     }
   };
-  const uebernimm = text => {
+  const uebernimm = (text, format) => {
     text = String(text || '').trim();
-    if (!text) { status = t`Kein QR-Code gefunden. Den Screenshot so wählen, dass der Code ganz zu sehen ist.`; return zeichne(); }
-    k.inhalt = text; status = t`QR-Code erkannt.`;
+    if (!text) { status = t`Kein Code gefunden. Den Screenshot so wählen, dass der Code ganz und scharf zu sehen ist.`; return zeichne(); }
+    const f = CODE_FORMATE[format];
+    if (!f || !f.zeichnen) { status = t`Erkannt: ${f ? f.name : format}. Dieses Format kann die App noch nicht anzeigen.`; return zeichne(); }
+    k.inhalt = text; k.format = format; status = t`${f.name} erkannt.`;
     zeichne();
   };
   zeichne();
@@ -2394,10 +2530,12 @@ function oeffneKarteBearbeiten(karte, nachher) {
   });
   b.addEventListener('change', async e => {
     if (e.target.id !== 'kaDatei' || !e.target.files[0]) return;
-    $('#kaStatus', b).innerHTML = '<span class="laedt"></span>' + esc(t`QR-Code wird gesucht`);
-    let text = null;
-    try { text = await qrAusBild(e.target.files[0]); } catch (err) {}
-    uebernimm(text);
+    $('#kaStatus', b).innerHTML = '<span class="laedt"></span>' + esc(t`Code wird gesucht`);
+    let r = null;
+    try { r = await codeAusBild(e.target.files[0]); }
+    catch (err) { status = t`Das Bild konnte nicht gelesen werden (${err.message || err.name || err}).`; e.target.value = ''; return zeichne(); }
+    e.target.value = '';
+    uebernimm(r && r.text, r && r.format);
   });
   b.addEventListener('click', e => {
     const kette = e.target.closest('[data-kette]');
@@ -2405,7 +2543,7 @@ function oeffneKarteBearbeiten(karte, nachher) {
     if (e.target.closest('#kaBild')) return $('#kaDatei', b).click();
     if (e.target.closest('#kaScan')) return oeffneScanner(uebernimm);
     if (e.target.closest('#kaOk')) {
-      const fertig = { id: k.id, kette: k.kette.trim(), name: k.name.trim(), inhalt: k.inhalt };
+      const fertig = { id: k.id, kette: k.kette.trim(), name: k.name.trim(), inhalt: k.inhalt, format: k.format };
       const i = S.karten.findIndex(x => x.id === k.id);
       if (i >= 0) S.karten[i] = fertig; else S.karten.push(fertig);
       sichereKarten(); schliesseBlatt(b); nachher && nachher(); render();
@@ -3929,9 +4067,9 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
     pruefe('Karten: passende Karte am Ladennamen', [fuer('Rewe Sendlinger Straße'), fuer('dm Marienplatz'), fuer('Supermarkt'), fuer('Edmund'), fuer('EDEKA Center')],
       [['r'], ['d'], [], [], ['e']]);
     S.karten = sichern;
-    if (!window.qrcode) await ladeSkript('vendor/qrcode.min.js');
-    // QR-Code als Vektorgrafik erzeugen, als „Screenshot“ in ein großes Bild setzen und wieder lesen
-    const screenshot = async (svg, dunkel) => {
+    for (const f of ['qr_code', 'aztec']) await codeBibliothek(f);
+    // Code als Vektorgrafik erzeugen, als „Screenshot“ (1170×2532) in ein großes Bild setzen und wieder lesen
+    const screenshot = async (svg, dunkel, groesse = 600, strich = false) => {
       const img = new Image();
       img.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
       await img.decode();
@@ -3939,22 +4077,34 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
       const ctx = c.getContext('2d');
       ctx.fillStyle = dunkel ? '#000' : '#f2f2f2'; ctx.fillRect(0, 0, c.width, c.height);
       ctx.fillStyle = dunkel ? '#fff' : '#333'; ctx.font = '60px sans-serif'; ctx.fillText('Kundenkarte', 100, 300);
-      ctx.drawImage(img, 285, 900, 600, 600);
+      ctx.drawImage(img, (1170 - groesse) / 2, 900, groesse, strich ? groesse / 3 : groesse);
       return new Promise(ok => c.toBlob(ok, 'image/png'));
     };
-    const faelle = ['9276000012345678', 'LIDLPLUS:ABC-123/45', 'https://example.org/k?id=a1b2c3&x=Ä'];
+    const faelle = [['9276000012345678', 'qr_code'], ['LIDLPLUS:ABC-123/45', 'qr_code'], ['https://example.org/k?id=a1b2c3&x=Ä', 'qr_code'],
+      ['2402000123456789012', 'aztec'], ['REWE-7Hk2pQ9x', 'aztec'], ['308342619012', 'data_matrix'], ['4006381333931', 'ean_13'], ['96385074', 'ean_8'],
+      ['1234567890', 'code_128'], ['PB 3083-4261', 'code_128'], ['CARD-42', 'code_39']];
     // Safari hat keinen BarcodeDetector: den Weg über zxing gezielt prüfen
     const detektor = Object.getOwnPropertyDescriptor(window, 'BarcodeDetector');
     if (detektor) delete window.BarcodeDetector;
     try {
       const gelesen = [];
-      for (const text of faelle) gelesen.push(await qrAusBild(await screenshot(qrSvg(text, 4))));
-      pruefe('Karten: Screenshot → Vektor-QR → wieder lesbar (zxing)', gelesen, faelle);
-      const invertiert = qrSvg(faelle[0], 4).replace('fill="#fff"', 'fill="#X"').replace('fill="#000"', 'fill="#fff"').replace('fill="#X"', 'fill="#000"');
-      pruefe('Karten: heller Code auf dunklem Grund (zxing)', await qrAusBild(await screenshot(invertiert, true)), faelle[0]);
-      pruefe('Karten: Bild ohne QR-Code', await qrAusBild(await screenshot('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>')), null);
+      for (const [text, f] of faelle) {
+        const r = await codeAusBild(await screenshot(codeSvg(text, f), false, CODE_FORMATE[f].strich ? 900 : 600, CODE_FORMATE[f].strich));
+        gelesen.push(r && [r.text, r.format]);
+      }
+      pruefe('Karten: Screenshot → Vektorgrafik → wieder lesbar, alle Formate (zxing)', gelesen, faelle);
+      const klein = await codeAusBild(await screenshot(codeSvg('2402000123456789012', 'aztec'), false, 170));
+      pruefe('Karten: kleiner Aztec-Code im großen Screenshot', klein && klein.text, '2402000123456789012');
+      const invertiert = codeSvg(faelle[0][0], 'qr_code').replace('fill="#fff"', 'fill="#X"').replace('fill="#000"', 'fill="#fff"').replace('fill="#X"', 'fill="#000"');
+      pruefe('Karten: heller Code auf dunklem Grund (zxing)', (await codeAusBild(await screenshot(invertiert, true))).text, faelle[0][0]);
+      pruefe('Karten: Bild ohne Code', await codeAusBild(await screenshot('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>')), null);
     } finally { if (detektor) Object.defineProperty(window, 'BarcodeDetector', detektor); }
-    if ('BarcodeDetector' in window) pruefe('Karten: Screenshot lesbar (BarcodeDetector)', await qrAusBild(await screenshot(qrSvg(faelle[1], 4))), faelle[1]);
+    if ('BarcodeDetector' in window) {
+      const r = await codeAusBild(await screenshot(codeSvg('2402000123456789012', 'aztec')));
+      pruefe('Karten: Screenshot lesbar (BarcodeDetector)', r && [r.text, r.format], ['2402000123456789012', 'aztec']);
+    }
+    pruefe('Karten: alte Karte ohne Format gilt als QR-Code', kartenFormat({ inhalt: 'x' }), 'qr_code');
+    pruefe('Karten: EAN-13 mit 95 Modulen', eanBits('4006381333931').length, 95);
   }
 
   // Sprachen: Übersetzungen vollständig, Platzhalter passen

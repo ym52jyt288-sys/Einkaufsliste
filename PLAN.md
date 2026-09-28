@@ -270,9 +270,25 @@ getrennten Läden einkauft. Neu:
   Abmelden, neuer Schlüssel. UI-Durchlauf mit Screenshots bei 390 px hell und dunkel; en/fr/es ohne deutsche Reste.
   Headless Chrome mit `--dump-dom` wartet nicht auf Bild-Dekodierung; der Selbsttest läuft jetzt per DevTools-Protokoll.
 - Offen, nur auf dem iPhone prüfbar: echter Screenshot aus REWE-/Lidl-App, Kassenscanner liest den erzeugten Code, Wake Lock.
-  Karten mit Strichcode (z. B. Payback-Plastikkarte) werden noch nicht unterstützt, nur QR.
   Manche Apps zeigen wechselnde Codes (zeitabhängig); die funktionieren als gespeicherter Screenshot nicht.
 - `sw.js` VERSION `einkauf-17`.
+
+### Bugfix 28.09.2026: Kundenkarte „Kein QR-Code gefunden“
+- Rückmeldung vom iPhone: Beim Screenshot kam immer „Kein QR-Code gefunden“. Ursache: Gelesen wurden nur QR-Codes. **REWE Bonus
+  zeigt einen Aztec-Code** (sieht ähnlich aus, Quadrat in der Mitte statt drei Ecken), Plastikkarten oft Strichcodes.
+- Jetzt `codeAusBild()` mit allen gängigen Formaten (`CODE_FORMATE`): QR, Aztec, Data Matrix, EAN-13/8, UPC-A, Code 128, Code 39;
+  PDF417/ITF/Codabar werden erkannt, aber als „kann die App noch nicht anzeigen“ gemeldet. Die Karte speichert `format`
+  (alte Karten ohne Format gelten als QR). Anzeige über `codeSvg()`: QR per qrcode-generator, Aztec und Data Matrix per zxing-Writer,
+  EAN und Code 128/39 selbst kodiert (`eanBits`, `code128Breiten`, `code39Breiten`).
+- Zwei Fallen in zxing: (1) Der Aztec-Leser sucht von der **Bildmitte** aus. In einem hohen Screenshot mit dem Code weiter oben
+  findet er nichts, deshalb werden danach überlappende quadratische Ausschnitte nur nach Aztec abgesucht. (2) Die Strichcode-Leser
+  drehen bei TRY_HARDER die Bildquelle in sich selbst, danach schlug der invertierte Versuch fehl: je Versuch eine neue Quelle.
+- Fehler beim Lesen des Bilds erscheinen jetzt mit Meldung, statt als „kein Code gefunden“ zu verschwinden. Der Kamera-Scan
+  liest dieselben Formate.
+- Dauer auf dem Mac: QR unter 0,1 s, Aztec in einem Ausschnitt ca. 1,7 s, Bild ohne Code ca. 2,4 s (der Ladekreis dreht weiter).
+- Selbsttest 261/261: alle darstellbaren Formate als Screenshot → Vektorgrafik → wieder gelesen (zxing), kleiner Aztec-Code oben im
+  Screenshot, invertiert, BarcodeDetector. `sw.js` VERSION `einkauf-18`.
+- Offen: Echter Screenshot aus der REWE-App ist nicht getestet. Ob REWE den Code zeitweise wechselt, ist unklar.
 
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
