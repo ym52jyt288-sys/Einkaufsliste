@@ -162,6 +162,11 @@
     touch-action: pan-y; transition: transform .2s ease;
   }
   .item.zieht { transition: none; }
+  /* Listenansicht: lange drücken hebt die Zeile zum Verschieben an */
+  ul.artikel .zeile { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .zeile.hebt { z-index: 5; overflow: visible; box-shadow: var(--schatten); border-bottom-color: transparent; }
+  .zeile.hebt .wisch { visibility: hidden; }
+  .zeile.hebt .item { background: var(--bg2); transform: scale(1.02); }
   .check { width: 44px; height: 44px; margin-left: -10px; display: grid; place-items: center; flex: none; }
   .check span { width: 24px; height: 24px; border-radius: 50%; border: 1.7px solid var(--muted); display: grid; place-items: center; }
   .erledigt .check span { background: var(--accent); border-color: var(--accent); }
@@ -521,8 +526,11 @@ function sichere(schluessel, wert) {
   if (SYNC_BEREIT) syncGeaendert(schluessel);   // Synchronisierung: Änderung erfassen (siehe unten)
 }
 
-const ABT_IDS = ABTEILUNGEN.map(a => a.id);
+// ABT_IDS und ABT_NAME enthalten auch die eigenen Abteilungen (S.abteilungen), siehe aktualisiereAbteilungen()
+const ABT_STANDARD = ABTEILUNGEN.map(a => a.id);
+const ABT_IDS = [...ABT_STANDARD];
 const ABT_NAME = Object.fromEntries(ABTEILUNGEN.map(a => [a.id, t(a.name)]));
+const istEigeneAbt = a => !ABT_STANDARD.includes(a);
 
 function standardProfile() {
   return [
@@ -546,6 +554,7 @@ const S = {
   einstellungen: null,
   geteilt: null,   // Liste, die jemand anderes geteilt hat: { id, t, artikel: [...] }
   rezepte: [],     // gespeicherte Rezepte: { id, name, zutaten: [{ name, menge, einheit, abteilung }] }
+  abteilungen: [], // eigene Abteilungen: { id, name } – gibt es in allen Läden, jeder Laden hat nur eigene Reihenfolge und Sichtbarkeit
   karten: [],      // Kundenkarten: { id, kette, name, inhalt, format } – inhalt ist der Text im Code, format siehe CODE_FORMATE
   geraete: {},     // Geräte im synchronisierten Haushalt: { code: { art, app, gesehen } }
 };
@@ -573,9 +582,11 @@ function ladeAlles() {
   S.rezepte = lade('rezepte', []);
   S.karten = lade('karten', []);
   S.geraete = lade('geraete', {});
+  S.abteilungen = lade('abteilungen', []);
+  aktualisiereAbteilungen();
   const std = standardEinstellungen(), gel = lade('einstellungen', {});
   S.einstellungen = { ...std, ...gel, farben: { ...std.farben, ...(gel.farben || {}) }, chips: { ...std.chips, ...(gel.chips || {}) } };
-  for (const i of S.liste) if (!ABT_IDS.includes(i.abteilung)) i.abteilung = klassifiziere(i.name).abt;
+  pruefeListe();
   if (!S.verlauf) {
     S.verlauf = {};
     const jetzt = Date.now();
@@ -585,12 +596,56 @@ function ladeAlles() {
     sichere('verlauf', S.verlauf);
   }
 }
-const sichereListe = () => sichere('liste', S.liste);
+// Eigene Abteilungen stehen vor „Sonstiges“
+function aktualisiereAbteilungen() {
+  for (const a of ABT_IDS) if (istEigeneAbt(a)) delete ABT_NAME[a];
+  const eigene = (S.abteilungen || []).filter(a => a && a.id && a.name && !ABT_STANDARD.includes(a.id));
+  ABT_IDS.splice(0, ABT_IDS.length, ...ABT_STANDARD.filter(a => a !== 'sonstiges'), ...eigene.map(a => a.id), 'sonstiges');
+  for (const a of eigene) ABT_NAME[a.id] = a.name;
+}
+// Name einer Abteilung im Laden p: dort umbenannt oder der allgemeine Name
+const abtName = (a, p = aktivesProfil()) => (p && p.namen && p.namen[a]) || ABT_NAME[a] || '';
+// Laufweg eines Ladens mit allen Abteilungen; fehlende (z. B. in einem anderen Laden angelegte) kommen vor „Sonstiges“
+function laufweg(p) {
+  const r = p.reihenfolge.filter(a => ABT_IDS.includes(a));
+  const fehlt = ABT_IDS.filter(a => !r.includes(a));
+  const s = r.indexOf('sonstiges');
+  return s < 0 ? [...r, ...fehlt] : [...r.slice(0, s), ...fehlt, ...r.slice(s)];
+}
+
+// Reihenfolge der Listenansicht über das Feld pos, damit sie auf allen Geräten gleich ist.
+// Artikel ohne pos (ältere Fassung, anderes Gerät) kommen ans Ende. Unbekannte Abteilungen werden neu bestimmt.
+const naechstePos = () => S.liste.reduce((m, i) => Math.max(m, typeof i.pos === 'number' ? i.pos : 0), 0) + 1;
+function pruefeListe() {
+  for (const i of S.liste) {
+    if (!ABT_IDS.includes(i.abteilung)) i.abteilung = klassifiziere(i.name).abt;
+    if (typeof i.pos !== 'number') i.pos = naechstePos();
+  }
+  S.liste.sort((a, b) => a.pos - b.pos);
+}
+// Nach dem Ziehen: Der Artikel bekommt eine Position zwischen seinen neuen Nachbarn. Nur sein Feld ändert sich,
+// so kommen sich zwei Geräte, die gleichzeitig umsortieren, nicht in die Quere.
+function verschiebeArtikel(id, vorId, nachId) {
+  const finde = x => x && S.liste.find(i => i.id === x);
+  const item = finde(id), vor = finde(vorId), nach = finde(nachId);
+  if (!item) return;
+  const neu = () => vor && nach ? (vor.pos + nach.pos) / 2 : vor ? vor.pos + 1 : nach ? nach.pos - 1 : item.pos;
+  let pos = neu();
+  if (vor && nach && !(vor.pos < pos && pos < nach.pos)) {   // gleiche Positionen oder Rechengenauigkeit erschöpft
+    S.liste.forEach((i, n) => { i.pos = n + 1; });
+    pos = neu();
+  }
+  item.pos = pos;
+  sichereListe();
+}
+
+const sichereListe = () => { pruefeListe(); sichere('liste', S.liste); };
 const sichereVerlauf = () => sichere('verlauf', S.verlauf);
 const sichereProfile = () => { sichere('profile', S.profile); sichere('aktivesProfil', S.aktivesProfil); };
 const sichereEinstellungen = () => sichere('einstellungen', S.einstellungen);
 const sichereRezepte = () => sichere('rezepte', S.rezepte);
 const sichereKarten = () => sichere('karten', S.karten);
+const sichereAbteilungen = () => { sichere('abteilungen', S.abteilungen); aktualisiereAbteilungen(); };
 
 /* ============================================================
    Katalog, Normalisierung und Klassifizierung
@@ -756,9 +811,9 @@ function erkenne(name) {
 
 function klassifiziere(name) {
   const key = kompakt(name);
-  if (S.korrekturen[key]) return { abt: S.korrekturen[key], quelle: 'korrektur' };
+  if (ABT_IDS.includes(S.korrekturen[key])) return { abt: S.korrekturen[key], quelle: 'korrektur' };
   const v = S.verlauf && S.verlauf[key];
-  if (v && v.abteilung && v.abteilung !== 'sonstiges') return { abt: v.abteilung, quelle: 'verlauf' };
+  if (v && v.abteilung && v.abteilung !== 'sonstiges' && ABT_IDS.includes(v.abteilung)) return { abt: v.abteilung, quelle: 'verlauf' };
   const r = erkenne(name);
   if (!r) return { abt: 'sonstiges', quelle: 'unbekannt' };
   let abt = r.e.abt;
@@ -857,11 +912,12 @@ function hinzufuegen(rohName, menge = null, extra = {}) {
     else { item.einheit = einheit; item.menge = menge; }
   } else if (item) {
     item.erledigt = false; item.pausiert = false; item.erledigtUm = null; item.menge = menge; item.einheit = einheit;
+    item.pos = naechstePos();
     S.liste.splice(S.liste.indexOf(item), 1); S.liste.push(item);
   } else {
     item = {
       id: uid(), name, menge, einheit, abteilung: extra.abteilung || klassifiziere(name).abt,
-      stamm: !!(v && v.stamm), erledigt: false, erledigtUm: null,
+      stamm: !!(v && v.stamm), erledigt: false, erledigtUm: null, pos: naechstePos(),
     };
     if (extra.notiz) item.notiz = extra.notiz;
     if (extra.ean) item.ean = extra.ean;
@@ -983,7 +1039,7 @@ function vorschlaege(text, { anheften = false } = {}) {
     aus.push({ name: n, art, hinweis });
   };
   const offenKeys = new Set(offene().map(i => kompakt(i.name)));
-  const hinweisFuer = n => !anheften && offenKeys.has(kompakt(n)) ? t`schon auf der Liste` : ABT_NAME[klassifiziere(n).abt];
+  const hinweisFuer = n => !anheften && offenKeys.has(kompakt(n)) ? t`schon auf der Liste` : abtName(klassifiziere(n).abt);
 
   // Verlauf: Anfang des Namens oder eines Worts
   const ausVerlauf = Object.entries(S.verlauf)
@@ -1004,7 +1060,7 @@ function vorschlaege(text, { anheften = false } = {}) {
     const text = haupt.startsWith(tk) || e.fehler ? e.name : e.text;
     return { text, e, laenge: kompakt(text).length };
   }).sort((a, b) => a.laenge - b.laenge);
-  for (const { text, e } of ausKatalog) nimm(text, 'praefix', ABT_NAME[e.abt], e.name);
+  for (const { text, e } of ausKatalog) nimm(text, 'praefix', abtName(e.abt), e.name);
 
   // Tippfehler
   if (aus.length < 5 && tk.length >= 5 && !INDEX.has(tk)) {
@@ -1115,7 +1171,7 @@ function legende(schema) {
   return BEREICHE.map(b => ({ name: t(b.name), ton: schema.bereiche[b.id] }));
 }
 const aktuellesSchema = () => FARBSCHEMATA.find(f => f.id === S.einstellungen.farben.schema) || FARBSCHEMATA[0];
-const zf = abt => `--zf:var(--z-${abt})`;
+const zf = abt => `--zf:var(--z-${abt}, var(--z-sonstiges))`;   // eigene Abteilungen: neutral wie Sonstiges
 
 function wendeDarstellungAn() {
   const e = S.einstellungen;
@@ -1153,7 +1209,7 @@ function zeileHTML(item, mitAbteilung) {
   const menge = m ? `<span class="menge">${esc(m)}</span>` : '';
   const sub = item.notiz ? `<span class="sub">${esc(item.notiz)}</span>` : '';
   const zuordnen = item.abteilung === 'sonstiges' && !item.erledigt && !S.geteilt ? `<button type="button" class="zuordnen" data-aktion="zuordnen">${t`zuordnen`}</button>` : '';
-  const abt = mitAbteilung && item.abteilung !== 'sonstiges' ? `<span class="punkt"></span><span>${esc(ABT_NAME[item.abteilung] || '')}</span>` : '';
+  const abt = mitAbteilung && item.abteilung !== 'sonstiges' ? `<span class="punkt"></span><span>${esc(abtName(item.abteilung) || '')}</span>` : '';
   return `<li class="zeile" data-id="${item.id}" style="${zf(item.abteilung)}">
     <div class="wisch${item.stamm ? ' pause' : ''}">${item.stamm ? t`Diesmal nicht` : t`Löschen`}</div>
     ${S.geteilt ? '' : `<div class="wisch anheften">${istAngeheftet(item.name) ? t`Lösen` : t`Anheften`}</div>`}
@@ -1168,7 +1224,7 @@ function zeileHTML(item, mitAbteilung) {
 function gruppeHTML(abt, items) {
   if (!items.length) return '';
   const erledigt = items.filter(i => i.erledigt).length;
-  return `<section class="gruppe" style="${zf(abt)}"><h2><span>${esc(ABT_NAME[abt] || abt)}</span><span>${erledigt ? `${erledigt}/${items.length}` : items.length}</span></h2>
+  return `<section class="gruppe" style="${zf(abt)}"><h2><span>${esc(abtName(abt) || abt)}</span><span>${erledigt ? `${erledigt}/${items.length}` : items.length}</span></h2>
     <ul class="artikel">${sortiert(items).map(i => zeileHTML(i, false)).join('')}</ul></section>`;
 }
 
@@ -1193,7 +1249,7 @@ function render() {
     html += `<ul class="artikel">${sortiert(sichtbar).map(i => zeileHTML(i, S.einstellungen.abteilungInListe)).join('')}</ul>`;
   } else {
     const p = aktivesProfil();
-    const reihenfolge = [...p.reihenfolge, ...ABT_IDS.filter(a => !p.reihenfolge.includes(a))];
+    const reihenfolge = laufweg(p);
     const gruppen = abt => sichtbar.filter(i => i.abteilung === abt);
     const gruppe = abt => gruppeHTML(abt, gruppen(abt));
     html += reihenfolge.filter(a => !p.ausgeblendet.includes(a)).map(gruppe).join('');
@@ -1473,6 +1529,7 @@ $('#main').addEventListener('click', e => {
   }, { passive: true });
   main.addEventListener('touchmove', e => {
     if (!start) return;
+    if (SORTIEREN) { start = null; return; }
     const dx = e.touches[0].clientX - start.x;
     const dy = e.touches[0].clientY - start.y;
     if (!start.aktiv) {
@@ -1513,6 +1570,66 @@ $('#main').addEventListener('click', e => {
   });
 })();
 
+/* Listenansicht: lange drücken, dann ziehen ändert die Reihenfolge. Nur offene Artikel; Abgehakte bleiben unten. */
+let SORTIEREN = null;   // laufender Ziehvorgang, solange ruht das Wischen
+(function umsortieren() {
+  const main = $('#main');
+  let z = null;
+  const offen = n => n && n.matches('.zeile') && !n.querySelector('.item.erledigt');
+  const ziehe = () => zieheZu($('ul.artikel', main), z.zeile, z.y + scrollY, z, offen);
+  // Am oberen oder unteren Rand rollt die Seite mit
+  const rolle = () => {
+    if (!z || !z.aktiv) return;
+    const oben = $('header').getBoundingClientRect().bottom + 50;
+    const leiste = $('#abschluss');
+    const unten = (leiste.hidden ? innerHeight : leiste.getBoundingClientRect().top) - 50;
+    const v = z.y < oben ? Math.max(-14, (z.y - oben) / 4) : z.y > unten ? Math.min(14, (z.y - unten) / 4) : 0;
+    if (v) { const vorher = scrollY; scrollBy(0, v); if (scrollY !== vorher) ziehe(); }
+    z.rollen = requestAnimationFrame(rolle);
+  };
+  const ende = () => {
+    if (!z) return;
+    clearTimeout(z.timer); cancelAnimationFrame(z.rollen);
+    const { zeile, aktiv, vorher } = z;
+    z = null; SORTIEREN = null;
+    if (!aktiv) return;
+    zeile._gewischt = true;
+    setTimeout(() => { zeile._gewischt = false; }, 350);
+    zeile.style.transform = ''; zeile.classList.remove('hebt');
+    const vor = zeile.previousElementSibling, nach = zeile.nextElementSibling;
+    if (vor !== vorher) verschiebeArtikel(zeile.dataset.id, offen(vor) ? vor.dataset.id : null, offen(nach) ? nach.dataset.id : null);
+    render();
+  };
+  main.addEventListener('touchstart', e => {
+    const item = e.target.closest('.item');
+    if (z || !item || e.touches.length > 1 || S.geteilt || S.einstellungen.ansicht !== 'liste' || item.classList.contains('erledigt')) return;
+    const zeile = item.closest('.zeile');
+    z = { zeile, x: e.touches[0].clientX, y: e.touches[0].clientY, aktiv: false };
+    z.timer = setTimeout(() => {
+      if (!z || !zeile.isConnected) { z = null; return; }
+      z.aktiv = true; SORTIEREN = z;
+      z.start = z.y + scrollY; z.vorher = zeile.previousElementSibling;
+      zeile.classList.add('hebt');
+      if (navigator.vibrate) navigator.vibrate(10);
+      z.rollen = requestAnimationFrame(rolle);
+    }, 450);
+  }, { passive: true });
+  main.addEventListener('touchmove', e => {
+    if (!z) return;
+    const p = e.touches[0];
+    if (!z.aktiv) {   // vorher bewegt: Wischen oder Rollen, kein Umsortieren
+      if (Math.hypot(p.clientX - z.x, p.clientY - z.y) > 8) { clearTimeout(z.timer); z = null; }
+      return;
+    }
+    e.preventDefault();
+    z.y = p.clientY;
+    ziehe();
+  }, { passive: false });
+  main.addEventListener('touchend', ende);
+  main.addEventListener('touchcancel', ende);
+  main.addEventListener('contextmenu', e => { if (e.target.closest('.zeile')) e.preventDefault(); });
+})();
+
 /* ============================================================
    Blätter (Bottom Sheets)
    ============================================================ */
@@ -1537,7 +1654,7 @@ function schliesseBlatt(hint) {
     if (hint._beimSchliessen) hint._beimSchliessen();
   }, 200);
 }
-const abteilungsOptionen = aktiv => ABT_IDS.map(a => `<option value="${a}"${a === aktiv ? ' selected' : ''}>${esc(ABT_NAME[a])}</option>`).join('');
+const abteilungsOptionen = aktiv => ABT_IDS.map(a => `<option value="${a}"${a === aktiv ? ' selected' : ''}>${esc(abtName(a))}</option>`).join('');
 
 function oeffneDetails(item) {
   const b = oeffneBlatt(`
@@ -1603,7 +1720,7 @@ function oeffneAbteilungWahl(item) {
     <div class="blatt-kopf"><h3>${esc(item.name)}</h3><button type="button" class="zurueck" data-schliessen>${t`Abbrechen`}</button></div>
     <p class="text-muted">${t`Abteilung wählen. Die App merkt sich das für diesen Artikel.`}</p>
     <ul class="liste-einst">${ABT_IDS.filter(a => a !== 'sonstiges').map(a =>
-      `<li><button type="button" class="fuellen" data-abt="${a}">${esc(ABT_NAME[a])}</button></li>`).join('')}</ul>
+      `<li><button type="button" class="fuellen" data-abt="${a}">${esc(abtName(a))}</button></li>`).join('')}</ul>
   `);
   b.addEventListener('click', e => {
     const x = e.target.closest('[data-abt]');
@@ -1929,15 +2046,17 @@ function oeffneEinstellungen(start = 'haupt') {
 function oeffneProfil(p, nachher) {
   const b = oeffneBlatt('<div id="prof"></div>', { voll: true });
   const zeichne = () => {
-    const reihenfolge = [...p.reihenfolge, ...ABT_IDS.filter(a => !p.reihenfolge.includes(a))];
+    const reihenfolge = laufweg(p);
     $('#prof', b).innerHTML = `
       <div class="blatt-kopf"><button type="button" class="zurueck" data-schliessen>${t`Zurück`}</button><h3></h3></div>
       <label class="feld"><span>${t`Name`}</span><input type="text" id="pName" value="${esc(p.name)}" placeholder="${t`z. B. REWE Hauptstraße`}"></label>
       <div class="abschnitt">${t`Laufweg`}</div>
       <p class="text-muted">${t`Am Griff ziehen, um die Reihenfolge zu ändern. Haken entfernen, wenn es die Abteilung in diesem Laden nicht gibt.`}</p>
+      <p class="text-muted">${t`Namen antippen, um die Abteilung umzubenennen.`}</p>
       <ul class="liste-einst" id="pAbts">${reihenfolge.map(a => `<li data-abt="${a}" class="${p.ausgeblendet.includes(a) ? 'aus' : ''}">
         <input type="checkbox" aria-label="${t`In diesem Laden vorhanden`}"${p.ausgeblendet.includes(a) ? '' : ' checked'}>
-        <span class="abtname" style="flex:1">${esc(ABT_NAME[a])}</span><span class="griff" aria-label="${t`Verschieben`}">${ICON_GRIFF}</span></li>`).join('')}</ul>
+        <button type="button" class="abtname fuellen" data-abt-name>${esc(abtName(a, p))}</button><span class="griff" aria-label="${t`Verschieben`}">${ICON_GRIFF}</span></li>`).join('')}</ul>
+      <div class="knopfreihe"><button type="button" class="knopf zweit" id="pAbtNeu">${t`Abteilung hinzufügen`}</button></div>
       <div class="abschnitt">${t`Standort`}</div>
       <p class="text-muted">${!p.ort ? t`Nicht gespeichert. Auf der Karte wählen oder im Laden stehend übernehmen, dann wählt die App diesen Laden automatisch.`
         : p.ort.quelle === 'karte' ? (p.ort.adresse ? t`Auf der Karte gewählt: ${esc(p.ort.adresse)}.` : t`Auf der Karte gewählt.`) : t`Gespeichert (±${Math.round(p.ort.genau || 0)} m).`}</p>
@@ -1971,6 +2090,9 @@ function oeffneProfil(p, nachher) {
     }
     if (e.target.closest('#pOrtWeg')) { delete p.ort; sichereProfile(); zeichne(); }
     if (e.target.closest('#pKarte')) oeffneKarte(p, zeichne);
+    if (e.target.closest('#pAbtNeu')) oeffneAbteilung(p, null, zeichne);
+    const abt = e.target.closest('[data-abt-name]');
+    if (abt) oeffneAbteilung(p, abt.closest('li').dataset.abt, zeichne);
     if (e.target.closest('#pLoeschen') && confirm(t`„${p.name}“ löschen?` + syncWarnung())) {
       S.profile = S.profile.filter(x => x !== p);
       if (S.aktivesProfil === p.id) S.aktivesProfil = S.profile[0].id;
@@ -1980,31 +2102,109 @@ function oeffneProfil(p, nachher) {
   b._beimSchliessen = nachher;
 }
 
+// Abteilung im Laden p umbenennen (a) oder neu anlegen (a = null).
+// Mitgelieferte Abteilungen bekommen einen Namen nur für diesen Laden. Eigene Abteilungen gibt es in allen Läden:
+// ihr Name gilt überall, und nur sie lassen sich löschen.
+function oeffneAbteilung(p, a, nachher) {
+  const eigene = a && istEigeneAbt(a) ? S.abteilungen.find(x => x.id === a) : null;
+  const umbenannt = a && !eigene && p.namen && p.namen[a];
+  const b = oeffneBlatt(`<div class="blatt-kopf"><h3>${a ? t`Abteilung` : t`Neue Abteilung`}</h3><button type="button" class="zurueck" data-schliessen>${a ? t`Fertig` : t`Abbrechen`}</button></div>
+    <label class="feld"><span>${t`Name`}</span><input type="text" id="aName" value="${esc(a ? abtName(a, p) : '')}" placeholder="${esc(a ? ABT_NAME[a] : t`z. B. Asia & Internationales`)}"></label>
+    <p class="text-muted">${!a ? t`Die neue Abteilung gibt es in allen Läden, jeweils vor „Sonstiges“. Im Laufweg lässt sie sich verschieben oder ausblenden.`
+      : eigene ? t`Eigene Abteilung. Name und Löschen gelten für alle Läden.`
+      : t`Der Name gilt nur für „${esc(p.name)}“. Ursprünglich: ${esc(ABT_NAME[a])}.`}</p>
+    <div class="knopfreihe">
+      ${!a ? `<button type="button" class="knopf" id="aOk">${t`Hinzufügen`}</button>` : ''}
+      ${umbenannt ? `<button type="button" class="knopf zweit" id="aZurueck">${t`Ursprünglichen Namen verwenden`}</button>` : ''}
+      ${eigene ? `<button type="button" class="knopf gefahr" id="aLoeschen">${t`Abteilung löschen`}</button>` : ''}
+    </div>`);
+  const feld = $('#aName', b);
+  if (!a) feld.focus();
+  const neu = () => {
+    const name = feld.value.trim();
+    if (!name) return feld.focus();
+    legeAbteilungAn(name);
+    p.reihenfolge = laufweg(p);
+    sichereProfile(); schliesseBlatt(b);
+  };
+  if (!a) {
+    $('#aOk', b).onclick = neu;
+    feld.addEventListener('keydown', e => { if (e.key === 'Enter') neu(); });
+  } else {
+    feld.addEventListener('input', () => benenneAbteilung(p, a, feld.value));
+    feld.addEventListener('keydown', e => { if (e.key === 'Enter') schliesseBlatt(b); });
+    if (umbenannt) $('#aZurueck', b).onclick = () => { benenneAbteilung(p, a, ''); schliesseBlatt(b); };
+    if (eigene) $('#aLoeschen', b).onclick = () => {
+      if (!confirm(t`Abteilung „${eigene.name}“ löschen? Die Artikel darin werden neu einsortiert.` + syncWarnung())) return;
+      loescheAbteilung(a); schliesseBlatt(b);
+    };
+  }
+  b._beimSchliessen = () => { nachher && nachher(); render(); };
+}
+
+function legeAbteilungAn(name) {
+  const id = 'e-' + uid();
+  S.abteilungen.push({ id, name });
+  sichereAbteilungen();
+  return id;
+}
+// Leerer Name: mitgelieferte Abteilung heißt wieder wie ursprünglich, eigene behält ihren Namen
+function benenneAbteilung(p, a, name) {
+  name = name.trim();
+  if (istEigeneAbt(a)) {
+    const e = S.abteilungen.find(x => x.id === a);
+    if (e && name) { e.name = name; sichereAbteilungen(); }
+    return;
+  }
+  const namen = { ...(p.namen || {}) };
+  if (!name || name === ABT_NAME[a]) delete namen[a]; else namen[a] = name;
+  if (Object.keys(namen).length) p.namen = namen; else delete p.namen;
+  sichereProfile();
+}
+// Eigene Abteilung entfernen: aus allen Läden, gelernte Zuordnungen vergessen, betroffene Artikel neu einsortieren
+function loescheAbteilung(a) {
+  S.abteilungen = S.abteilungen.filter(x => x.id !== a);
+  aktualisiereAbteilungen();
+  for (const p of S.profile) {
+    p.reihenfolge = p.reihenfolge.filter(x => x !== a);
+    p.ausgeblendet = p.ausgeblendet.filter(x => x !== a);
+    if (p.namen) delete p.namen[a];
+  }
+  for (const [k, v] of Object.entries(S.korrekturen)) if (v === a) delete S.korrekturen[k];
+  for (const v of Object.values(S.verlauf)) if (v.abteilung === a) { delete v.abteilung; v.abteilung = klassifiziere(v.name).abt; }
+  for (const e of Object.values(S.eans)) if (e.abt === a) e.abt = klassifiziere(e.name).abt;
+  for (const r of S.rezepte) for (const z of r.zutaten || []) if (z.abteilung === a) z.abteilung = klassifiziere(z.name).abt;
+  sichereAbteilungen(); sichereProfile(); sichere('korrekturen', S.korrekturen); sichereVerlauf(); sichere('eans', S.eans); sichereRezepte();
+  sichereListe();   // Artikel mit der gelöschten Abteilung sortiert pruefeListe() neu ein
+}
+
+// Beim Ziehen: li folgt dem Finger (y) und tauscht den Platz mit dem Nachbarn, dessen Mitte es überquert.
+// z.start = y, bei dem li unverschoben stünde; darf(n) = mit diesem Nachbarn darf getauscht werden.
+function zieheZu(ul, li, y, z, darf = () => true) {
+  li.style.transform = `translateY(${y - z.start}px)`;
+  const mitte = li.getBoundingClientRect().top + li.offsetHeight / 2;
+  const vor = li.previousElementSibling, nach = li.nextElementSibling;
+  const rVor = vor && darf(vor) && vor.getBoundingClientRect(), rNach = nach && darf(nach) && nach.getBoundingClientRect();
+  if (rVor && mitte < rVor.top + rVor.height / 2) { ul.insertBefore(li, vor); z.start -= rVor.height; }
+  else if (rNach && mitte > rNach.top + rNach.height / 2) { ul.insertBefore(nach, li); z.start += rNach.height; }
+  else return;
+  li.style.transform = `translateY(${y - z.start}px)`;
+}
+
 // Sortieren per Ziehen am Griff
 function ziehbar(ul, beiEnde) {
-  let li = null, versatz = 0;
+  let li = null;
+  const z = {};
   ul.addEventListener('pointerdown', e => {
     const griff = e.target.closest('.griff');
     if (!griff) return;
     e.preventDefault();
     li = griff.closest('li');
-    versatz = e.clientY;
+    z.start = e.clientY;
     li.classList.add('zieht');
     griff.setPointerCapture(e.pointerId);
   });
-  ul.addEventListener('pointermove', e => {
-    if (!li) return;
-    const dy = e.clientY - versatz;
-    li.style.transform = `translateY(${dy}px)`;
-    const nachbarn = [...ul.children].filter(x => x !== li);
-    const mitte = li.getBoundingClientRect().top + li.offsetHeight / 2;
-    for (const n of nachbarn) {
-      const r = n.getBoundingClientRect();
-      const nMitte = r.top + r.height / 2;
-      if (n === li.previousElementSibling && mitte < nMitte) { ul.insertBefore(li, n); versatz -= r.height; li.style.transform = `translateY(${e.clientY - versatz}px)`; break; }
-      if (n === li.nextElementSibling && mitte > nMitte) { ul.insertBefore(n, li); versatz += r.height; li.style.transform = `translateY(${e.clientY - versatz}px)`; break; }
-    }
-  });
+  ul.addEventListener('pointermove', e => { if (li) zieheZu(ul, li, e.clientY, z); });
   const ende = () => {
     if (!li) return;
     li.style.transform = ''; li.classList.remove('zieht'); li = null;
@@ -2017,7 +2217,7 @@ function ziehbar(ul, beiEnde) {
 /* Sicherung */
 async function exportieren() {
   const daten = { version: 1, exportiert: new Date().toISOString(), liste: S.liste, verlauf: S.verlauf, korrekturen: S.korrekturen,
-    eans: S.eans, profile: S.profile, aktivesProfil: S.aktivesProfil, rezepte: S.rezepte, karten: S.karten, einstellungen: { ...S.einstellungen, apiKey: '' } };
+    eans: S.eans, profile: S.profile, aktivesProfil: S.aktivesProfil, rezepte: S.rezepte, karten: S.karten, abteilungen: S.abteilungen, einstellungen: { ...S.einstellungen, apiKey: '' } };
   const name = `einkaufsliste-${new Date().toISOString().slice(0, 10)}.json`;
   const datei = new File([JSON.stringify(daten, null, 1)], name, { type: 'application/json' });
   if (navigator.canShare && navigator.canShare({ files: [datei] })) {
@@ -2037,8 +2237,10 @@ async function importieren(datei, nachher) {
     S.profile = d.profile; S.aktivesProfil = d.aktivesProfil || d.profile[0].id;
     S.rezepte = Array.isArray(d.rezepte) ? d.rezepte : S.rezepte;
     S.karten = Array.isArray(d.karten) ? d.karten : S.karten;
+    S.abteilungen = Array.isArray(d.abteilungen) ? d.abteilungen : S.abteilungen;
+    aktualisiereAbteilungen();   // vor dem Speichern der Liste, damit eigene Abteilungen erkannt werden
     S.einstellungen = { ...S.einstellungen, ...(d.einstellungen || {}), apiKey: S.einstellungen.apiKey };
-    sichereListe(); sichereVerlauf(); sichere('korrekturen', S.korrekturen); sichere('eans', S.eans); sichereProfile(); sichereEinstellungen(); sichereRezepte(); sichereKarten();
+    sichereListe(); sichereVerlauf(); sichere('korrekturen', S.korrekturen); sichere('eans', S.eans); sichereProfile(); sichereEinstellungen(); sichereRezepte(); sichereKarten(); sichereAbteilungen();
     if (ermittleSprache() !== SPRACHE) return location.reload();   // Sicherung mit anderer Sprache
     zeigeToast(t`Sicherung eingespielt`); nachher(); render();
   } catch (e) { zeigeToast(t`Datei konnte nicht gelesen werden`); }
@@ -2246,7 +2448,7 @@ async function waehleLadenPerStandort(mitMeldung) {
    Barcode
    ============================================================ */
 
-$('#btnScan').addEventListener('click', oeffneScanner);
+$('#btnScan').addEventListener('click', () => oeffneScanner());   // nicht direkt: das Klick-Ereignis landete sonst in beiQr
 
 function ladeSkript(src) {
   return new Promise((ok, fehler) => {
@@ -2258,58 +2460,101 @@ function ladeSkript(src) {
 
 // beiQr: Kundenkarte scannen – alle Formate, Text und Format zurückgeben, statt Barcode oder Einladung zu verarbeiten
 async function oeffneScanner(beiQr = null) {
+  if (typeof beiQr !== 'function') beiQr = null;
   const el = document.createElement('div');
   el.className = 'scanner';
   el.innerHTML = `<video playsinline muted autoplay></video><div class="rahmen${beiQr ? ' quadrat' : ''}"></div>
     <div class="oben"><button type="button" data-zu>${t`Abbrechen`}</button>${beiQr ? '' : `<button type="button" data-hand>${t`Nummer eingeben`}</button>`}</div>
     <div class="unten" id="scanHinweis">${beiQr ? t`Code der Karte in den Rahmen halten` : t`Barcode in den Rahmen halten`}</div>`;
   document.body.appendChild(el);
-  const video = $('video', el);
+  const video = $('video', el), hinweis = $('#scanHinweis', el);
   let stopp = () => {};
   let fertig = false;
   const schliessen = () => { fertig = true; stopp(); el.remove(); };
   el.querySelector('[data-zu]').onclick = schliessen;
   if (!beiQr) el.querySelector('[data-hand]').onclick = () => {
     const ean = prompt(t`EAN-Nummer (unter dem Barcode):`);
-    if (ean && /^\d{8,14}$/.test(ean.trim())) { schliessen(); barcodeGefunden(ean.trim()); }
+    if (ean == null) return;
+    const ziffern = ean.replace(/[\s-]/g, '');
+    if (/^\d{8,14}$/.test(ziffern)) { schliessen(); barcodeGefunden(ziffern); }
+    else hinweis.textContent = t`„${ean.trim()}“ ist keine EAN-Nummer (8 bis 14 Ziffern).`;
   };
   const gefunden = (code, format) => {
     if (fertig) return;
     if (beiQr) { schliessen(); return beiQr(code, format); }
     const link = linkAus(code);
-    if (!link && !/^\d{6,14}$/.test(code)) return;          // anderer QR-Code: weiter suchen
+    if (!link && !/^\d{6,14}$/.test(code)) return false;    // anderer QR-Code: weiter suchen
     schliessen();
     link ? verarbeiteLink(link) : barcodeGefunden(code);
   };
 
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('keine Kamera');
-    if ('BarcodeDetector' in window) {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
-      stopp = () => stream.getTracks().forEach(t => t.stop());
-      video.srcObject = stream;
-      await video.play();
-      const detektor = new BarcodeDetector({ formats: beiQr ? (await BarcodeDetector.getSupportedFormats()).filter(f => CODE_FORMATE[f]) : ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code'] });
-      const schleife = async () => {
-        if (fertig) return;
-        try { const r = await detektor.detect(video); if (r[0]) return gefunden(r[0].rawValue, r[0].format); } catch (e) {}
-        requestAnimationFrame(schleife);
-      };
-      schleife();
-    } else {
-      if (!window.ZXing) await ladeSkript('vendor/zxing.min.js');
-      const hints = new Map();
-      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, beiQr ? Object.values(CODE_FORMATE).map(f => ZXing.BarcodeFormat[f.zx])
-        : [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E, ZXing.BarcodeFormat.QR_CODE]);
-      const leser = new ZXing.BrowserMultiFormatReader(hints, 300);
-      stopp = () => leser.reset();
-      await leser.decodeFromConstraints({ video: { facingMode: 'environment' }, audio: false }, video, r => { if (r) gefunden(r.getText(), formatVon(ZXing.BarcodeFormat[r.getBarcodeFormat()])); });
-    }
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    stopp = () => stream.getTracks().forEach(t => t.stop());
+    if (fertig) return stopp();                              // während der Kamera-Freigabe abgebrochen
+    video.srcObject = stream;
+    await video.play();
+    const erkenne = await scanLeser(video, beiQr);
+    // Eigene Schleife: Ein Bild, das nicht gelesen werden kann (auch ein unerwarteter Fehler im Leser), darf die
+    // Suche nicht beenden. zxings decodeContinuously hörte in dem Fall still auf, der Scanner stand dann einfach.
+    let fehler = 0;
+    const schleife = async () => {
+      if (fertig) return;
+      if (stream.getVideoTracks().every(t => t.readyState === 'ended')) {
+        hinweis.textContent = t`Kamera unterbrochen. Hier tippen, um neu zu starten.`;
+        hinweis.onclick = () => { schliessen(); oeffneScanner(beiQr); };
+        return;
+      }
+      try {
+        const r = await erkenne();
+        fehler = 0;
+        if (r && gefunden(r.text, r.format) !== false) return;
+      } catch (e) {
+        if (++fehler === 25) hinweis.textContent = t`Code nicht lesbar. Etwas Abstand halten, für Licht sorgen oder die Nummer eingeben.`;
+      }
+      setTimeout(schleife, 80);
+    };
+    schleife();
   } catch (e) {
-    $('#scanHinweis', el).textContent = location.protocol === 'https:' || location.hostname === 'localhost'
+    if (fertig) return;
+    hinweis.textContent = location.protocol === 'https:' || location.hostname === 'localhost'
       ? t`Kamera nicht verfügbar. Zugriff in den Einstellungen erlauben oder Nummer eingeben.`
       : t`Die Kamera geht nur, wenn die App über https geöffnet wird. Nummer eingeben geht trotzdem.`;
   }
+}
+
+// Liest ein Bild aus dem laufenden Video: async () => { text, format } | null (kein Code im Bild).
+// BarcodeDetector, wo vorhanden, sonst zxing (Safari).
+async function scanLeser(video, beiQr) {
+  if ('BarcodeDetector' in window) {
+    const formate = beiQr ? (await BarcodeDetector.getSupportedFormats()).filter(f => CODE_FORMATE[f]) : ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code'];
+    const detektor = new BarcodeDetector({ formats: formate });
+    return async () => {
+      const r = await detektor.detect(video);
+      return r[0] ? { text: r[0].rawValue, format: r[0].format } : null;
+    };
+  }
+  if (!window.ZXing) await ladeSkript('vendor/zxing.min.js');
+  const leser = new ZXing.MultiFormatReader();
+  leser.setHints(new Map([[ZXing.DecodeHintType.POSSIBLE_FORMATS, beiQr ? Object.values(CODE_FORMATE).map(f => ZXing.BarcodeFormat[f.zx])
+    : [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E, ZXing.BarcodeFormat.QR_CODE]]]));
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  return async () => {
+    const b = video.videoWidth, h = video.videoHeight;
+    if (!b || !h) return null;                                // Kamera liefert noch kein Bild
+    const f = Math.min(1, 1280 / Math.max(b, h));
+    c.width = Math.round(b * f); c.height = Math.round(h * f);   // Größe jedes Mal neu: das Bild dreht sich mit dem iPhone
+    ctx.drawImage(video, 0, 0, c.width, c.height);
+    try {
+      const r = leser.decodeWithState(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(c))));
+      return { text: r.getText(), format: formatVon(ZXing.BarcodeFormat[r.getBarcodeFormat()]) };
+    } catch (e) {
+      if (e instanceof ZXing.NotFoundException || e instanceof ZXing.ChecksumException || e instanceof ZXing.FormatException) return null;
+      throw e;
+    }
+  };
 }
 
 /* ============================================================
@@ -2624,10 +2869,11 @@ async function holeJSON(url, ms = 7000, optionen = {}) {
 }
 
 function produktname(p) {
-  const marke = gross((p.brands || '').split(',')[0].trim());
-  let name = (p['product_name_' + SPRACHE] || p.product_name || p['generic_name_' + SPRACHE] || p.generic_name || '').trim();
+  const text = v => typeof v === 'string' ? v : v == null ? '' : String(v);   // die Datenbank liefert nicht immer Text
+  const marke = gross(text(p.brands).split(',')[0].trim());
+  let name = text(p['product_name_' + SPRACHE] || p.product_name || p['generic_name_' + SPRACHE] || p.generic_name).trim();
   if (marke && name.toLowerCase().includes(marke.toLowerCase())) name = name.replace(new RegExp(marke.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '').trim();
-  const menge = (p.quantity || '').trim();
+  const menge = text(p.quantity).trim();
   return [marke, name, menge].filter(Boolean).join(' ').replace(/\s+/g, ' ');
 }
 
@@ -2654,8 +2900,9 @@ async function barcodeGefunden(ean) {
   const b = oeffneBlatt(`<div class="blatt-kopf"><h3>${t`Barcode ${esc(ean)}`}</h3><button type="button" class="zurueck" data-schliessen>${t`Abbrechen`}</button></div>
     <p id="bcStatus"><span class="laedt"></span>${t`Produkt wird gesucht`}</p><div id="bcForm"></div>`);
   let treffer = S.eans[ean] || null;
-  if (!treffer) treffer = await sucheProdukt(ean);
+  if (!treffer) { try { treffer = await sucheProdukt(ean); } catch (e) { treffer = null; } }   // dann von Hand benennen
   if (!b.isConnected) return;
+  if (treffer && !ABT_IDS.includes(treffer.abt)) treffer = { ...treffer, abt: klassifiziere(treffer.name).abt };
   $('#bcStatus', b).textContent = treffer ? (S.eans[ean] ? t`Schon einmal gescannt.` : t`Gefunden. Name bei Bedarf kürzen.`)
     : t`Nicht in der Produktdatenbank. Einmal benennen, dann merkt sich die App den Barcode.`;
   $('#bcForm', b).innerHTML = `
@@ -2673,6 +2920,7 @@ async function barcodeGefunden(ean) {
     sichere('eans', S.eans);
     S.korrekturen[kompakt(name)] = abt; sichere('korrekturen', S.korrekturen);
     const item = hinzufuegen(name, null, { abteilung: abt, ean });
+    if (!item) return feld.focus();
     item.abteilung = abt;
     sichereListe(); sichereVerlauf();
     schliesseBlatt(b); render(); if (item) blitze(item.id);
@@ -2887,7 +3135,7 @@ function oeffnePruefung(artikel, { titel = t`Was brauchst du?`, speichern = true
       <label class="pruef-haken"><input type="checkbox" data-i="${i}" aria-label="${t`Übernehmen`}"${a.an ? ' checked' : ''}></label>
       <div class="pruef-text">
         <input type="text" class="pruef-name" data-name="${i}" value="${esc(pruefText(a))}" aria-label="${t`Name und Menge`}" autocapitalize="sentences" autocorrect="off" spellcheck="false" enterkeyhint="done">
-        <span class="pruef-abt"><span>${esc(ABT_NAME[a.abt])}</span><select data-abt="${i}" aria-label="${t`Abteilung`}">${abteilungsOptionen(a.abt)}</select></span>
+        <span class="pruef-abt"><span>${esc(abtName(a.abt))}</span><select data-abt="${i}" aria-label="${t`Abteilung`}">${abteilungsOptionen(a.abt)}</select></span>
       </div>
       ${a.grund ? `<span class="marke">${esc(a.grund)}</span>` : ''}</li>`).join('')}</ul>
     ${speichern ? `<label class="feld"><span>${t`Als Rezept speichern (optional, alle Zutaten)`}</span>
@@ -2909,12 +3157,12 @@ function oeffnePruefung(artikel, { titel = t`Was brauchst du?`, speichern = true
       const a = artikel[+t.dataset.name];
       if (!pruefAendern(a, t.value)) t.value = pruefText(a);
       $(`[data-abt="${t.dataset.name}"]`, b).value = a.abt;
-      $(`[data-abt="${t.dataset.name}"]`, b).previousElementSibling.textContent = ABT_NAME[a.abt];
+      $(`[data-abt="${t.dataset.name}"]`, b).previousElementSibling.textContent = abtName(a.abt);
     }
     if (t.dataset.abt != null) {
       const a = artikel[+t.dataset.abt];
       a.abt = t.value; a.abtManuell = true;
-      t.previousElementSibling.textContent = ABT_NAME[a.abt];
+      t.previousElementSibling.textContent = abtName(a.abt);
     }
     zaehle();
   });
@@ -2986,7 +3234,7 @@ function oeffneRezeptBearbeiten(rz, nachher) {
       <label class="feld"><span>${t`Name (abrufen mit #Name)`}</span><input type="text" id="rzName" value="${esc(rz.name)}" autocapitalize="sentences" autocorrect="off"></label>
       <div class="abschnitt">${t`Zutaten`}</div>
       <ul class="liste-einst">${rz.zutaten.map((z, i) => `<li><span style="flex:1">${esc(artikelText(z))}
-        <span class="text-muted" style="display:block;font-size:13px">${esc(ABT_NAME[z.abteilung] || '')}</span></span>
+        <span class="text-muted" style="display:block;font-size:13px">${esc(abtName(z.abteilung) || '')}</span></span>
         <button type="button" class="zurueck" data-zutat-weg="${i}" style="color:var(--danger)">${t`Entfernen`}</button></li>`).join('')}</ul>
       <form class="eingabe" id="rzNeu" style="margin-top:10px"><input id="rzNeuName" type="text" placeholder="${t`Zutat, z. B. 500 g Hackfleisch`}" autocapitalize="sentences" autocorrect="off" enterkeyhint="done"></form>
       <div class="knopfreihe">
@@ -3292,8 +3540,8 @@ function oeffneRueckmeldung(r) {
 
 const SYNC_URL_STANDARD = 'https://einkaufsliste-sync.56nr5tc89d.workers.dev';   // Worker-Adresse, siehe server/ANLEITUNG.md; zum Testen überschreibbar mit localStorage „ek.syncUrl“
 const SYNC_URL = (() => { try { return localStorage.getItem('ek.syncUrl') || SYNC_URL_STANDARD; } catch (e) { return SYNC_URL_STANDARD; } })().replace(/\/+$/, '');
-const SYNC_SAMMLUNGEN = ['liste', 'verlauf', 'korrekturen', 'eans', 'profile', 'rezepte', 'karten', 'geraete'];
-const SYNC_LISTEN = ['liste', 'profile', 'rezepte', 'karten'];      // Arrays mit id, der Rest sind Objekte mit Schlüssel
+const SYNC_SAMMLUNGEN = ['liste', 'verlauf', 'korrekturen', 'eans', 'profile', 'rezepte', 'karten', 'geraete', 'abteilungen'];
+const SYNC_LISTEN = ['liste', 'profile', 'rezepte', 'karten', 'abteilungen'];      // Arrays mit id, der Rest sind Objekte mit Schlüssel
 const SYNC_GRABSTEIN_TAGE = 60;
 const SYNC = { stand: null, doc: null, laeuft: false, nochmal: false, zeitgeber: null, fehler: '', online: true };
 
@@ -3486,10 +3734,10 @@ function syncAnwenden(doc) {
   if (kanonisch(doc) === vorher) return false;
   SYNC.anwenden = true;
   try {
-    for (const name of SYNC_SAMMLUNGEN) {
-      S[name] = ausDokument(doc, name, S[name]);
-      sichere(name, S[name]);
-    }
+    for (const name of SYNC_SAMMLUNGEN) S[name] = ausDokument(doc, name, S[name]);
+    aktualisiereAbteilungen();
+    pruefeListe();
+    for (const name of SYNC_SAMMLUNGEN) sichere(name, S[name]);
     if (!S.profile.length) S.profile = standardProfile();
     if (!S.profile.some(p => p.id === S.aktivesProfil)) { S.aktivesProfil = S.profile[0].id; sichere('aktivesProfil', S.aktivesProfil); }
   } finally { SYNC.anwenden = false; }
@@ -4018,6 +4266,72 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
   pruefe('Listenzeile mit Abteilung', zeileHTML(probe, true).includes(esc(ABT_NAME.molkerei)), true);
   pruefe('Listenzeile ohne Abteilung', zeileHTML(probe, false).includes(esc(ABT_NAME.molkerei)), false);
 
+  // Reihenfolge der Listenansicht
+  {
+    S.liste = ['Milch', 'Brot', 'Käse'].map((name, i) => ({ id: 'r' + i, name, abteilung: 'molkerei', erledigt: false }));   // ältere Fassung ohne pos
+    pruefeListe();
+    const namen = () => S.liste.map(i => i.name);
+    pruefe('Reihenfolge: alte Liste bekommt Positionen', S.liste.map(i => i.pos), [1, 2, 3]);
+    verschiebeArtikel('r2', null, 'r0');
+    pruefe('Reihenfolge: nach oben gezogen', namen(), ['Käse', 'Milch', 'Brot']);
+    verschiebeArtikel('r2', 'r0', 'r1');
+    pruefe('Reihenfolge: in die Mitte gezogen, nur ein Feld geändert', [namen(), S.liste.map(i => i.pos)], [['Milch', 'Käse', 'Brot'], [1, 1.5, 2]]);
+    verschiebeArtikel('r0', 'r1', null);
+    pruefe('Reihenfolge: nach unten gezogen', namen(), ['Käse', 'Brot', 'Milch']);
+    S.liste[0].pos = S.liste[1].pos = 5;   // gleiche Positionen, z. B. von zwei Geräten
+    verschiebeArtikel('r0', S.liste[0].id, S.liste[1].id);
+    pruefe('Reihenfolge: gleiche Positionen werden neu verteilt', [namen(), new Set(S.liste.map(i => i.pos)).size], [['Käse', 'Milch', 'Brot'], 3]);
+    hinzufuegen('Eier');
+    pruefe('Reihenfolge: Neues kommt ans Ende', namen().at(-1), 'Eier');
+    S.einstellungen.ansicht = 'liste'; S.profile = standardProfile(); S.aktivesProfil = 'supermarkt'; render();
+    pruefe('Reihenfolge: Listenansicht zeigt sie', $$('#main .zeile .name').map(e => e.textContent), ['Käse', 'Milch', 'Brot', 'Eier']);
+    // Lange drücken und ziehen: Käse unter Brot
+    const zeile = n => $$('#main .zeile').find(z => $('.name', z).textContent === n);
+    const beruehre = (art, el, y) => { const t = new Touch({ identifier: 1, target: el, clientX: 60, clientY: y });
+      el.dispatchEvent(new TouchEvent(art, { touches: art === 'touchend' ? [] : [t], changedTouches: [t], bubbles: true, cancelable: true })); };
+    const kaese = $('.item', zeile('Käse')), y0 = kaese.getBoundingClientRect().top + 20, h = zeile('Käse').offsetHeight;
+    beruehre('touchstart', kaese, y0);
+    await new Promise(ok => setTimeout(ok, 500));
+    pruefe('Ziehen: Zeile nach langem Drücken angehoben', zeile('Käse').classList.contains('hebt'), true);
+    for (let y = y0; y <= y0 + 2 * h + 5; y += 10) beruehre('touchmove', kaese, y);
+    beruehre('touchend', kaese, y0 + 2 * h + 5);
+    pruefe('Ziehen: neue Reihenfolge', [namen(), $$('#main .zeile .name').map(e => e.textContent)], [['Milch', 'Brot', 'Käse', 'Eier'], ['Milch', 'Brot', 'Käse', 'Eier']]);
+    const brot = $('.item', zeile('Brot')), yb = brot.getBoundingClientRect().top + 20;
+    beruehre('touchstart', brot, yb); beruehre('touchmove', brot, yb + 30);   // sofort bewegt: Rollen, kein Ziehen
+    await new Promise(ok => setTimeout(ok, 500));
+    beruehre('touchend', brot, yb + 30);
+    pruefe('Ziehen: ohne langes Drücken bleibt alles', [!!$('.zeile.hebt'), namen()], [false, ['Milch', 'Brot', 'Käse', 'Eier']]);
+    S.liste = []; S.profile = [];
+  }
+
+  // Eigene Abteilungen und Namen je Laden
+  {
+    S.profile = standardProfile(); S.aktivesProfil = 'supermarkt'; S.abteilungen = []; S.korrekturen = {}; S.verlauf = {};
+    const [markt, dm] = S.profile;
+    const asia = legeAbteilungAn('Asia');
+    pruefe('Abteilung: angelegt, vor Sonstiges', [ABT_IDS.includes(asia), ABT_IDS.at(-1), laufweg(markt).slice(-2)], [true, 'sonstiges', [asia, 'sonstiges']]);
+    const x = hinzufuegen('Kokosmilch'); setzeAbteilung(x, asia);
+    pruefe('Abteilung: Artikel zugeordnet und gelernt', [x.abteilung, klassifiziere('Kokosmilch').abt], [asia, asia]);
+    pruefe('Abteilung: in der Auswahl', abteilungsOptionen(asia).includes(`value="${asia}" selected>Asia<`), true);
+    S.einstellungen.ansicht = 'laden'; render();
+    pruefe('Abteilung: Gruppe in der Laden-Ansicht', $$('#main .gruppe h2 span:first-child').map(e => e.textContent), ['Asia']);
+    benenneAbteilung(markt, 'molkerei', 'Kühlregal');
+    pruefe('Umbenennen: nur in diesem Laden', [abtName('molkerei', markt), abtName('molkerei', dm), ABT_NAME.molkerei], ['Kühlregal', ABT_NAME.molkerei, ABT_NAME.molkerei]);
+    benenneAbteilung(markt, 'molkerei', ' ');
+    pruefe('Umbenennen: leer heißt ursprünglicher Name', [abtName('molkerei', markt), 'namen' in markt], [ABT_NAME.molkerei, false]);
+    benenneAbteilung(dm, asia, 'Asia & Internationales');
+    pruefe('Umbenennen: eigene Abteilung überall', [abtName(asia, markt), abtName(asia, dm)], ['Asia & Internationales', 'Asia & Internationales']);
+    pruefe('Abteilung: wird synchronisiert', [SYNC_SAMMLUNGEN.includes('abteilungen'), SYNC_LISTEN.includes('abteilungen')], [true, true]);
+    S.liste.push({ id: 'fremd', name: 'Sojasauce', abteilung: 'e-unbekannt', erledigt: false });   // Abteilung auf anderem Gerät gelöscht
+    pruefeListe();
+    pruefe('Abteilung: unbekannte wird neu bestimmt', S.liste.find(i => i.id === 'fremd').abteilung, 'konserven');
+    loescheAbteilung(asia);
+    pruefe('Abteilung gelöscht: Artikel neu einsortiert', [ABT_IDS.includes(asia), x.abteilung, klassifiziere('Kokosmilch').abt, markt.reihenfolge.includes(asia)],
+      [false, 'konserven', 'konserven', false]);
+    S.liste = []; S.abteilungen = []; aktualisiereAbteilungen(); S.profile = []; S.korrekturen = {}; S.verlauf = {};
+    S.einstellungen = standardEinstellungen();
+  }
+
   // Ganze Liste löschen: nur nach Bestätigung, Rückgängig stellt alles wieder her
   const echtConfirm = window.confirm;
   S.liste = []; hinzufuegen('Milch'); hinzufuegen('Brot');
@@ -4202,6 +4516,43 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
     }
     pruefe('Karten: alte Karte ohne Format gilt als QR-Code', kartenFormat({ inhalt: 'x' }), 'qr_code');
     pruefe('Karten: EAN-13 mit 95 Modulen', eanBits('4006381333931').length, 95);
+
+    // Scanner mit Kamera: ein Canvas mit Strichcode spielt die Kamera. zxing wirft zuerst unerwartete Fehler,
+    // die Suche muss trotzdem weiterlaufen. Gestartet über den Knopf oben (früher landete dort das Klick-Ereignis in beiQr).
+    const bild = new Image();
+    bild.src = URL.createObjectURL(new Blob([codeSvg('4006381333931', 'ean_13')], { type: 'image/svg+xml' }));
+    await bild.decode();
+    const leinwand = document.createElement('canvas'); leinwand.width = 1280; leinwand.height = 720;
+    const lctx = leinwand.getContext('2d');
+    const male = () => { lctx.fillStyle = '#fff'; lctx.fillRect(0, 0, 1280, 720); lctx.drawImage(bild, 290, 210, 700, 233); };
+    male();
+    const maler = setInterval(male, 50);
+    const kamera = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+    if (!navigator.mediaDevices) Object.defineProperty(navigator, 'mediaDevices', { value: {}, configurable: true });
+    navigator.mediaDevices.getUserMedia = async () => leinwand.captureStream(20);
+    const echt = ZXing.MultiFormatReader.prototype.decodeWithState;
+    let stoerungen = 0;
+    ZXing.MultiFormatReader.prototype.decodeWithState = function (...a) { if (stoerungen < 3) { stoerungen++; throw new Error('ArrayIndexOutOfBounds'); } return echt.apply(this, a); };
+    const detektor2 = Object.getOwnPropertyDescriptor(window, 'BarcodeDetector');
+    if (detektor2) delete window.BarcodeDetector;
+    const eans = S.eans;
+    S.eans = { '4006381333931': { name: 'Teststift', abt: 'haushalt' } };   // ohne Netz
+    try {
+      $('#btnScan').click();
+      let blatt = null;
+      for (let i = 0; i < 100 && !blatt; i++) { await new Promise(ok => setTimeout(ok, 100)); blatt = $$('.hinterlegt').find(b => $('#bcName', b)); }
+      pruefe('Scanner: Kamera-Scan trotz Lesefehlern, Knopf oben öffnet den Barcode-Modus',
+        [stoerungen, !!$('.scanner'), blatt && $('#bcName', blatt).value], [3, false, 'Teststift']);
+      if (blatt) blatt.remove();
+    } finally {
+      clearInterval(maler);
+      ZXing.MultiFormatReader.prototype.decodeWithState = echt;
+      if (kamera) navigator.mediaDevices.getUserMedia = kamera; else delete navigator.mediaDevices.getUserMedia;
+      if (detektor2) Object.defineProperty(window, 'BarcodeDetector', detektor2);
+      S.eans = eans;
+      $$('.scanner').forEach(e => e.remove());
+      document.body.style.overflow = '';
+    }
   }
 
   // Sprachen: Übersetzungen vollständig, Platzhalter passen

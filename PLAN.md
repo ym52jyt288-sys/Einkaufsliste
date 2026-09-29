@@ -1,6 +1,6 @@
 # Einkaufsliste – Plan und Stand
 
-## Stand — 28.09.2026
+## Stand — 29.09.2026
 
 **Online unter https://ym52jyt288-sys.github.io/Einkaufsliste/** (GitHub Pages, Repo `ym52jyt288-sys/Einkaufsliste`, Branch `main`).
 Selbsttest online 80/80 (Stand Erstveröffentlichung). Prüfung auf dem iPhone durch den Nutzer steht noch aus.
@@ -325,6 +325,34 @@ getrennten Läden einkauft. Neu:
   stehen“: **Platz behalten** (Standard, wie oben) oder **Ausblenden** (bisheriges Verhalten: fällt weg, häufig gekaufte
   rücken nach). `einstellungen.chips.aufListe` = `behalten` | `ausblenden`, gilt nur für dieses Gerät. Selbsttest 267/267.
   `sw.js` VERSION `einkauf-22`.
+
+### Runde 16 (29.09.2026): Listenreihenfolge, eigene Abteilungen, Scanner-Bugfix
+- **Reihenfolge in der Listenansicht**: Zeile lange drücken (450 ms), dann ziehen. Nur offene Artikel, Abgehakte bleiben
+  unten. Am oberen/unteren Rand rollt die Seite mit. Bewegt sich der Finger vorher (Wischen, Rollen), passiert nichts. Das
+  Wischen ruht während des Ziehens (`SORTIEREN`). Gespeichert wird die Reihenfolge im Feld **`pos`** jedes Artikels, damit sie
+  synchronisiert wird (vorher galt nur die lokale Array-Reihenfolge). `verschiebeArtikel()` setzt nur beim gezogenen Artikel
+  eine Position zwischen den neuen Nachbarn. Zwei Geräte, die gleichzeitig umsortieren, kommen sich so nicht in die Quere.
+  `pruefeListe()` (läuft in `sichereListe`, beim Laden und nach dem Abgleich) sortiert nach `pos` und vergibt fehlende
+  Positionen. Die Reihenfolge gilt auch innerhalb der Abteilungen in der Laden-Ansicht.
+- **Eigene Abteilungen** (Laden-Profil → „Abteilung hinzufügen“): neue synchronisierte Sammlung `abteilungen`
+  (`[{ id: 'e-…', name }]`, auch in der Sicherung). Eine eigene Abteilung gibt es in allen Läden, jeweils vor „Sonstiges“
+  (`laufweg(p)`), und dort lässt sie sich verschieben oder ausblenden. Farbe neutral wie Sonstiges. Löschen (nur eigene) entfernt
+  sie aus allen Läden, vergisst gelernte Zuordnungen und sortiert betroffene Artikel neu ein. `ABT_IDS`/`ABT_NAME` sind jetzt
+  veränderlich (`aktualisiereAbteilungen()`); unbekannte Abteilungs-IDs (z. B. auf einem anderen Gerät gelöscht) werden neu bestimmt.
+- **Abteilungen umbenennen**: Namen im Laufweg antippen. Mitgelieferte Abteilungen bekommen einen Namen **nur für diesen Laden**
+  (`p.namen = { abtId: name }`, leer = ursprünglicher Name). Eigene Abteilungen haben einen Namen für alle Läden. Angezeigt
+  wird überall `abtName(a)` mit dem aktiven Laden.
+- **Bugfix Scanner** („bricht ab ohne Fehlermeldung“): Seit Runde 13 übergab der Scan-Knopf oben das Klick-Ereignis als
+  `beiQr`. Der Scanner lief deshalb im Kundenkarten-Modus und warf nach dem Treffer einen TypeError, nachdem er sich schon
+  geschlossen hatte: Er verschwand kommentarlos. Außerdem beendete zxings `decodeContinuously` die Suche still bei jedem
+  Lesefehler außer „nicht gefunden“/Prüfsumme/Format. Jetzt gibt es eine eigene Leseschleife (`scanLeser`), die jedes Bild neu
+  versucht. Nach 25 Fehlern in Folge erscheint ein Hinweis, eine beendete Kamera zeigt „Tippen, um neu zu starten“. Weitere Fixes:
+  Die Kamera geht aus, wenn während der Freigabe abgebrochen wurde; „Nummer eingeben“ nimmt Leerzeichen/Bindestriche und meldet
+  ungültige Eingaben; die Produktsuche fängt Fehler ab, statt mit Ladekreis hängen zu bleiben.
+- Selbsttest 288/288 (neu: Positionen, Ziehen mit Touch-Ereignissen, eigene Abteilungen, Umbenennen, Löschen, Kamera-Scan
+  mit Canvas als Kamera und gestörtem Leser über den echten Knopf; mit der alten Knopf-Bindung schlägt er fehl).
+  `sw.js` VERSION `einkauf-24`.
+- Offen, nur auf dem iPhone prüfbar: langes Drücken und Ziehen in Safari (Textauswahl/Callout sind abgeschaltet), Kamera-Scan.
 
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
