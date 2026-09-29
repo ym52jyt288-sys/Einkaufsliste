@@ -358,6 +358,10 @@ getrennten Läden einkauft. Neu:
 - 2D-Codes (QR, Aztec, Data Matrix) an der Kasse jetzt so groß wie in Apple Wallet: `min(48vw, 30vh, 210px)` statt
   `min(88vw, 58vh, 480px)`, auf dem iPhone ≈ 190 pt mit Ruhezone, Code selbst ≈ 35 % der Breite. Zu große Codes lesen
   Kassenscanner schlechter. Strichcodes unverändert. `sw.js` VERSION `einkauf-25`.
+- **Bugfix Update kam nicht an**: Der Service Worker holte die Seite „erst Netz“, aber über den HTTP-Cache des Browsers.
+  GitHub Pages sendet `max-age=600`, also sah die App bis zu 10 Minuten lang die alte Fassung, auch nach Neustart. Jetzt
+  `fetch(url, { cache: 'no-cache' })` für Seite, Katalog und Sprachpakete und `cache: 'reload'` beim Installieren. Geprüft mit
+  lokalem Server mit `max-age=600`: geänderte `index.html` ist nach einem Neuladen sofort da. `sw.js` VERSION `einkauf-26`.
 
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |

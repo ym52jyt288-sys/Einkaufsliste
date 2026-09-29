@@ -1,10 +1,11 @@
 // Service Worker: hält die App offline verfügbar (z. B. bei schlechtem Empfang im Laden).
 // Bei jeder Änderung an den Dateien VERSION erhöhen, damit das iPhone die neue Fassung lädt.
-const VERSION = 'einkauf-25';
+const VERSION = 'einkauf-26';
 const DATEIEN = ['./', 'index.html', 'katalog.js', 'sprache-en.js', 'sprache-fr.js', 'sprache-es.js', 'vendor/zxing.min.js', 'vendor/qrcode.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(DATEIEN)).then(() => self.skipWaiting()));
+  // cache: 'reload' – am HTTP-Cache vorbei, sonst landen bis zu 10 Minuten alte Dateien im neuen Cache (GitHub Pages: max-age=600)
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(DATEIEN.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {
@@ -18,10 +19,11 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
-  // Seite, Katalog und Sprachpakete: erst Netz (damit Updates ankommen), sonst Cache
+  // Seite, Katalog und Sprachpakete: erst Netz (damit Updates ankommen), sonst Cache.
+  // cache: 'no-cache' fragt immer beim Server nach; ohne das lieferte der HTTP-Cache bis zu 10 Minuten die alte Seite.
   if (e.request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('katalog.js') || /sprache-\w+\.js$/.test(url.pathname)) {
     e.respondWith(
-      fetch(e.request)
+      fetch(e.request.url, { cache: 'no-cache' })
         .then(r => { const kopie = r.clone(); caches.open(VERSION).then(c => c.put(e.request, kopie)); return r; })
         .catch(() => caches.match(e.request, { ignoreSearch: true }).then(r => r || caches.match('index.html')))
     );
