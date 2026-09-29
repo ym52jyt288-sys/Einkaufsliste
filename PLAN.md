@@ -354,6 +354,11 @@ getrennten Läden einkauft. Neu:
   `sw.js` VERSION `einkauf-24`.
 - Offen, nur auf dem iPhone prüfbar: langes Drücken und Ziehen in Safari (Textauswahl/Callout sind abgeschaltet), Kamera-Scan.
 
+### Anpassung 29.09.2026: Kundenkarte kleiner
+- 2D-Codes (QR, Aztec, Data Matrix) an der Kasse jetzt so groß wie in Apple Wallet: `min(48vw, 30vh, 210px)` statt
+  `min(88vw, 58vh, 480px)`, auf dem iPhone ≈ 190 pt mit Ruhezone, Code selbst ≈ 35 % der Breite. Zu große Codes lesen
+  Kassenscanner schlechter. Strichcodes unverändert. `sw.js` VERSION `einkauf-25`.
+
 ### Abweichungen vom Entwurf unten
 | Thema | Entwurf | Umsetzung |
 |---|---|---|

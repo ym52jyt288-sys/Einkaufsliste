@@ -388,7 +388,8 @@
   .kartenansicht .ka-mitte { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 0; }
   .kartenansicht h2 { margin: 0; font-size: 26px; }
   .kartenansicht .ka-name { margin: 2px 0 0; color: #555; }
-  .kartenansicht .ka-code { width: min(88vw, 58vh, 480px); margin: 18px 0 10px; }
+  /* 2D-Codes so groß wie in Apple Wallet (weißes Feld ≈ 44 % der Breite): größer lesen Kassenscanner schlechter */
+  .kartenansicht .ka-code { width: min(48vw, 30vh, 210px); margin: 18px 0 10px; }
   .kartenansicht .ka-code.strich { width: min(94vw, 640px); }
   .kartenansicht .ka-code.strich svg { height: min(30vh, 34vw); }
   .kartenansicht .ka-nummer { margin: 0; font: 17px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; overflow-wrap: anywhere; }
