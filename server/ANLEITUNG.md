@@ -49,6 +49,20 @@ Einstellungen → Synchronisieren der Knopf „Synchronisierung einrichten“ ak
 Im Worker **Settings → Triggers → Cron Triggers** → **Add**, z. B. `0 3 * * 1` (montags 3 Uhr). Dann löscht der Worker
 Haushalte, die ein Jahr lang niemand benutzt hat.
 
+## Nutzungsstatistik (statistik.html)
+Die App meldet einmal pro Tag eine zufällige Geräte-ID an den Worker (nicht den Gerätenamen, keine Listen) und ob
+die Synchronisierung an ist. Das Dashboard `statistik.html` zeigt daraus die Geräte der letzten 7 und 30 Tage.
+Einmalig einrichten:
+1. D1-Datenbank `einkauf` → **Console**, diese Zeile einfügen → **Execute**:
+   ```sql
+   CREATE TABLE IF NOT EXISTS besuch (tag TEXT NOT NULL, geraet TEXT NOT NULL, sync INTEGER NOT NULL, PRIMARY KEY (tag, geraet));
+   ```
+2. Im Worker **Edit code**: den Inhalt von [`worker.js`](worker.js) neu einfügen → **Deploy**.
+3. Im Worker **Settings → Variables and Secrets** → **Add** → Typ **Secret**, Name `STAT_TOKEN`, Wert: ein langes
+   zufälliges Passwort → **Deploy**. Ohne dieses Secret bleibt die Statistik gesperrt.
+4. `https://ym52jyt288-sys.github.io/Einkaufsliste/statistik.html` öffnen, unter „Zugang“ das Token eintragen.
+   (Die Seite ist öffentlich erreichbar, zeigt ohne Token aber nichts.)
+
 ## Gut zu wissen
 - **Kosten**: Das Gratis-Kontingent von Workers und D1 reicht für einen Haushalt um ein Vielfaches: Die App fragt
   höchstens alle 10 Sekunden nach, und nur solange sie offen ist. Die aktuellen Grenzen stehen bei Cloudflare unter

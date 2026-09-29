@@ -3569,6 +3569,7 @@ async function starteSync(schluessel, modus) {
     for (const name of SYNC_SAMMLUNGEN) erfasse(SYNC.doc, name, S[name], t0);
   }
   sichereSync();
+  zaehleNutzung();
   await synchronisiere();
 }
 
@@ -3788,10 +3789,24 @@ function oeffneBeitreten(schluessel) {
 
 // Auslöser: Start, zurück in die App, wieder online, alle 10 s solange offen
 function starteSyncZeitgeber() {
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') planeSync(100); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { planeSync(100); zaehleNutzung(); } });
   addEventListener('online', () => planeSync(100));
   setInterval(() => { if (document.visibilityState === 'visible' && syncAn()) synchronisiere().catch(() => {}); }, 10000);
   if (syncAn()) planeSync(300);
+}
+
+// Nutzungszähler (statistik.html): einmal pro Tag eine zufällige Geräte-ID an den Server, dazu ob Sync an ist.
+// Nicht der Gerätename, keine Listen, nichts sonst. Erneut nur, wenn sich Tag oder Sync-Zustand ändern.
+function zaehleNutzung() {
+  if (!SYNC_URL || !/\.github\.io$/.test(location.hostname)) return;
+  try {
+    let id = localStorage.getItem(SPEICHER_PREFIX + 'zaehler');
+    if (!/^[A-Za-z0-9_-]{22}$/.test(id || '')) localStorage.setItem(SPEICHER_PREFIX + 'zaehler', id = b64url(crypto.getRandomValues(new Uint8Array(16))));
+    const stand = new Date().toISOString().slice(0, 10) + (syncAn() ? '+' : '');
+    if (localStorage.getItem(SPEICHER_PREFIX + 'gezaehlt') === stand) return;
+    fetch(`${SYNC_URL}/z`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ geraet: id, sync: syncAn() }) })
+      .then(r => { if (r.ok) localStorage.setItem(SPEICHER_PREFIX + 'gezaehlt', stand); }).catch(() => {});
+  } catch (e) {}
 }
 
 /* ============================================================
@@ -4284,6 +4299,7 @@ if (new URLSearchParams(location.search).has('test')) {
   render();
   linkAusAdresse();
   starteSyncZeitgeber();
+  zaehleNutzung();
   addEventListener('hashchange', linkAusAdresse);
   if (S.einstellungen.standort) waehleLadenPerStandort(false);
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

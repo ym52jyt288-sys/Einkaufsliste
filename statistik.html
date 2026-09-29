@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Einkaufsliste Statistik</title>
+<!-- Nutzungs-Dashboard: liest /statistik vom Sync-Worker (server/worker.js). Braucht das Worker-Secret STAT_TOKEN,
+     siehe server/ANLEITUNG.md. Adresse und Token bleiben nur in diesem Browser (localStorage). -->
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f4f2; --surface: #fcfcfb; --line: #e4e3df; --grid: #ecebe7;
+    --text: #0b0b0b; --text2: #52514e; --muted: #7a7974;
+    --serie: #2a78d6; --serie-hell: #2a78d633; --fehler: #c62828;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #111110; --surface: #1a1a19; --line: #2e2e2c; --grid: #262624;
+      --text: #ffffff; --text2: #c3c2b7; --muted: #8f8e87;
+      --serie: #3987e5; --serie-hell: #3987e533; --fehler: #ef6b6b;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #111110; --surface: #1a1a19; --line: #2e2e2c; --grid: #262624;
+    --text: #ffffff; --text2: #c3c2b7; --muted: #8f8e87;
+    --serie: #3987e5; --serie-hell: #3987e533; --fehler: #ef6b6b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  h1 { font-size: 22px; margin: 0; }
+  h2 { font-size: 16px; margin: 0 0 2px; }
+  .sub { color: var(--text2); font-size: 13px; margin: 0; }
+  button, input { font: inherit; color: inherit; }
+  button { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button:hover { background: var(--surface); }
+  .karte { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 16px; }
+  .kacheln { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 14px 0 18px; }
+  .kachel { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .kachel .zahl { font-size: 30px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .kachel .was { color: var(--text2); font-size: 13px; }
+  .diagramm { position: relative; }
+  .diagramm svg { display: block; overflow: visible; }
+  .diagramm .achse { fill: var(--muted); font-size: 11px; }
+  .diagramm .gitter { stroke: var(--grid); stroke-width: 1; }
+  .diagramm .balken { fill: var(--serie); }
+  .diagramm .spalte:hover .balken, .diagramm .spalte.aktiv .balken { opacity: .8; }
+  .diagramm .spalte:hover .treffer, .diagramm .spalte.aktiv .treffer { fill: var(--serie-hell); }
+  .diagramm .treffer { fill: transparent; }
+  .tipp { position: absolute; pointer-events: none; background: var(--text); color: var(--bg); font-size: 12px; padding: 6px 9px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -100%); margin-top: -8px; display: none; }
+  .tipp b { font-variant-numeric: tabular-nums; }
+  details { margin-top: 10px; color: var(--text2); font-size: 13px; }
+  summary { cursor: pointer; }
+  table { border-collapse: collapse; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 3px 12px 3px 0; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  form { display: grid; gap: 10px; }
+  label { display: grid; gap: 4px; font-size: 13px; color: var(--text2); }
+  input { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
+  .fehler { color: var(--fehler); }
+  .hinweis { color: var(--muted); font-size: 12px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Einkaufsliste – Nutzung</h1>
+      <p class="sub" id="stand">&nbsp;</p>
+    </div>
+    <div>
+      <button type="button" id="neuLaden">Aktualisieren</button>
+      <button type="button" id="zugang">Zugang</button>
+    </div>
+  </header>
+
+  <section class="karte" id="einstellungen" hidden>
+    <h2>Zugang</h2>
+    <p class="sub">Worker-Adresse und das Secret <code>STAT_TOKEN</code> aus Cloudflare. Bleibt nur in diesem Browser gespeichert.</p>
+    <form id="formular" style="margin-top:12px">
+      <label>Worker-Adresse <input id="fUrl" type="url" required></label>
+      <label>Token <input id="fToken" type="password" required autocomplete="off"></label>
+      <div><button type="submit">Speichern und laden</button></div>
+    </form>
+  </section>
+
+  <p class="fehler" id="fehler" hidden></p>
+
+  <div id="inhalt" hidden>
+    <section class="karte">
+      <h2>App (GitHub-Seite)</h2>
+      <p class="sub">Geräte, die die App geöffnet haben – jedes Gerät zählt pro Zeitraum einmal.</p>
+      <div class="kacheln">
+        <div class="kachel"><div class="zahl" id="kGeraete7">–</div><div class="was">Geräte, letzte 7 Tage</div></div>
+        <div class="kachel"><div class="zahl" id="kGeraeteHeute">–</div><div class="was">Geräte heute</div></div>
+      </div>
+      <div class="diagramm" id="dGeraete"></div>
+    </section>
+
+    <section class="karte">
+      <h2>Synchronisierung (Cloudflare)</h2>
+      <p class="sub">Geräte mit eingeschalteter Synchronisierung und Haushalte (gemeinsame Listen).</p>
+      <div class="kacheln">
+        <div class="kachel"><div class="zahl" id="kSync7">–</div><div class="was">Sync-Geräte, letzte 7 Tage</div></div>
+        <div class="kachel"><div class="zahl" id="kHaushalte7">–</div><div class="was">Haushalte mit Änderungen, 7 Tage</div></div>
+        <div class="kachel"><div class="zahl" id="kHaushalte">–</div><div class="was">Haushalte insgesamt</div></div>
+      </div>
+      <div class="diagramm" id="dSync"></div>
+    </section>
+
+    <details>
+      <summary>Tabelle der letzten 30 Tage</summary>
+      <table id="tabelle"><thead><tr><th>Tag (UTC)</th><th>Geräte</th><th>davon Sync</th></tr></thead><tbody></tbody></table>
+    </details>
+
+    <p class="hinweis">Gezählt wird eine zufällige ID je App-Installation, einmal pro Tag (UTC). Wer die Browserdaten löscht
+      oder die App auf dem Home-Bildschirm und in Safari getrennt nutzt, zählt als weiteres Gerät. Zählt erst ab der
+      App-Version mit Nutzungszähler.</p>
+  </div>
+</main>
+
+<script>
+const URL_STANDARD = 'https://einkaufsliste-sync.56nr5tc89d.workers.dev';
+const lies = k => { try { return localStorage.getItem('ek.statistik.' + k) || ''; } catch (e) { return ''; } };
+const schreib = (k, v) => { try { localStorage.setItem('ek.statistik.' + k, v); } catch (e) {} };
+const $ = id => document.getElementById(id);
+
+const TAG = 864e5;
+const tagVon = ms => new Date(ms).toISOString().slice(0, 10);
+const kurz = tag => { const [, m, d] = tag.split('-'); return `${+d}.${+m}.`; };
+const wochentag = tag => new Date(tag + 'T12:00:00Z').toLocaleDateString('de-DE', { weekday: 'short', timeZone: 'UTC' });
+
+function zeigeZugang(offen) {
+  $('einstellungen').hidden = !offen;
+  if (offen) { $('fUrl').value = lies('url') || URL_STANDARD; $('fToken').value = lies('token'); }
+}
+
+async function lade() {
+  const url = (lies('url') || URL_STANDARD).replace(/\/+$/, ''), token = lies('token');
+  if (!token) return zeigeZugang(true);
+  $('fehler').hidden = true;
+  $('stand').textContent = 'Lade …';
+  try {
+    const r = await fetch(url + '/statistik', { headers: { authorization: 'Bearer ' + token }, cache: 'no-store' });
+    if (r.status === 404) throw new Error('Kein Zugriff: Token falsch, STAT_TOKEN im Worker nicht gesetzt oder Worker noch nicht aktualisiert.');
+    if (!r.ok) throw new Error('Server antwortet mit ' + r.status + '. Fehlt die Tabelle „besuch“ in D1?');
+    zeige(await r.json());
+  } catch (e) {
+    $('fehler').textContent = e.message === 'Failed to fetch' || e.name === 'TypeError' ? 'Worker nicht erreichbar: ' + url : e.message;
+    $('fehler').hidden = false;
+    $('stand').textContent = '';
+  }
+}
+
+let DATEN = null;
+function zeige(d) {
+  DATEN = d;
+  $('inhalt').hidden = false;   // vor dem Zeichnen, sonst haben die Diagramme noch keine Breite
+  // Lückenlos 30 Tage bis heute (Tage ohne Besuche = 0)
+  const nachTag = Object.fromEntries(d.tage.map(t => [t.tag, t]));
+  const ende = Date.parse(d.heute + 'T00:00:00Z');
+  const tage = Array.from({ length: 30 }, (_, i) => {
+    const tag = tagVon(ende - (29 - i) * TAG), t = nachTag[tag] || {};
+    return { tag, geraete: t.geraete || 0, sync: t.sync || 0 };
+  });
+  const zahl = n => n.toLocaleString('de-DE');
+  $('kGeraete7').textContent = zahl(d.geraete7);
+  $('kGeraeteHeute').textContent = zahl(tage[29].geraete);
+  $('kSync7').textContent = zahl(d.sync7);
+  $('kHaushalte7').textContent = zahl(d.haushalte7);
+  $('kHaushalte').textContent = zahl(d.haushalte);
+  balken($('dGeraete'), tage, 'geraete', 'Geräte');
+  balken($('dSync'), tage, 'sync', 'Sync-Geräte');
+  $('tabelle').tBodies[0].innerHTML = tage.slice().reverse()
+    .map(t => `<tr><td>${wochentag(t.tag)} ${kurz(t.tag)}</td><td>${t.geraete}</td><td>${t.sync}</td></tr>`).join('');
+  $('stand').textContent = 'Stand ' + new Date().toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+// Tägliche Balken der letzten 30 Tage, eine Achse, Hover-Tooltip je Tag
+function balken(el, tage, feld, name) {
+  const B = Math.max(280, el.clientWidth), H = 180, links = 28, unten = 22, oben = 6;
+  const max = Math.max(1, ...tage.map(t => t[feld]));
+  const schritt = max <= 4 ? 1 : Math.ceil(max / 4 / (max > 20 ? 5 : 1)) * (max > 20 ? 5 : 1);
+  const obenWert = Math.ceil(max / schritt) * schritt;
+  const y = v => oben + (H - oben - unten) * (1 - v / obenWert);
+  const breite = (B - links) / tage.length, bb = Math.max(4, breite - 4);
+  let svg = '';
+  for (let v = 0; v <= obenWert; v += schritt)
+    svg += `<line class="gitter" x1="${links}" x2="${B}" y1="${y(v)}" y2="${y(v)}"/><text class="achse" x="${links - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  tage.forEach((t, i) => {
+    const x = links + i * breite + (breite - bb) / 2, h = y(0) - y(t[feld]), r = Math.min(4, bb / 2, h);
+    const form = h > 0 ? `<path class="balken" d="M${x},${y(0)} V${y(t[feld]) + r} Q${x},${y(t[feld])} ${x + r},${y(t[feld])} H${x + bb - r} Q${x + bb},${y(t[feld])} ${x + bb},${y(t[feld]) + r} V${y(0)} Z"/>` : '';
+    const beschriftung = (i % 7 === 29 % 7) ? `<text class="achse" x="${x + bb / 2}" y="${H - 6}" text-anchor="middle">${kurz(t.tag)}</text>` : '';
+    svg += `<g class="spalte" data-i="${i}"><rect class="treffer" x="${links + i * breite}" y="${oben}" width="${breite}" height="${H - oben - unten}" rx="3"/>${form}${beschriftung}</g>`;
+  });
+  el.innerHTML = `<svg viewBox="0 0 ${B} ${H}" width="${B}" height="${H}" role="img" aria-label="${name} pro Tag, letzte 30 Tage">${svg}</svg><div class="tipp"></div>`;
+  const tipp = el.querySelector('.tipp'), svgEl = el.querySelector('svg');
+  const zeigeTipp = g => {
+    el.querySelectorAll('.spalte.aktiv').forEach(a => a.classList.remove('aktiv'));
+    if (!g) { tipp.style.display = 'none'; return; }
+    g.classList.add('aktiv');
+    const t = tage[+g.dataset.i];
+    tipp.innerHTML = `${wochentag(t.tag)} ${kurz(t.tag)} · <b>${t[feld]}</b> ${name}`;
+    tipp.style.left = Math.min(Math.max(links + (+g.dataset.i + .5) * breite, 80), B - 80) + 'px';
+    tipp.style.top = y(t[feld]) + 'px';
+    tipp.style.display = 'block';
+  };
+  svgEl.addEventListener('pointermove', e => zeigeTipp(e.target.closest('.spalte')));
+  svgEl.addEventListener('pointerleave', () => zeigeTipp(null));
+}
+
+$('zugang').onclick = () => zeigeZugang($('einstellungen').hidden);
+$('neuLaden').onclick = lade;
+$('formular').onsubmit = e => {
+  e.preventDefault();
+  schreib('url', $('fUrl').value.trim()); schreib('token', $('fToken').value.trim());
+  zeigeZugang(false); lade();
+};
+lade();
+let warte;
+addEventListener('resize', () => { clearTimeout(warte); warte = setTimeout(() => DATEN && zeige(DATEN), 150); });
+</script>
+</body>
+</html>
