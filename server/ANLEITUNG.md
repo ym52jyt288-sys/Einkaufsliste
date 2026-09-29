@@ -47,7 +47,7 @@ Einstellungen → Synchronisieren der Knopf „Synchronisierung einrichten“ ak
 
 ## Optional: alte Räume aufräumen
 Im Worker **Settings → Triggers → Cron Triggers** → **Add**, z. B. `0 3 * * 1` (montags 3 Uhr). Dann löscht der Worker
-Haushalte, die ein Jahr lang niemand benutzt hat.
+Haushalte, die drei Monate lang niemand benutzt hat (jedes Gerät meldet sich beim Öffnen der App, das zählt als Benutzung).
 
 ## Nutzungsstatistik (statistik.html)
 Die App meldet einmal pro Tag eine zufällige Geräte-ID an den Worker (nicht den Gerätenamen, keine Listen) und ob

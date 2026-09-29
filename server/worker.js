@@ -21,9 +21,9 @@ export default {
     catch (e) { return new Response(JSON.stringify({ fehler: 'Server' }), { status: 500, headers: { 'access-control-allow-origin': '*', 'content-type': 'application/json' } }); }
   },
 
-  // Optional (Cron-Trigger, z. B. einmal pro Woche): Räume löschen, die ein Jahr lang niemand benutzt hat
+  // Optional (Cron-Trigger, z. B. einmal pro Woche): Räume löschen, die drei Monate lang niemand benutzt hat
   async scheduled(_, env) {
-    await env.DB.prepare('DELETE FROM raum WHERE geaendert < ?').bind(Date.now() - 365 * TAG).run();
+    await env.DB.prepare('DELETE FROM raum WHERE geaendert < ?').bind(Date.now() - 90 * TAG).run();
     await env.DB.prepare('DELETE FROM besuch WHERE tag < ?').bind(tagVon(Date.now() - 400 * TAG)).run();
   },
 };
