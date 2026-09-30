@@ -270,6 +270,8 @@
     '{0} Artikel hinzufügen': 'Add {0} items',
     '{0} und Rezept speichern': '{0} and save recipe',
     'Nur Rezept speichern': 'Save recipe only',
+    "Nur als Rezept speichern": "Save as recipe only",
+    "Bitte einen Namen für das Rezept eingeben": "Please enter a name for the recipe",
     'Rezept gespeichert, abrufen mit #{0}': 'Recipe saved, call it up with #{0}',
     'Es gibt schon ein Rezept „#{0}“. Ersetzen?': 'There is already a recipe “#{0}”. Replace it?',
     'Name (abrufen mit #Name)': 'Name (call up with #Name)',

@@ -272,6 +272,8 @@
     '{0} Artikel hinzufügen': 'Ajouter {0} articles',
     '{0} und Rezept speichern': '{0} et enregistrer la recette',
     'Nur Rezept speichern': 'Enregistrer seulement la recette',
+    "Nur als Rezept speichern": "Enregistrer seulement comme recette",
+    "Bitte einen Namen für das Rezept eingeben": "Saisis un nom pour la recette",
     'Rezept gespeichert, abrufen mit #{0}': 'Recette enregistrée, rappelez-la avec #{0}',
     'Es gibt schon ein Rezept „#{0}“. Ersetzen?': 'La recette « #{0} » existe déjà. La remplacer ?',
     'Name (abrufen mit #Name)': 'Nom (rappel avec #Nom)',

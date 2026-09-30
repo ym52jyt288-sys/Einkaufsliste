@@ -370,6 +370,15 @@ getrennten Läden einkauft. Neu:
   sonst richtig. Offen: Geschwindigkeit und Qualität mit echten Kochbuchfotos auf dem iPhone.
 - Selbsttest 290/290. `sw.js` VERSION `einkauf-28`.
 
+### Runde 18 (30.09.2026): Nur als Rezept speichern, Aufzählungszeichen bei der Texterkennung
+- **Prüfblatt**: zweiter Knopf „Nur als Rezept speichern“ (`#pNurRezept`). Er speichert alle Zutaten als Rezept, ohne etwas auf die Liste
+  zu setzen. Ohne Namen gibt es einen Hinweis und das Namensfeld bekommt den Fokus. Ist nichts angehakt, erledigt das der Hauptknopf, dann ist er ausgeblendet.
+- **`ocrAufraeumen`**: Tesseract liest Aufzählungszeichen als beliebige Zeichen (● → „®“/„e“, ■ → „=“, ✓ → „Y“, ○ → „o“/„°“, • im
+  Fließtext → „+“, · → „-“). Diese werden am Zeilenanfang entfernt und mitten in der Zeile zu Zeilenumbrüchen (`OCR_PUNKT`). Spannen wie
+  „1 - 2“ bleiben. „Zutaten: 250 g Mehl …“ in einer Zeile wird erkannt.
+- Geprüft mit Testbildern (untereinander mit ●■✓–○▪», in einer Zeile mit • · | ● ■, HTML-Listen disc/square/circle): alle Zutaten erkannt.
+- Selbsttest 293/293. `sw.js` VERSION `einkauf-29`.
+
 ### Anpassung 29.09.2026: Kundenkarte kleiner
 - 2D-Codes (QR, Aztec, Data Matrix) an der Kasse jetzt so groß wie in Apple Wallet: `min(48vw, 30vh, 210px)` statt
   `min(88vw, 58vh, 480px)`, auf dem iPhone ≈ 190 pt mit Ruhezone, Code selbst ≈ 35 % der Breite. Zu große Codes lesen

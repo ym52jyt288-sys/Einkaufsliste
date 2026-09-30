@@ -3153,7 +3153,8 @@ function oeffnePruefung(artikel, { titel = t`Was brauchst du?`, speichern = true
       ${a.grund ? `<span class="marke">${esc(a.grund)}</span>` : ''}</li>`).join('')}</ul>
     ${speichern ? `<label class="feld"><span>${t`Als Rezept speichern (optional, alle Zutaten)`}</span>
       <input type="text" id="pRezept" placeholder="${t`Name, z. B. Chili sin Carne`}" autocapitalize="sentences" autocorrect="off" enterkeyhint="done"></label>` : ''}
-    <div class="knopfreihe"><button type="button" class="knopf" id="pOk"></button></div>`);
+    <div class="knopfreihe"><button type="button" class="knopf" id="pOk"></button>
+      ${speichern ? `<button type="button" class="knopf zweit" id="pNurRezept">${t`Nur als Rezept speichern`}</button>` : ''}</div>`);
   const rezeptName = () => speichern ? $('#pRezept', b).value.trim().replace(/^#+\s*/, '') : '';
   const zaehle = () => {
     const n = $$('input[data-i]:checked', b).length;
@@ -3161,6 +3162,7 @@ function oeffnePruefung(artikel, { titel = t`Was brauchst du?`, speichern = true
     const anzahl = n === 1 ? t`1 Artikel hinzufügen` : t`${n} Artikel hinzufügen`;
     k.textContent = rezeptName() ? (n ? t`${anzahl} und Rezept speichern` : t`Nur Rezept speichern`) : anzahl;
     k.disabled = !n && !rezeptName();
+    if (speichern) $('#pNurRezept', b).hidden = !n && !!rezeptName();   // dann macht das schon der Hauptknopf
   };
   zaehle();
   b.addEventListener('change', e => {
@@ -3181,6 +3183,14 @@ function oeffnePruefung(artikel, { titel = t`Was brauchst du?`, speichern = true
   });
   b.addEventListener('input', zaehle);
   b.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.dataset.name != null) { e.preventDefault(); e.target.blur(); } });
+  // Speichert das Rezept, ohne etwas auf die Liste zu setzen (alle Zutaten, wie beim Hauptknopf)
+  if (speichern) $('#pNurRezept', b).onclick = () => {
+    const name = rezeptName();
+    if (!name) { zeigeToast(t`Bitte einen Namen für das Rezept eingeben`); $('#pRezept', b).focus(); return; }
+    if (!rezeptSpeichern(name, artikel)) return;
+    schliesseBlatt(b);
+    zeigeToast(t`Rezept gespeichert, abrufen mit #${name}`);
+  };
   $('#pOk', b).onclick = () => {
     const name = rezeptName();
     if (name && !rezeptSpeichern(name, artikel)) return;
@@ -3314,12 +3324,27 @@ async function textAusFoto(datei, fortschritt = () => {}) {
   } finally { worker.terminate(); }
 }
 
-// Erkannten Text vorsortieren: alles vor der Überschrift „Zutaten“ weg (Titel, Portionen), Aufzählungszeichen weg
-// (Tesseract liest Punkte oft als „*“ oder „+“)
+// Erkannten Text vorsortieren. Tesseract liest Aufzählungszeichen als beliebige Zeichen: ● als „®“ oder „e“, ■ als „=“,
+// ✓ als „Y“, ○ als „o“ oder „°“, • im Fließtext als „+“, · als „-“. Solche Einzelzeichen werden zu Zeilenumbrüchen.
+// Außerdem fällt alles vor der Überschrift „Zutaten“ weg (Titel, Portionen).
+const OCR_PUNKT = String.raw`[*+•·»«>~=|©®°¢■▪●○◦►▶➢✓✔□☐◆◇–—\-]`;
 function ocrAufraeumen(text) {
-  let zeilen = text.split('\n').map(z => z.replace(/^\s*[*+•·»>~=-]+\s*/, '').trim());
-  const kopf = zeilen.findIndex(z => /^(zutaten|ingredients|ingrédients|ingredientes)\b[^a-zäöüß]*$/i.test(z));
-  if (kopf >= 0) zeilen = zeilen.slice(kopf + 1);
+  let zeilen = text.split('\n').flatMap(z => z
+    // mitten in der Zeile: Symbol zwischen Leerzeichen nach einem Wort (nicht „1 - 2“), oder ein einzelner Buchstabe vor einer Menge
+    .replace(new RegExp(String.raw`([^\d\s])\s+${OCR_PUNKT}+\s+`, 'g'), '$1\n')
+    .replace(/([^\d\s])\s+[eoyY®©]\s+(?=\d)/g, '$1\n')
+    .split('\n'))
+    .map(z => z.trim()
+      .replace(new RegExp(String.raw`^${OCR_PUNKT}+\s*`), '')                 // Symbol am Zeilenanfang
+      .replace(/^[a-zA-ZäöüÄÖÜ®©]\s+(?=[\dA-ZÄÖÜ])/, '')                  // einzelnes Zeichen vor Menge oder Großbuchstabe: „e 3 Eier“
+      .replace(new RegExp(String.raw`\s+${OCR_PUNKT}+$`), '')                 // Symbol am Zeilenende
+      .trim());
+  const KOPF = /^(zutaten|ingredients|ingrédients|ingredientes)\b[^a-zäöüß\d]*/i;
+  const kopf = zeilen.findIndex(z => KOPF.test(z));
+  if (kopf >= 0) {
+    const rest = zeilen[kopf].replace(KOPF, '').trim();   // „Zutaten: 250 g Mehl …“ in einer Zeile
+    zeilen = [...(rest ? [rest] : []), ...zeilen.slice(kopf + 1)];
+  }
   return zeilen.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -4317,6 +4342,11 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
   pruefe('Teilen: Link mitten im Text erkannt', await dekodiere(linkAus(`Hier die Liste:\n${probeLink}\nDanke!`).daten), probeObj);
   pruefe('Foto: Text aufgeräumt', ocrAufraeumen('Spaghetti Bolognese\nFür 4 Personen\nZutaten\n* 500 g Spaghetti\n+ 1 Zwiebel\n\n\n\n• Parmesan'), '500 g Spaghetti\n1 Zwiebel\n\nParmesan');
   pruefe('Foto: ohne Überschrift bleibt alles', ocrAufraeumen('Mehl\n- Zucker'), 'Mehl\nZucker');
+  pruefe('Foto: Aufzählungszeichen als Buchstaben', ocrAufraeumen('Zutaten\n\n® 250 g Mehl\ne 3 Eier\n= 1 Prise Salz\nY 200 ml Milch\n— 50 g Butter\no Zucker\n° Zimt'),
+    '250 g Mehl\n3 Eier\n1 Prise Salz\n200 ml Milch\n50 g Butter\nZucker\nZimt');
+  pruefe('Foto: Aufzählung in einer Zeile', ocrAufraeumen('Zutaten: 250 g Mehl + 3 Eier + 1 Prise Salz + 200 ml Milch - 50 g Butter -\nZucker | 1 Päckchen Backpulver e 2 Äpfel = Zimt'),
+    '250 g Mehl\n3 Eier\n1 Prise Salz\n200 ml Milch\n50 g Butter\nZucker\n1 Päckchen Backpulver\n2 Äpfel\nZimt');
+  pruefe('Foto: Spannen und Wörter bleiben', ocrAufraeumen('1 - 2 Zwiebeln\nSalz und Pfeffer\na pinch of salt'), '1 - 2 Zwiebeln\nSalz und Pfeffer\na pinch of salt');
   pruefe('Teilen: Rücklink erkannt', linkAus('https://x.de/#r=zAbCd-_12').art, 'r');
   pruefe('Teilen: normaler Text ist kein Link', linkAus('Milch, Brot'), null);
   S.liste = []; hinzufuegen('Milch'); hinzufuegen('Brot'); hinzufuegen('Deo'); hinzufuegen('Käse');

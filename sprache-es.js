@@ -273,6 +273,8 @@
     '{0} Artikel hinzufügen': 'Añadir {0} artículos',
     '{0} und Rezept speichern': '{0} y guardar receta',
     'Nur Rezept speichern': 'Guardar solo la receta',
+    "Nur als Rezept speichern": "Guardar solo como receta",
+    "Bitte einen Namen für das Rezept eingeben": "Escribe un nombre para la receta",
     'Rezept gespeichert, abrufen mit #{0}': 'Receta guardada, llámala con #{0}',
     'Es gibt schon ein Rezept „#{0}“. Ersetzen?': 'Ya existe una receta «#{0}». ¿Sustituirla?',
     'Name (abrufen mit #Name)': 'Nombre (llamar con #Nombre)',
