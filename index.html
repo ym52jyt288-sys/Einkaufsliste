@@ -562,7 +562,7 @@ const S = {
 
 function standardEinstellungen() {
   return {
-    ansicht: 'liste', apiKey: '', standort: false,
+    ansicht: 'liste', standort: false,
     sprache: 'auto',                                        // auto (Gerätesprache) | de | en | fr | es
     abteilungInListe: true,                                 // Abteilungsname neben dem Artikel in der Listenansicht
     thema: 'system',                                        // system | light | dark
@@ -587,6 +587,7 @@ function ladeAlles() {
   aktualisiereAbteilungen();
   const std = standardEinstellungen(), gel = lade('einstellungen', {});
   S.einstellungen = { ...std, ...gel, farben: { ...std.farben, ...(gel.farben || {}) }, chips: { ...std.chips, ...(gel.chips || {}) } };
+  if ('apiKey' in S.einstellungen) { delete S.einstellungen.apiKey; sichereEinstellungen(); }   // Rezeptfotos per Claude-API gibt es nicht mehr
   pruefeListe();
   if (!S.verlauf) {
     S.verlauf = {};
@@ -1784,8 +1785,8 @@ function oeffneEinstellungen(start = 'haupt') {
       <div class="abschnitt">${t`Erweitert`}</div>
       <ul class="liste-einst">
         ${zeile('sync', t`Synchronisieren`, !syncAn() ? t`Aus` : andereGeraete().length ? t`Mit ${andereGeraete().length} Geräten` : t`An`)}
-        ${zeile('foto', t`Rezept-Fotos`, e.apiKey ? t`Eingerichtet` : t`Aus`)}
         ${zeile('daten', t`Daten`)}
+        ${zeile('datenschutz', t`Datenschutz`)}
       </ul>`;
     },
     laeden: () => `
@@ -1872,10 +1873,18 @@ function oeffneEinstellungen(start = 'haupt') {
         <button type="button" class="knopf gefahr" id="eSyncNeu">${t`Neuen Schlüssel erzeugen`}</button>
       </div>
       <p class="text-muted">${t`Ein neuer Schlüssel trennt alle anderen Geräte. Sie müssen neu eingeladen werden.`}</p>`,
-    foto: () => `
-      <label class="feld"><span>${t`Claude-API-Schlüssel (bleibt nur auf diesem Gerät)`}</span>
-        <input type="password" id="eApiKey" value="${esc(S.einstellungen.apiKey)}" placeholder="sk-ant-…" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-      <p class="text-muted">${t`Ohne Schlüssel funktioniert „Zutaten übernehmen“ per Text weiterhin. Mit Schlüssel kostet ein Rezeptfoto etwa 2–3 Cent.`}</p>`,
+    datenschutz: () => `
+      <div class="abschnitt">${t`Wo deine Daten liegen`}</div>
+      <p class="text-muted">${t`Liste, Verlauf, Rezepte, Läden, Kundenkarten und Einstellungen liegen nur auf diesem Gerät, im Speicher der App. Es gibt kein Konto und keine Anmeldung.`}</p>
+      <div class="abschnitt">${t`Wie sie übertragen werden`}</div>
+      <p class="text-muted">${t`Ohne Synchronisierung verlässt keine Liste dein Gerät. Mit Synchronisierung werden die Daten auf dem Gerät verschlüsselt (AES-256), bevor sie an den Server gehen. Der Schlüssel steckt nur in der Einladung (QR-Code oder Link) und geht nie an den Server. Der Server kann die Daten nicht lesen.`}</p>
+      <p class="text-muted">${t`Einzelne Funktionen fragen Dienste im Internet, aber nur, wenn du sie benutzt: Barcode-Scan (Open Food Facts: die Nummer), Karte für Läden (OpenStreetMap: Kartenausschnitt und Suchtext). Der Standort wird nur auf dem Gerät ausgewertet. Auch Rezeptfotos erkennt die App auf dem Gerät: Beim ersten Mal lädt sie dafür die Texterkennung herunter, das Foto selbst wird nicht übertragen.`}</p>
+      <p class="text-muted">${t`Eine geteilte Liste steckt unverschlüsselt im Link. Wer den Link hat, kann sie lesen.`}</p>
+      <div class="abschnitt">${t`Wie sie gesichert sind`}</div>
+      <p class="text-muted">${t`Auf dem Gerät gilt der Schutz deines iPhones, zum Beispiel der Sperrcode. Die App verschlüsselt lokal nichts zusätzlich. Die Sicherungsdatei (Einstellungen → Daten) ist unverschlüsselt, bewahre sie entsprechend auf.`}</p>
+      <p class="text-muted">${t`Auf dem Server liegt nur der verschlüsselte Block. Ein Haushalt, den drei Monate lang niemand benutzt hat, wird dort automatisch gelöscht. Mit „Neuen Schlüssel erzeugen“ verlieren alle anderen Geräte den Zugriff.`}</p>
+      <div class="abschnitt">${t`Anonyme Nutzungsstatistik`}</div>
+      <p class="text-muted">${t`Damit sichtbar wird, wie viele Geräte die App nutzen, sendet sie höchstens einmal am Tag eine zufällige Kennung und ob die Synchronisierung an ist. Die Kennung ist keine Gerätekennung des iPhones und mit keinem Namen, keiner Liste und keinem Ort verknüpft. Übertragen werden keine Artikel, Listen, Standorte oder Namen. Gezählt werden nur aktive Geräte je Tag.`}</p>`,
     daten: () => `
       <div class="knopfreihe">
         <button type="button" class="knopf zweit" id="eExport">${t`Sicherung exportieren`}</button>
@@ -1886,7 +1895,7 @@ function oeffneEinstellungen(start = 'haupt') {
       <p class="text-muted" style="margin-top:20px">${t`${Object.keys(S.verlauf).length} Artikel im Verlauf · ${Object.keys(S.korrekturen).length} gelernte Zuordnungen · ${INDEX_KEYS.length} Katalogbegriffe`}</p>`,
   };
   const titel = { haupt: t`Einstellungen`, laeden: t`Läden`, stamm: t`Stammartikel`, rezepte: t`Rezepte`, karten: t`Kundenkarten`, darstellung: t`Darstellung`,
-    schnell: t`Schnellauswahl`, sprache: t`Sprache`, sync: t`Synchronisieren`, foto: t`Rezept-Fotos`, daten: t`Daten` };
+    schnell: t`Schnellauswahl`, sprache: t`Sprache`, sync: t`Synchronisieren`, daten: t`Daten`, datenschutz: t`Datenschutz` };
   const zeichne = () => {
     const kopf = seite === 'haupt'
       ? `<div class="blatt-kopf unter"><span></span><button type="button" class="zurueck" data-schliessen>${t`Fertig`}</button></div>`
@@ -2038,7 +2047,6 @@ function oeffneEinstellungen(start = 'haupt') {
     if (e.target.id === 'eAbtListe') { S.einstellungen.abteilungInListe = e.target.checked; sichereEinstellungen(); }
     if (e.target.id === 'eChips') { S.einstellungen.chips.an = e.target.checked; sichereEinstellungen(); zeichne(); }
     if (e.target.id === 'eStandort') { S.einstellungen.standort = e.target.checked; sichereEinstellungen(); if (e.target.checked) waehleLadenPerStandort(true); }
-    if (e.target.id === 'eApiKey') { S.einstellungen.apiKey = e.target.value.trim(); sichereEinstellungen(); }
     if (e.target.id === 'eImportDatei' && e.target.files[0]) importieren(e.target.files[0], zeichne);
   });
   b._beimSchliessen = () => { document.removeEventListener('sync', beiSync); render(); };
@@ -2218,7 +2226,7 @@ function ziehbar(ul, beiEnde) {
 /* Sicherung */
 async function exportieren() {
   const daten = { version: 1, exportiert: new Date().toISOString(), liste: S.liste, verlauf: S.verlauf, korrekturen: S.korrekturen,
-    eans: S.eans, profile: S.profile, aktivesProfil: S.aktivesProfil, rezepte: S.rezepte, karten: S.karten, abteilungen: S.abteilungen, einstellungen: { ...S.einstellungen, apiKey: '' } };
+    eans: S.eans, profile: S.profile, aktivesProfil: S.aktivesProfil, rezepte: S.rezepte, karten: S.karten, abteilungen: S.abteilungen, einstellungen: S.einstellungen };
   const name = `einkaufsliste-${new Date().toISOString().slice(0, 10)}.json`;
   const datei = new File([JSON.stringify(daten, null, 1)], name, { type: 'application/json' });
   if (navigator.canShare && navigator.canShare({ files: [datei] })) {
@@ -2240,7 +2248,8 @@ async function importieren(datei, nachher) {
     S.karten = Array.isArray(d.karten) ? d.karten : S.karten;
     S.abteilungen = Array.isArray(d.abteilungen) ? d.abteilungen : S.abteilungen;
     aktualisiereAbteilungen();   // vor dem Speichern der Liste, damit eigene Abteilungen erkannt werden
-    S.einstellungen = { ...S.einstellungen, ...(d.einstellungen || {}), apiKey: S.einstellungen.apiKey };
+    S.einstellungen = { ...S.einstellungen, ...(d.einstellungen || {}) };
+    delete S.einstellungen.apiKey;
     sichereListe(); sichereVerlauf(); sichere('korrekturen', S.korrekturen); sichere('eans', S.eans); sichereProfile(); sichereEinstellungen(); sichereRezepte(); sichereKarten(); sichereAbteilungen();
     if (ermittleSprache() !== SPRACHE) return location.reload();   // Sicherung mit anderer Sprache
     zeigeToast(t`Sicherung eingespielt`); nachher(); render();
@@ -3067,19 +3076,21 @@ function rezeptArtikel(namen) {
 }
 
 function oeffneRezept() {
-  const mitKey = !!S.einstellungen.apiKey;
   const b = oeffneBlatt(`
     <div class="blatt-kopf"><h3>${t`Rezept übernehmen`}</h3><button type="button" class="zurueck" data-schliessen>${t`Abbrechen`}</button></div>
     ${S.rezepte.length ? `<div class="feld"><span>${t`Gespeicherte Rezepte`}</span><div class="chips">${S.rezepte.map(x =>
       `<button type="button" class="chip" data-rezept-abruf="${x.id}">#${esc(x.name)}</button>`).join('')}</div></div>` : ''}
-    <p class="text-muted">${t`Im Foto oder Screenshot die Zutaten markieren (Text gedrückt halten), kopieren und hier einfügen.`}</p>
     <label class="feld"><span>${t`Zutaten`}</span><textarea id="rText" placeholder="${t`200 g Spaghetti&#10;2 Zehen Knoblauch&#10;1 Bund Basilikum`}"></textarea></label>
     <div class="knopfreihe">
       <button type="button" class="knopf" id="rWeiter">${t`Zutaten übernehmen`}</button>
-      <button type="button" class="knopf zweit" id="rFoto">${mitKey ? t`Foto wählen und erkennen lassen` : t`Foto erkennen lassen (API-Schlüssel nötig)`}</button>
+      <button type="button" class="knopf zweit" id="rFoto">${t`Foto auswählen`}</button>
     </div>
     <input type="file" id="rDatei" accept="image/*" hidden>
-    <p class="text-muted" id="rStatus"></p>`);
+    <p class="text-muted" id="rStatus"></p>
+    <div class="abschnitt">${t`So kommen die Zutaten ins Feld`}</div>
+    <p class="text-muted">${t`Mit der Kamera: Ins Feld „Zutaten“ tippen, noch einmal tippen und „Text scannen“ wählen. Dann die Kamera auf die Zutatenliste halten und „Einsetzen“ tippen.`}</p>
+    <p class="text-muted">${t`Aus einem Foto oder Screenshot: Den Text im Bild gedrückt halten, die Zutaten markieren, kopieren und hier einfügen.`}</p>
+    <p class="text-muted">${t`Oder „Foto auswählen“: Die App liest den Text selbst, auf dem Gerät. Das Ergebnis erscheint im Feld und kann vor dem Übernehmen korrigiert werden.`}</p>`);
   b.addEventListener('click', e => {
     const x = e.target.closest('[data-rezept-abruf]');
     const rz = x && S.rezepte.find(y => y.id === x.dataset.rezeptAbruf);
@@ -3091,24 +3102,25 @@ function oeffneRezept() {
     schliesseBlatt(b);
     setTimeout(() => oeffnePruefung(rezeptArtikel(namen)), 220);
   };
-  $('#rFoto', b).onclick = () => {
-    if (!S.einstellungen.apiKey) { schliesseBlatt(b); setTimeout(() => oeffneEinstellungen('foto'), 220); return; }
-    $('#rDatei', b).click();
-  };
+  $('#rFoto', b).onclick = () => $('#rDatei', b).click();
   $('#rDatei', b).onchange = async e => {
     const datei = e.target.files[0];
+    e.target.value = '';
     if (!datei) return;
-    const status = $('#rStatus', b);
-    status.innerHTML = '<span class="laedt"></span>' + t`Foto wird ausgewertet`;
+    const status = $('#rStatus', b), feld = $('#rText', b);
+    status.innerHTML = '<span class="laedt"></span>' + t`Texterkennung wird geladen`;
     $$('button', b).forEach(x => x.disabled = true);
     try {
-      const zutaten = await zutatenAusFoto(datei);
+      const text = await textAusFoto(datei, anteil => {
+        status.innerHTML = '<span class="laedt"></span>' + t`Text wird erkannt: ${Math.round(anteil * 100)} %`;
+      });
       if (!b.isConnected) return;
-      if (!zutaten.length) throw new Error(t`Auf dem Foto wurden keine Zutaten gefunden.`);
-      schliesseBlatt(b);
-      setTimeout(() => oeffnePruefung(rezeptArtikel(zutaten)), 220);
+      if (!parseRezept(text).length) throw new Error(t`Auf dem Foto wurde kein Text erkannt. Am besten die Zutatenliste gerade und formatfüllend fotografieren.`);
+      feld.value = text.trim();
+      status.textContent = t`Text erkannt. Bitte prüfen, Überflüssiges löschen und dann „Zutaten übernehmen“ tippen.`;
     } catch (err) {
-      status.textContent = err.message || t`Fehler bei der Erkennung.`;
+      if (b.isConnected) status.textContent = err.message || t`Fehler bei der Erkennung.`;
+    } finally {
       $$('button', b).forEach(x => x.disabled = false);
     }
   };
@@ -3272,7 +3284,11 @@ function oeffneRezeptBearbeiten(rz, nachher) {
   b._beimSchliessen = nachher;
 }
 
-async function bildAlsJPEG(datei, maxKante = 1568) {
+// Texterkennung für Rezeptfotos auf dem Gerät: Tesseract.js 7 in vendor/tesseract/ (Apache-2.0). Wird erst beim ersten Foto
+// geladen (Programm ≈ 4 MB, Sprachmodell 0,7–3 MB); das Sprachmodell speichert Tesseract danach selbst (IndexedDB).
+const OCR_SPRACHE = { de: 'deu', en: 'eng', fr: 'fra', es: 'spa' };
+
+async function bildVerkleinert(datei, maxKante = 2000) {
   const url = URL.createObjectURL(datei);
   try {
     const img = await new Promise((ok, fehler) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fehler; i.src = url; });
@@ -3280,82 +3296,31 @@ async function bildAlsJPEG(datei, maxKante = 1568) {
     const c = document.createElement('canvas');
     c.width = Math.round(img.naturalWidth * f); c.height = Math.round(img.naturalHeight * f);
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    return c.toDataURL('image/jpeg', 0.85).split(',')[1];
+    return c;
   } finally { URL.revokeObjectURL(url); }
 }
 
-async function zutatenAusFoto(datei) {
-  const daten = await bildAlsJPEG(datei);
-  const abteilungen = ABT_IDS.map(a => `${a} = ${ABT_NAME[a]}`).join('\n');
-  const antwort = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': S.einstellungen.apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'server-side-fallback-2026-07-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-opus-5',
-      max_tokens: 8000,
-      output_config: {
-        effort: 'low',
-        format: {
-          type: 'json_schema',
-          schema: {
-            type: 'object',
-            properties: {
-              zutaten: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    menge: { type: 'number' },
-                    einheit: { type: 'string', enum: EINHEITEN_MENGE },
-                    abteilung: { type: 'string', enum: ABT_IDS },
-                  },
-                  required: ['name', 'menge', 'einheit', 'abteilung'],
-                  additionalProperties: false,
-                },
-              },
-            },
-            required: ['zutaten'],
-            additionalProperties: false,
-          },
-        },
-      },
-      fallbacks: 'default',
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: daten } },
-          { type: 'text', text:
-`Das Bild zeigt ein Rezept (Foto oder Screenshot). Liste alle Zutaten als Einkaufsartikel auf. Schreibe die Artikelnamen auf ${{ de: 'Deutsch', en: 'Englisch', fr: 'Französisch', es: 'Spanisch' }[SPRACHE]}, auch wenn das Rezept in einer anderen Sprache ist.
-- Nur den Artikelnamen, so wie man ihn auf einen Einkaufszettel schreibt: "Zwiebeln" statt "2 Zwiebeln, fein gewürfelt", "Knoblauch" statt "3 Zehen Knoblauch".
-- Keine Zubereitungshinweise im Namen. Doppelte Zutaten nur einmal.
-- menge und einheit nur, wenn man die Zutat so einkauft: Gramm (g), Kilogramm (kg), Milliliter (ml), Liter (l) oder Stückzahl (stk, auch für Dose, Packung, Bund, Becher). Bei Küchenmaßen wie EL, TL, Prise, Zehe oder ohne Angabe: menge 0 und einheit "stk".
-- Ordne jede Zutat genau einer Supermarkt-Abteilung zu (id verwenden):
-${abteilungen}
-Enthält das Bild kein Rezept, gib eine leere Liste zurück.` },
-        ],
-      }],
-    }),
+async function textAusFoto(datei, fortschritt = () => {}) {
+  if (!window.Tesseract) await ladeSkript('vendor/tesseract/tesseract.min.js');
+  const basis = new URL('vendor/tesseract/', location.href).href;
+  // OEM 1 = nur LSTM; corePath als Verzeichnis: Tesseract wählt die passende Variante (mit/ohne SIMD) selbst
+  const worker = await Tesseract.createWorker(OCR_SPRACHE[SPRACHE] || 'eng', 1, {
+    workerPath: basis + 'worker.min.js', corePath: basis, langPath: basis + 'lang', workerBlobURL: false,
+    logger: m => { if (m.status === 'recognizing text') fortschritt(m.progress); },
   });
-  let d = null;
-  try { d = await antwort.json(); } catch (e) {}
-  if (!antwort.ok) {
-    const meldung = d && d.error && d.error.message;
-    if (antwort.status === 401) throw new Error(t`API-Schlüssel ungültig. Bitte in den Einstellungen prüfen.`);
-    if (antwort.status === 429 || antwort.status === 529) throw new Error(t`Claude ist gerade ausgelastet. Bitte gleich noch einmal versuchen.`);
-    throw new Error(t`Fehler ${antwort.status}` + (meldung ? ': ' + meldung : ''));
-  }
-  if (d.stop_reason === 'refusal') throw new Error(t`Die Anfrage wurde abgelehnt. Bitte den Text einfügen.`);
-  if (d.stop_reason === 'max_tokens') throw new Error(t`Die Antwort war zu lang. Bitte einen kleineren Ausschnitt fotografieren.`);
-  const text = (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('');
-  const json = JSON.parse(text);
-  return (json.zutaten || []).filter(z => z && z.name);
+  try {
+    const { data } = await worker.recognize(await bildVerkleinert(datei));
+    return ocrAufraeumen(data.text || '');
+  } finally { worker.terminate(); }
+}
+
+// Erkannten Text vorsortieren: alles vor der Überschrift „Zutaten“ weg (Titel, Portionen), Aufzählungszeichen weg
+// (Tesseract liest Punkte oft als „*“ oder „+“)
+function ocrAufraeumen(text) {
+  let zeilen = text.split('\n').map(z => z.replace(/^\s*[*+•·»>~=-]+\s*/, '').trim());
+  const kopf = zeilen.findIndex(z => /^(zutaten|ingredients|ingrédients|ingredientes)\b[^a-zäöüß]*$/i.test(z));
+  if (kopf >= 0) zeilen = zeilen.slice(kopf + 1);
+  return zeilen.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /* ============================================================
@@ -4350,6 +4315,8 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
   pruefe('Teilen: Kodierung unkomprimiert', await dekodiere(await kodiere(probeObj, false)), probeObj);
   const probeLink = `${appAdresse()}#l=${await kodiere(probeObj)}`;
   pruefe('Teilen: Link mitten im Text erkannt', await dekodiere(linkAus(`Hier die Liste:\n${probeLink}\nDanke!`).daten), probeObj);
+  pruefe('Foto: Text aufgeräumt', ocrAufraeumen('Spaghetti Bolognese\nFür 4 Personen\nZutaten\n* 500 g Spaghetti\n+ 1 Zwiebel\n\n\n\n• Parmesan'), '500 g Spaghetti\n1 Zwiebel\n\nParmesan');
+  pruefe('Foto: ohne Überschrift bleibt alles', ocrAufraeumen('Mehl\n- Zucker'), 'Mehl\nZucker');
   pruefe('Teilen: Rücklink erkannt', linkAus('https://x.de/#r=zAbCd-_12').art, 'r');
   pruefe('Teilen: normaler Text ist kein Link', linkAus('Milch, Brot'), null);
   S.liste = []; hinzufuegen('Milch'); hinzufuegen('Brot'); hinzufuegen('Deo'); hinzufuegen('Käse');

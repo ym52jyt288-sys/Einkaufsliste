@@ -1,6 +1,6 @@
 // Service Worker: hält die App offline verfügbar (z. B. bei schlechtem Empfang im Laden).
 // Bei jeder Änderung an den Dateien VERSION erhöhen, damit das iPhone die neue Fassung lädt.
-const VERSION = 'einkauf-26';
+const VERSION = 'einkauf-28';
 const DATEIEN = ['./', 'index.html', 'katalog.js', 'sprache-en.js', 'sprache-fr.js', 'sprache-es.js', 'vendor/zxing.min.js', 'vendor/qrcode.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -27,6 +27,14 @@ self.addEventListener('fetch', e => {
         .then(r => { const kopie = r.clone(); caches.open(VERSION).then(c => c.put(e.request, kopie)); return r; })
         .catch(() => caches.match(e.request, { ignoreSearch: true }).then(r => r || caches.match('index.html')))
     );
+    return;
+  }
+  // Texterkennung (vendor/tesseract/, ≈ 4 MB + Sprachmodell): nicht vorab, sondern beim ersten Rezeptfoto in den Cache
+  if (url.pathname.includes('/vendor/tesseract/')) {
+    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(n => {
+      if (n.ok) { const kopie = n.clone(); caches.open(VERSION).then(c => c.put(e.request, kopie)); }
+      return n;
+    })));
     return;
   }
   // Alles andere: Cache zuerst

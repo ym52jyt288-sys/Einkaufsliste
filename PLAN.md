@@ -354,6 +354,22 @@ getrennten Läden einkauft. Neu:
   `sw.js` VERSION `einkauf-24`.
 - Offen, nur auf dem iPhone prüfbar: langes Drücken und Ziehen in Safari (Textauswahl/Callout sind abgeschaltet), Kamera-Scan.
 
+### Runde 17 (30.09.2026): Datenschutzhinweis, Rezeptfotos ohne API
+- Einstellungen → Erweitert → **Datenschutz** (`seiten.datenschutz`): wo die Daten liegen, wie sie übertragen und gesichert werden, dazu ein
+  Absatz zur anonymen Nutzungsstatistik (zufällige Kennung, höchstens einmal täglich, keine Inhalte). Texte in en/fr/es übersetzt.
+- **Claude-API entfernt**: Einstellung „Rezept-Fotos“, API-Schlüssel und `zutatenAusFoto` sind weg. Ein gespeicherter Schlüssel wird beim
+  Laden gelöscht (`ladeAlles`) und aus importierten Sicherungen entfernt.
+- **Rezept-Blatt**: Anleitung für die iOS-Texterkennung („Text scannen“ im Zutatenfeld, Text im Foto markieren und kopieren).
+  Per Code auslösen lässt sich „Text scannen“ nicht.
+- **„Foto auswählen“** erkennt den Text auf dem Gerät mit Tesseract.js 7.0.0 (`vendor/tesseract/`, Apache-2.0): `textAusFoto()` lädt
+  Skript, Worker, Core (lstm / simd-lstm / relaxedsimd-lstm, je ≈ 3,9 MB, Tesseract wählt selbst) und das Sprachmodell der App-Sprache
+  (`lang/*.traineddata.gz`, 4.0.0_best_int: deu 1,3 MB, eng 3 MB, fra 0,7 MB, spa 2,1 MB). Das Ergebnis landet bereinigt
+  (`ocrAufraeumen`: alles vor „Zutaten“ und Aufzählungszeichen weg) im Textfeld, danach wie gewohnt „Zutaten übernehmen“.
+  Der Service Worker legt `vendor/tesseract/` beim ersten Abruf in den Cache (danach offline), das Sprachmodell speichert Tesseract in IndexedDB.
+- Geprüft in Headless Chrome: Rezept-Screenshot ≈ 2 s, alle 8 Zutaten richtig. Leicht gedreht und unscharf: „400 g“ als „4008“ gelesen,
+  sonst richtig. Offen: Geschwindigkeit und Qualität mit echten Kochbuchfotos auf dem iPhone.
+- Selbsttest 290/290. `sw.js` VERSION `einkauf-28`.
+
 ### Anpassung 29.09.2026: Kundenkarte kleiner
 - 2D-Codes (QR, Aztec, Data Matrix) an der Kasse jetzt so groß wie in Apple Wallet: `min(48vw, 30vh, 210px)` statt
   `min(88vw, 58vh, 480px)`, auf dem iPhone ≈ 190 pt mit Ruhezone, Code selbst ≈ 35 % der Breite. Zu große Codes lesen
