@@ -174,10 +174,11 @@
   .erledigt .check svg { opacity: 1; }
   .item .txt { flex: 1; min-width: 0; padding: 8px 0; }
   .item .name { overflow-wrap: anywhere; }
-  .item .menge { font-weight: 600; margin-right: 6px; font-variant-numeric: tabular-nums; }
+  .item .menge { font-weight: 600; margin-right: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .item .sub { display: block; font-size: 13px; color: var(--muted); margin-top: 1px; }
   .item .rechts { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; flex: none; }
   .item .stamm-ico, .item .pin-ico { width: 16px; height: 16px; }
+  .item .rezept-ico { width: 14px; height: 14px; opacity: .7; }
   .erledigt .txt { color: var(--muted); }
   .erledigt .name { text-decoration: line-through; text-decoration-color: var(--muted); }
   .zuordnen { font-size: 13px; color: var(--accent); padding: 8px 0 8px 8px; }
@@ -455,6 +456,9 @@
 <script>
 'use strict';
 
+// Versionsnummer, unten in den Einstellungen sichtbar. Bei jeder Änderung erhöhen – zusammen mit VERSION in sw.js.
+const APP_VERSION = 30;
+
 /* ============================================================
    Hilfsfunktionen
    ============================================================ */
@@ -506,6 +510,7 @@ function uebersetzeSeite() {
 const ICON_STAMM = '<svg class="ico stamm-ico" viewBox="0 0 24 24" aria-label="' + t('Stammartikel') + '"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>';
 const ICON_HAKEN = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 const ICON_PIN = '<svg class="ico pin-ico" viewBox="0 0 24 24" aria-label="' + t('Angeheftet') + '"><path d="M12 17v5"/><path d="M9 3h6l-1 5 3 3v2H7v-2l3-3z"/></svg>';
+const ICON_REZEPT = '<svg class="ico rezept-ico" viewBox="0 0 24 24" aria-label="' + t('Aus einem Rezept') + '"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/></svg>';
 const ICON_GRIFF = '<svg class="ico" viewBox="0 0 24 24"><path d="M5 9h14M5 15h14"/></svg>';
 
 /* ============================================================
@@ -881,7 +886,8 @@ function zerlegeEingabe(text) {
 const offene = () => S.liste.filter(i => !i.erledigt && !i.pausiert);
 const findeOffen = key => S.liste.find(i => !i.erledigt && kompakt(i.name) === key);
 
-function merkeVerlauf(item) {
+// mengeMerken = false: Menge/Einheit im Verlauf nicht anfassen (z. B. Rezeptmengen gelten nur für dieses eine Mal)
+function merkeVerlauf(item, mengeMerken = true) {
   const key = kompakt(item.name);
   const v = S.verlauf[key] || { name: item.name, anzahl: 0 };
   v.name = item.name;
@@ -891,8 +897,10 @@ function merkeVerlauf(item) {
   if (item.stamm) v.stamm = true;
   if (item.ean) v.ean = item.ean;
   // Gewicht/Volumen merken, damit „Hackfleisch“ beim nächsten Mal gleich mit 500 g kommt
-  if (item.einheit && item.einheit !== 'stk') { v.einheit = item.einheit; v.menge = item.menge; }
-  else { delete v.einheit; delete v.menge; }
+  if (mengeMerken) {
+    if (item.einheit && item.einheit !== 'stk') { v.einheit = item.einheit; v.menge = item.menge; }
+    else { delete v.einheit; delete v.menge; }
+  }
   S.verlauf[key] = v;
 }
 
@@ -911,9 +919,18 @@ function hinzufuegen(rohName, menge = null, extra = {}) {
   let item = S.liste.find(i => kompakt(i.name) === key && (!i.erledigt || i.stamm));
   if (item && !item.erledigt && !item.pausiert) {
     if ((item.einheit || 'stk') === einheit) item.menge = (item.menge || 1) + menge;
-    else { item.einheit = einheit; item.menge = menge; }
+    else {
+      // Rezeptmenge ersetzt die bisherige, die bisherige bleibt als Notiz sichtbar („+ 1 Stück“)
+      if (extra.einmalig) {
+        const alt = '+ ' + (mengeText(item) || zahlText(item.menge || 1)) + ((item.einheit || 'stk') === 'stk' ? ' ' + EINHEIT_NAME.stk : '');
+        item.notiz = item.notiz ? `${item.notiz}, ${alt}` : alt;
+      }
+      item.einheit = einheit; item.menge = menge;
+    }
+    if (extra.einmalig) item.rezept = true;
   } else if (item) {
     item.erledigt = false; item.pausiert = false; item.erledigtUm = null; item.menge = menge; item.einheit = einheit;
+    if (extra.einmalig) item.rezept = true; else delete item.rezept;
     item.pos = naechstePos();
     S.liste.splice(S.liste.indexOf(item), 1); S.liste.push(item);
   } else {
@@ -923,9 +940,10 @@ function hinzufuegen(rohName, menge = null, extra = {}) {
     };
     if (extra.notiz) item.notiz = extra.notiz;
     if (extra.ean) item.ean = extra.ean;
+    if (extra.einmalig) item.rezept = true;
     S.liste.push(item);
   }
-  merkeVerlauf(item);
+  merkeVerlauf(item, !extra.einmalig);
   return item;
 }
 
@@ -969,7 +987,7 @@ function einkaufAbschliessen() {
   for (const item of S.liste) {
     if (item.stamm) {
       if (item.erledigt || item.pausiert) {
-        item.erledigt = false; item.pausiert = false; item.erledigtUm = null;
+        item.erledigt = false; item.pausiert = false; item.erledigtUm = null; delete item.rezept;
         item.menge = EINHEIT_START[item.einheit || 'stk'];
         const v = S.verlauf[kompakt(item.name)];
         if (v && v.einheit === item.einheit && v.menge) item.menge = v.menge;
@@ -1218,7 +1236,7 @@ function zeileHTML(item, mitAbteilung) {
     <div class="item${item.erledigt ? ' erledigt' : ''}">
       <button type="button" class="check" data-aktion="abhaken" aria-label="${item.erledigt ? t`Zurückholen` : t`Abhaken`}"><span>${ICON_HAKEN}</span></button>
       <div class="txt" data-aktion="details">${menge}<span class="name">${esc(item.name)}</span>${sub}</div>
-      <div class="rechts">${zuordnen}${abt}${!S.geteilt && istAngeheftet(item.name) ? ICON_PIN : ''}${item.stamm ? ICON_STAMM : ''}</div>
+      <div class="rechts">${zuordnen}${abt}${!S.geteilt && istAngeheftet(item.name) ? ICON_PIN : ''}${item.stamm ? ICON_STAMM : ''}${item.rezept ? ICON_REZEPT : ''}</div>
     </div>
   </li>`;
 }
@@ -1787,7 +1805,8 @@ function oeffneEinstellungen(start = 'haupt') {
         ${zeile('sync', t`Synchronisieren`, !syncAn() ? t`Aus` : andereGeraete().length ? t`Mit ${andereGeraete().length} Geräten` : t`An`)}
         ${zeile('daten', t`Daten`)}
         ${zeile('datenschutz', t`Datenschutz`)}
-      </ul>`;
+      </ul>
+      <p class="text-muted" style="text-align:center;margin:24px 0 8px">${t`Version ${APP_VERSION}`}</p>`;
     },
     laeden: () => `
       <ul class="liste-einst">${S.profile.map(p => `<li><button type="button" class="fuellen zeile" data-profil="${p.id}"><span>${esc(p.name)}
@@ -3197,7 +3216,7 @@ function oeffnePruefung(artikel, { titel = t`Was brauchst du?`, speichern = true
     let letztes = null;
     for (const cb of $$('input[data-i]:checked', b)) {
       const a = artikel[+cb.dataset.i];
-      const item = hinzufuegen(a.name, a.menge || null, { abteilung: a.abt, einheit: a.einheit || undefined });
+      const item = hinzufuegen(a.name, a.menge || null, { abteilung: a.abt, einheit: a.einheit || undefined, einmalig: true });
       if (item && a.abtManuell) setzeAbteilung(item, a.abt);  // von Hand gewählt: für nächstes Mal merken
       letztes = item || letztes;
     }
@@ -3871,6 +3890,7 @@ function fasseDoppelteZusammen(liste) {
       if ((i.einheit || 'stk') === (bleibt.einheit || 'stk')) bleibt.menge = Math.max(bleibt.menge || 1, i.menge || 1);
       if (!bleibt.notiz && i.notiz) bleibt.notiz = i.notiz;
       if (i.stamm) bleibt.stamm = true;
+      if (i.rezept) bleibt.rezept = true;
       weg.add(i);
     }
   }
@@ -4228,8 +4248,17 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
   pruefe('Vorschläge für #', vorschlaege('#spa').map(v => v.name), ['#Spaghetti Napoli']);
   const abruf = rezeptArtikel(rezeptZutaten([findeRezept('#Spaghetti Napoli')]));
   pruefe('Rezept abrufen: Vorrat abgewählt', abruf.filter(a => !a.an).map(a => a.name), ['Olivenöl', 'Salz', 'Pfeffer']);
-  hinzufuegen('Hackfleisch', 400, { einheit: 'g' });
+  hinzufuegen('Hackfleisch', 400, { einheit: 'g', einmalig: true });
   pruefe('Rezept: Menge auf der Liste', mengeText(S.liste[0]), '400 g');
+  S.liste = []; delete S.verlauf[kompakt('Tomaten')];
+  hinzufuegen('Tomaten', 150, { einheit: 'g', einmalig: true });
+  S.liste = [];
+  pruefe('Rezeptmenge nicht gemerkt', mengeText(hinzufuegen('Tomaten')), '');
+  pruefe('Ohne Rezept kein Rezept-Symbol', !!S.liste[0].rezept, false);
+  const tom = hinzufuegen('Tomaten', 150, { einheit: 'g', einmalig: true });
+  pruefe('Rezept: andere Einheit ersetzt, bisherige als Notiz', [mengeText(tom), tom.notiz, tom.rezept], ['150 g', '+ 1 ' + EINHEIT_NAME.stk, true]);
+  pruefe('Rezept-Symbol in der Zeile', zeileHTML(tom, false).includes('rezept-ico'), true);
+  S.liste = [];
   window.confirm = echtConfirm2;
   S.rezepte = []; S.liste = [];
 
@@ -4552,6 +4581,9 @@ Die Nudeln in reichlich Salzwasser kochen und abgießen, danach alles vermengen 
       document.body.style.overflow = '';
     }
   }
+
+  const sw = await (await fetch('sw.js', { cache: 'no-store' })).text();
+  pruefe('Versionsnummer passt zu sw.js', sw.match(/VERSION = 'einkauf-(\d+)'/)?.[1], String(APP_VERSION));
 
   // Sprachen: Übersetzungen vollständig, Platzhalter passen
   const html = await (await fetch('index.html', { cache: 'no-store' })).text();

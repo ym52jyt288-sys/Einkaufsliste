@@ -1,6 +1,6 @@
 // Service Worker: hält die App offline verfügbar (z. B. bei schlechtem Empfang im Laden).
-// Bei jeder Änderung an den Dateien VERSION erhöhen, damit das iPhone die neue Fassung lädt.
-const VERSION = 'einkauf-29';
+// Bei jeder Änderung an den Dateien VERSION erhöhen, damit das iPhone die neue Fassung lädt (gleiche Zahl wie APP_VERSION in index.html).
+const VERSION = 'einkauf-30';
 const DATEIEN = ['./', 'index.html', 'katalog.js', 'sprache-en.js', 'sprache-fr.js', 'sprache-es.js', 'vendor/zxing.min.js', 'vendor/qrcode.min.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

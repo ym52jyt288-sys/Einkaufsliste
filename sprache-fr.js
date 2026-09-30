@@ -94,6 +94,8 @@
     'Erscheint, sobald du ins Eingabefeld tippst, und bei leerer Liste.': 'Apparaît dès que vous touchez le champ de saisie, et quand la liste est vide.',
     'Anzahl': 'Nombre',
     'Artikel anheften': 'Épingler un article',
+    'Version {0}': 'Version {0}',
+    'Aus einem Rezept': 'D’une recette',
     'Stammartikel': 'Articles habituels',
     'Entfernen': 'Retirer',
     'Noch keine. Artikel antippen und „Wird immer benötigt“ einschalten.': 'Aucun. Touchez un article et activez « Toujours nécessaire ».',

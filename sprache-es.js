@@ -95,6 +95,8 @@
     'Erscheint, sobald du ins Eingabefeld tippst, und bei leerer Liste.': 'Aparece en cuanto tocas el campo de texto y cuando la lista está vacía.',
     'Anzahl': 'Cantidad',
     'Artikel anheften': 'Fijar un artículo',
+    'Version {0}': 'Versión {0}',
+    'Aus einem Rezept': 'De una receta',
     'Stammartikel': 'Artículos habituales',
     'Entfernen': 'Quitar',
     'Noch keine. Artikel antippen und „Wird immer benötigt“ einschalten.': 'Ninguno. Toca un artículo y activa «Siempre hace falta».',

@@ -94,6 +94,8 @@
     'Erscheint, sobald du ins Eingabefeld tippst, und bei leerer Liste.': 'Appears as soon as you tap the input field, and when the list is empty.',
     'Anzahl': 'Number',
     'Artikel anheften': 'Pin an item',
+    'Version {0}': 'Version {0}',
+    'Aus einem Rezept': 'From a recipe',
     'Stammartikel': 'Regular items',
     'Entfernen': 'Remove',
     'Noch keine. Artikel antippen und „Wird immer benötigt“ einschalten.': 'None yet. Tap an item and turn on “Always needed”.',
